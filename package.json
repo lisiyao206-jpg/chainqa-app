@@ -1,0 +1,14 @@
+{
+  "name": "chainqa",
+  "version": "0.1.0",
+  "description": "链知答 — 面向区块链课程学习者的教材知识问答系统",
+  "type": "module",
+  "scripts": {
+    "build": "node rag.mjs build",
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

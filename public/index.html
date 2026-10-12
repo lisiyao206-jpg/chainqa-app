@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>链知答 · 区块链教材知识问答</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f6f7f9;
+    color: #1f2329;
+  }
+  .app { max-width: 860px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 24px 20px 8px; }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; color: #6b7280; font-size: 14px; }
+
+  #chat { flex: 1; padding: 12px 20px; display: flex; flex-direction: column; gap: 16px; }
+  .msg { max-width: 100%; line-height: 1.7; font-size: 15px; }
+  .msg.user { align-self: flex-end; background: #2556b6; color: #fff; padding: 10px 14px; border-radius: 14px 14px 4px 14px; max-width: 80%; }
+  .msg.bot { background: #fff; padding: 14px 18px; border-radius: 14px; }
+  .msg.bot pre { background: #f3f4f6; padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+  .msg.bot code { font-family: Consolas, Menlo, monospace; }
+  .msg.bot :not(pre) > code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; }
+  .msg.bot h3, .msg.bot h4 { margin: 12px 0 4px; }
+  .cite { display: inline-block; background: #e8eefb; color: #2556b6; font-size: 12px; padding: 0 6px; border-radius: 6px; margin: 0 1px; cursor: pointer; }
+  .refused { color: #b45309; background: #fef3c7; padding: 8px 12px; border-radius: 8px; }
+  .error { color: #b91c1c; background: #fee2e2; padding: 8px 12px; border-radius: 8px; }
+
+  .sources { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .sources-title { font-size: 13px; color: #6b7280; }
+  .source { background: #f6f7f9; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+  .source summary { cursor: pointer; }
+  .source .score { color: #9ca3af; margin-left: 6px; }
+  .source p { white-space: pre-wrap; color: #4b5563; margin: 6px 0 0; }
+  .source.flash { background: #e8eefb; }
+
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; }
+  .examples button { border: none; background: #fff; padding: 8px 14px; border-radius: 999px; cursor: pointer; font-size: 14px; color: #374151; }
+  .examples button:hover { background: #e8eefb; }
+
+  form { position: sticky; bottom: 0; display: flex; gap: 8px; padding: 16px 20px 24px; background: #f6f7f9; }
+  textarea { flex: 1; resize: none; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; font: inherit; font-size: 15px; height: 52px; }
+  textarea:focus { outline: none; border-color: #2556b6; }
+  button.send { border: none; background: #1f2329; color: #fff; border-radius: 12px; padding: 0 22px; font-size: 15px; cursor: pointer; }
+  button.send:disabled { opacity: 0.4; cursor: default; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>链知答</h1>
+    <p>面向区块链课程学习者的教材知识问答 · 每个回答都标注教材出处</p>
+  </header>
+
+  <main id="chat">
+    <div class="examples" id="examples">
+      <button>ERC20 怎么实现？</button>
+      <button>什么是 delegatecall？</button>
+      <button>重入攻击是怎么发生的？</button>
+      <button>mapping 和数组有什么区别？</button>
+    </div>
+  </main>
+
+  <form id="form">
+    <textarea id="input" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"></textarea>
+    <button class="send" id="send">提问</button>
+  </form>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// 极简 Markdown 渲染：代码块、行内代码、粗体、标题、列表、引用编号 [1]
+function renderMarkdown(md) {
+  const blocks = md.split(/```/);
+  return blocks.map((part, i) => {
+    if (i % 2 === 1) {
+      const code = part.replace(/^[\w-]*\n/, ""); // 去掉 ```solidity 这样的语言标记
+      return `<pre><code>${escapeHtml(code)}</code></pre>`;
+    }
+    return escapeHtml(part)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/^#{1,3} (.+)$/gm, "<h3>$1</h3>")
+      .replace(/^#{4,6} (.+)$/gm, "<h4>$1</h4>")
+      .replace(/^\s*[-*] (.+)$/gm, "• $1")
+      .replace(/\[(\d+)\]/g, '<span class="cite" data-n="$1">$1</span>')
+      .replace(/\n/g, "<br>");
+  }).join("");
+}
+
+function addMessage(cls, html) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.innerHTML = html;
+  chat.appendChild(div);
+  div.scrollIntoView({ behavior: "smooth", block: "end" });
+  return div;
+}
+
+function renderSources(box, sources) {
+  if (!sources.length) return;
+  const wrap = document.createElement("div");
+  wrap.className = "sources";
+  wrap.innerHTML = `<div class="sources-title">📚 引用的教材片段</div>` + sources.map((s, i) => `
+    <details class="source" id="${box.dataset.id}-src-${i + 1}">
+      <summary>[${i + 1}] ${escapeHtml(s.file)} › ${escapeHtml(s.heading)}<span class="score">相似度 ${s.score}</span></summary>
+      <p>${escapeHtml(s.text)}…</p>
+    </details>`).join("");
+  box.appendChild(wrap);
+
+  // 点击回答里的 [1]，展开并高亮对应来源
+  box.querySelectorAll(".cite").forEach((el) => {
+    el.onclick = () => {
+      const src = document.getElementById(`${box.dataset.id}-src-${el.dataset.n}`);
+      if (!src) return;
+      src.open = true;
+      src.classList.add("flash");
+      src.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => src.classList.remove("flash"), 1200);
+    };
+  });
+}
+
+let msgCount = 0;
+
+async function ask(question) {
+  document.getElementById("examples")?.remove();
+  addMessage("user", escapeHtml(question));
+  const box = addMessage("bot", "<span style='color:#9ca3af'>正在检索教材…</span>");
+  box.dataset.id = "m" + ++msgCount;
+  sendBtn.disabled = true;
+
+  let text = "";
+  const answerEl = document.createElement("div");
+  try {
+    const res = await fetch("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) throw new Error((await res.json()).error || "请求失败");
+
+    box.innerHTML = "";
+    box.appendChild(answerEl);
+
+    // 解析服务器推来的 SSE：event: xxx \n data: xxx
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop();
+      for (const raw of events) {
+        const event = raw.match(/^event: (.+)$/m)?.[1];
+        const data = JSON.parse(raw.match(/^data: (.+)$/m)?.[1] || "null");
+        if (event === "delta") {
+          text += data;
+          answerEl.innerHTML = renderMarkdown(text);
+        } else if (event === "sources") {
+          answerEl.innerHTML = renderMarkdown(text);
+          renderSources(box, data);
+        } else if (event === "refused") {
+          answerEl.innerHTML = `<div class="refused">⚠️ ${escapeHtml(data)}，为避免编造，暂不回答。可以换个说法再问。</div>`;
+        } else if (event === "error") {
+          answerEl.innerHTML += `<div class="error">出错了：${escapeHtml(data)}</div>`;
+        }
+        box.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    }
+  } catch (err) {
+    box.innerHTML = `<div class="error">出错了：${escapeHtml(err.message)}</div>`;
+  }
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+form.onsubmit = (e) => {
+  e.preventDefault();
+  const q = input.value.trim();
+  if (!q || sendBtn.disabled) return;
+  input.value = "";
+  ask(q);
+};
+input.onkeydown = (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    form.requestSubmit();
+  }
+};
+document.querySelectorAll("#examples button").forEach((b) => (b.onclick = () => ask(b.textContent)));
+</script>
+</body>
+</html>
