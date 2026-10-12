@@ -1,0 +1,11 @@
+# 密钥，绝对不能提交
+.env
+
+# 向量库，由 build 生成
+vectors.json
+
+# 开源语料，体积大且非原创
+knowledge/
+
+# 依赖
+node_modules/
