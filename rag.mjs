@@ -2,6 +2,7 @@
 // 用法:
 //   node rag.mjs build          构建知识库
 //   node rag.mjs ask "你的问题"  提问
+// 也可以被 server.mjs 导入，给网页提供问答能力。
 
 import fs from "node:fs";
 import path from "node:path";
@@ -17,7 +18,7 @@ function loadEnv() {
 loadEnv();
 
 const ZHIPU_KEY = process.env.ZHIPU_API_KEY;
-const BASE = "https://open.bigmodel.cn/api/paas/v4";
+const BASE = process.env.ZHIPU_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
 const DB_FILE = "vectors.json";
 const DOCS_DIR = "knowledge";
 
@@ -135,9 +136,18 @@ function cosine(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-async function search(question, topK = 4) {
-  if (!fs.existsSync(DB_FILE)) throw new Error("请先运行: node rag.mjs build");
-  const items = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+// 向量库只读一次，之后留在内存里（网页连续提问时不用每次重新读文件）
+let dbCache = null;
+function loadDB() {
+  if (!dbCache) {
+    if (!fs.existsSync(DB_FILE)) throw new Error("请先运行: node rag.mjs build");
+    dbCache = JSON.parse(fs.readFileSync(DB_FILE, "utf-8"));
+  }
+  return dbCache;
+}
+
+export async function search(question, topK = 4) {
+  const items = loadDB();
   const [qv] = await embed([question]);
   return items
     .map((it) => ({ ...it, score: cosine(qv, it.vector) }))
@@ -152,20 +162,13 @@ const SYSTEM_PROMPT = `你是区块链课程知识问答助手。规则：
 3. 资料不足时必须回答"知识库中未找到相关依据"，不得编造。
 4. 用中文回答，结构清晰，代码用 Markdown 代码块。`;
 
-async function ask(question) {
+// 检索 + 生成。onDelta 每收到一小段回答就被调用一次（命令行打印、网页推送都用它）
+// 返回检索结果；没有达到相似度阈值的资料时 refused 为 true，不调用大模型
+export async function answer(question, onDelta) {
   const hits = await search(question);
   const THRESHOLD = 0.35;
   const good = hits.filter((h) => h.score >= THRESHOLD);
-
-  console.log("\n🔍 检索结果：");
-  hits.forEach((h, i) =>
-    console.log(`  [${i + 1}] ${h.score.toFixed(3)} | ${h.file} > ${h.heading}`)
-  );
-
-  if (!good.length) {
-    console.log("\n⚠️  知识库中未找到相关依据，拒绝回答。\n");
-    return;
-  }
+  if (!good.length) return { hits, good, refused: true };
 
   const context = good
     .map((h, i) => `[${i + 1}] 来源：${h.file} > ${h.heading}\n${h.text}`)
@@ -184,13 +187,9 @@ async function ask(question) {
       ],
     }),
   });
+  if (!res.ok) throw new Error("生成失败: " + (await res.text()));
 
-  if (!res.ok) {
-    console.error("生成失败:", await res.text());
-    return;
-  }
-
-  console.log("\n💬 回答：\n");
+  // 智谱按 SSE 格式流式返回，每行形如 data: {...}
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -206,15 +205,37 @@ async function ask(question) {
       if (data === "[DONE]") continue;
       try {
         const delta = JSON.parse(data).choices[0]?.delta?.content;
-        if (delta) process.stdout.write(delta);
+        if (delta) onDelta(delta);
       } catch {}
     }
   }
-  console.log("\n");
+  return { hits, good, refused: false };
+}
+
+// 命令行提问：在终端打印检索结果和回答
+async function ask(question) {
+  let printedHeader = false;
+  const { hits, refused } = await answer(question, (delta) => {
+    if (!printedHeader) {
+      console.log("\n💬 回答：\n");
+      printedHeader = true;
+    }
+    process.stdout.write(delta);
+  });
+
+  console.log("\n\n🔍 检索结果：");
+  hits.forEach((h, i) =>
+    console.log(`  [${i + 1}] ${h.score.toFixed(3)} | ${h.file} > ${h.heading}`)
+  );
+  if (refused) console.log("\n⚠️  知识库中未找到相关依据，拒绝回答。");
+  console.log();
 }
 
 // ---------- 入口 ----------
-const [cmd, arg] = process.argv.slice(2);
-if (cmd === "build") build();
-else if (cmd === "ask") ask(arg || "什么是智能合约");
-else console.log('用法:\n  node rag.mjs build\n  node rag.mjs ask "你的问题"');
+// 只有直接运行 node rag.mjs 时才执行命令；被 server.mjs 导入时跳过
+if (path.basename(process.argv[1] || "") === "rag.mjs") {
+  const [cmd, arg] = process.argv.slice(2);
+  if (cmd === "build") build();
+  else if (cmd === "ask") ask(arg || "什么是智能合约");
+  else console.log('用法:\n  node rag.mjs build\n  node rag.mjs ask "你的问题"');
+}
