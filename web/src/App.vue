@@ -1,77 +1,61 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import ChatPanel from './components/ChatPanel.vue'
 
-// 左侧导航的三项：to 是要跳转的网址（对应 router.js 里的 path）
-const navs = [
-  { to: '/textbook', label: '📖 教材' },
-  { to: '/notebook', label: '📝 学习本' },
-  { to: '/game', label: '🕵️ 漏洞猎人' },
-]
+// 当前所在的页面信息（网址、标题等）
+const route = useRoute()
+// 是不是在大厅
+const inLobby = computed(() => route.path === '/')
 
 // AI 悬浮窗是否展开
 const aiOpen = ref(false)
 </script>
 
 <template>
-  <div class="layout">
-    <!-- 顶栏：左边 logo，右边个人头像 -->
+  <!-- 大厅：整屏显示，不要顶栏 -->
+  <RouterView v-if="inLobby" />
+
+  <!-- 其他页面：顶栏 + 内容 -->
+  <div v-else class="page">
     <header class="topbar">
-      <div class="logo">🔗 链知答</div>
+      <RouterLink to="/" class="back">← 返回大厅</RouterLink>
+      <div class="page-title">{{ route.meta.title }}</div>
       <div class="avatar" title="个人中心">我</div>
     </header>
 
-    <!-- 左侧导航：RouterLink 点击后跳转到对应网址 -->
-    <aside class="sidebar">
-      <RouterLink v-for="nav in navs" :key="nav.to" :to="nav.to">
-        {{ nav.label }}
-      </RouterLink>
-    </aside>
-
-    <!-- 主内容区：RouterView 会根据当前网址显示对应的页面 -->
     <main class="content">
       <RouterView />
     </main>
 
-    <!-- AI 悬浮窗 -->
-    <div v-if="aiOpen" class="ai-panel"><ChatPanel /></div>
-    <button class="ai-fab" @click="aiOpen = !aiOpen">🤖</button>
+    <!-- AI 悬浮窗：在「白帽导师」页不需要，因为整页就是对话 -->
+    <template v-if="route.path !== '/mentor'">
+      <div v-if="aiOpen" class="ai-panel"><ChatPanel /></div>
+      <button class="ai-fab" @click="aiOpen = !aiOpen">🤖</button>
+    </template>
   </div>
 </template>
 
 <style scoped>
-.layout {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  grid-template-rows: 56px 1fr;
-  height: 100vh;
-}
+.page { display: flex; flex-direction: column; height: 100vh; }
 .topbar {
-  grid-column: 1 / 3;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  height: 56px;
   padding: 0 20px;
   border-bottom: 1px solid #e5e7eb;
 }
-.logo { font-weight: bold; font-size: 18px; }
+.back { color: #2556b6; text-decoration: none; }
+.page-title { font-weight: bold; font-size: 18px; }
 .avatar {
+  justify-self: end;
   width: 36px; height: 36px; border-radius: 50%;
   background: #2556b6; color: #fff;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
 }
-.sidebar {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 12px; border-right: 1px solid #e5e7eb;
-}
-.sidebar a {
-  padding: 10px 12px; border-radius: 8px;
-  color: inherit; text-decoration: none; font-size: 15px;
-}
-/* 当前所在页面的导航项：RouterLink 会自动加上 router-link-active 这个 class */
-.sidebar a.router-link-active { background: #e8eefb; color: #2556b6; font-weight: bold; }
-.content { padding: 24px; overflow: auto; }
+.content { flex: 1; padding: 24px; overflow: auto; }
 .ai-fab {
   position: fixed; right: 24px; bottom: 24px;
   width: 56px; height: 56px; border-radius: 50%; border: none;

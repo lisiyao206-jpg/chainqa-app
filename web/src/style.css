@@ -1,0 +1,16 @@
+/* 全局样式：对所有页面生效 */
+
+/* 去掉浏览器默认的白边 */
+body {
+  margin: 0;
+}
+
+/* 让所有元素的宽高计算方式统一（加了边框和内边距也不会撑大） */
+* {
+  box-sizing: border-box;
+}
+
+/* 全站字体 */
+body {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
