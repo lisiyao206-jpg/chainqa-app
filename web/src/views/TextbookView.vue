@@ -64,7 +64,7 @@ function toggle(name) {
 <template>
   <div class="camp">
     <!-- 左侧：章节目录 -->
-    <aside class="toc">
+    <aside class="toc glass">
       <div v-if="loading" class="hint">正在加载目录…</div>
       <div v-else-if="error" class="error">{{ error }}</div>
 
@@ -91,7 +91,7 @@ function toggle(name) {
     </aside>
 
     <!-- 右侧：阅读区 -->
-    <section class="reader" ref="readerEl">
+      <section class="reader glass" ref="readerEl">
       <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
       <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
       <article v-else class="article" v-html="content"></article>
@@ -100,17 +100,33 @@ function toggle(name) {
 </template>
 
 <style scoped>
-.camp { display: flex; gap: 24px; height: 100%; }
+/* 整个训练营的底图：先铺 /camp/bg.jpg，图片还没放进来时显示下面的渐变 */
+.camp {
+  display: flex; gap: 20px; height: 100%;
+  padding: 20px; border-radius: 16px;
+  background:
+    url('/camp/bg.jpg') center / cover no-repeat,
+    linear-gradient(135deg, #c7d7fe 0%, #e9d5ff 50%, #fbcfe8 100%);
+}
+/* 毛玻璃卡片：半透明白色 + 把后面的底图模糊掉 */
+.glass {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
 .toc {
   width: 240px; flex-shrink: 0;
   overflow-y: auto;
-  border-right: 1px solid #e5e7eb; padding-right: 12px;
+  padding: 12px;
 }
 .group { margin-bottom: 6px; }
 .group-title {
   width: 100%; display: flex; align-items: center; gap: 8px;
   padding: 8px 10px; border: none; border-radius: 8px;
-  background: #f6f7f9; font-size: 14px; font-weight: bold; cursor: pointer; text-align: left;
+  background: rgba(255, 255, 255, 0.5); font-size: 14px; font-weight: bold; cursor: pointer; text-align: left;
 }
 .arrow { font-size: 10px; color: #9ca3af; transition: transform 0.2s; }
 .arrow.open { transform: rotate(90deg); }  /* 展开时箭头转 90 度，变成朝下 */
@@ -123,10 +139,10 @@ function toggle(name) {
 }
 /* 标题太长时只显示一行，末尾用 … 代替 */
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chapters li:hover { background: #f3f4f6; }
+.chapters li:hover { background: rgba(255, 255, 255, 0.6); }
 .chapters li.active { background: #e8eefb; color: #2556b6; font-weight: bold; }
 .no { flex-shrink: 0; width: 32px; color: #9ca3af; font-size: 12px; }
-.reader { flex: 1; overflow-y: auto; padding-right: 8px; }
+.reader { flex: 1; overflow-y: auto; padding: 24px 32px; }
 
 /* ===== 教材正文的排版 ===== */
 /* v-html 塞进来的内容不受 scoped 管，所以要用 :deep() 才能给它们写样式 */
@@ -149,3 +165,4 @@ function toggle(name) {
 .hint { color: #9ca3af; }
 .error { color: #b91c1c; }
 </style>
+
