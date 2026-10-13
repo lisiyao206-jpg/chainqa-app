@@ -2,14 +2,11 @@
 import { ref } from 'vue'
 import ChatPanel from './components/ChatPanel.vue'
 
-// 当前选中的导航项，默认是「教材」
-const current = ref('textbook')
-
-// 左侧导航的三项
+// 左侧导航的三项：to 是要跳转的网址（对应 router.js 里的 path）
 const navs = [
-  { key: 'textbook', label: '📖 教材' },
-  { key: 'notebook', label: '📝 学习本' },
-  { key: 'game', label: '🕵️ 漏洞猎人' },
+  { to: '/textbook', label: '📖 教材' },
+  { to: '/notebook', label: '📝 学习本' },
+  { to: '/game', label: '🕵️ 漏洞猎人' },
 ]
 
 // AI 悬浮窗是否展开
@@ -24,27 +21,20 @@ const aiOpen = ref(false)
       <div class="avatar" title="个人中心">我</div>
     </header>
 
-    <!-- 左侧导航 -->
+    <!-- 左侧导航：RouterLink 点击后跳转到对应网址 -->
     <aside class="sidebar">
-      <button
-        v-for="nav in navs"
-        :key="nav.key"
-        :class="{ active: current === nav.key }"
-        @click="current = nav.key"
-      >
+      <RouterLink v-for="nav in navs" :key="nav.to" :to="nav.to">
         {{ nav.label }}
-      </button>
+      </RouterLink>
     </aside>
 
-    <!-- 主内容区：根据 current 显示不同内容 -->
+    <!-- 主内容区：RouterView 会根据当前网址显示对应的页面 -->
     <main class="content">
-      <div v-if="current === 'textbook'">这里是章节目录</div>
-      <div v-else-if="current === 'notebook'">这里是笔记和难题</div>
-      <div v-else>这里是关卡卡片</div>
+      <RouterView />
     </main>
 
     <!-- AI 悬浮窗 -->
-    <div v-if="aiOpen" class="ai-panel"><ChatPanel />AI 对话面板（下次做）</div>
+    <div v-if="aiOpen" class="ai-panel"><ChatPanel /></div>
     <button class="ai-fab" @click="aiOpen = !aiOpen">🤖</button>
   </div>
 </template>
@@ -75,11 +65,12 @@ const aiOpen = ref(false)
   display: flex; flex-direction: column; gap: 4px;
   padding: 12px; border-right: 1px solid #e5e7eb;
 }
-.sidebar button {
-  text-align: left; padding: 10px 12px; border: none;
-  background: none; border-radius: 8px; cursor: pointer; font-size: 15px;
+.sidebar a {
+  padding: 10px 12px; border-radius: 8px;
+  color: inherit; text-decoration: none; font-size: 15px;
 }
-.sidebar button.active { background: #e8eefb; color: #2556b6; font-weight: bold; }
+/* 当前所在页面的导航项：RouterLink 会自动加上 router-link-active 这个 class */
+.sidebar a.router-link-active { background: #e8eefb; color: #2556b6; font-weight: bold; }
 .content { padding: 24px; overflow: auto; }
 .ai-fab {
   position: fixed; right: 24px; bottom: 24px;
@@ -93,4 +84,3 @@ const aiOpen = ref(false)
   padding: 16px;
 }
 </style>
-
