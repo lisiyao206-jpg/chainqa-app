@@ -31,7 +31,8 @@ if (!ZHIPU_KEY) {
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const name of fs.readdirSync(dir)) {
-    if (name.startsWith(".") || name === "Languages"|| name === "Topics") continue;
+        // 跳过：隐藏文件夹、外语副本、专题、第三方代码库（lib 里多是英文说明文件）
+    if (name.startsWith(".") || ["Languages", "Topics", "lib", "node_modules"].includes(name)) continue;
     const full = path.join(dir, name);
     if (fs.statSync(full).isDirectory()) walk(full, out);
     else if (/\.(md|txt)$/i.test(name)) out.push(full);

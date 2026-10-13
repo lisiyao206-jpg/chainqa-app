@@ -6,6 +6,7 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { answer } from "./rag.mjs";
+import { listChapters, readChapter } from "./chapters.mjs";
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = "public";
@@ -55,6 +56,28 @@ async function handleAsk(req, res) {
   res.end();
 }
 
+// 返回 JSON 的小工具
+function sendJSON(res, status, data) {
+  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(data));
+}
+
+// GET /api/chapters：章节目录（分组）
+function handleChapters(req, res) {
+  try {
+    sendJSON(res, 200, listChapters());
+  } catch (err) {
+    sendJSON(res, 500, { error: err.message });
+  }
+}
+
+// GET /api/chapters/23_Delegatecall：某一章的原文
+function handleChapter(req, res, id) {
+  const text = readChapter(decodeURIComponent(id));
+  if (text === null) return sendJSON(res, 404, { error: "没有这一章" });
+  sendJSON(res, 200, { id, text });
+}
+
 // 其余请求：返回 public/ 下的静态文件
 function handleStatic(req, res) {
   const urlPath = req.url === "/" ? "/index.html" : decodeURIComponent(req.url.split("?")[0]);
@@ -70,7 +93,10 @@ function handleStatic(req, res) {
 
 http
   .createServer((req, res) => {
+    const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
+    else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);
+    else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
     else if (req.method === "GET") handleStatic(req, res);
     else {
       res.writeHead(405);
