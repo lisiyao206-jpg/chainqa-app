@@ -1,8 +1,14 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useNotesStore } from '../stores/notes.js'
+import { useMistakesStore } from '../stores/mistakes.js'
+import MistakesModal from '../components/MistakesModal.vue'
 
 const notes = useNotesStore()
+
+// 错题本弹窗
+const mistakes = useMistakesStore()
+const showMistakes = ref(false)
 
 // 当前正在编辑的笔记 id
 const currentId = ref(notes.list[0]?.id ?? null)
@@ -30,6 +36,10 @@ function formatTime(t) {
   <div class="archive">
     <!-- 左侧：笔记列表 -->
     <aside class="list">
+      <button class="mistakes-btn" @click="showMistakes = true">
+        🎯 错题本
+        <span v-if="mistakes.todo.length" class="badge">{{ mistakes.todo.length }} 题待温习</span>
+      </button>
       <button class="new-btn" @click="newNote">＋ 新建笔记</button>
       <div v-if="notes.list.length === 0" class="hint">还没有笔记，点上面新建一条吧</div>
       <div
@@ -65,6 +75,9 @@ function formatTime(t) {
         <div class="saved">✓ 已自动保存 · {{ formatTime(current.updatedAt) }}</div>
       </template>
     </section>
+
+    <!-- 错题本弹窗 -->
+    <MistakesModal v-if="showMistakes" @close="showMistakes = false" />
   </div>
 </template>
 
@@ -74,6 +87,13 @@ function formatTime(t) {
   width: 240px; flex-shrink: 0; overflow-y: auto;
   border-right: 1px solid #e5e7eb; padding-right: 12px;
 }
+.mistakes-btn {
+  width: 100%; padding: 10px; margin-bottom: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  border: none; border-radius: 8px; background: #1f2329; color: #fff;
+  cursor: pointer; font-size: 14px;
+}
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f59e0b; color: #fff; }
 .new-btn {
   width: 100%; padding: 10px; margin-bottom: 10px;
   border: 1px dashed #9ca3af; border-radius: 8px;
