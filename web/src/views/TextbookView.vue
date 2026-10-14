@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
+import { useAiStore } from '../stores/ai.js'
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
 const groups = ref([])
@@ -64,6 +65,32 @@ async function openChapter(c) {
   if (readerEl.value) readerEl.value.scrollTop = 0
 }
 
+// ===== 选中文字 → 问 AI =====
+const ai = useAiStore()
+// 选中文字后弹出的小按钮：{ x, y, text }，没选中时为 null
+const selBtn = ref(null)
+
+// 在正文里松开鼠标时，看看有没有选中文字
+function onMouseUp() {
+  const sel = window.getSelection()
+  const text = sel.toString().trim()
+  if (text.length < 2) {
+    selBtn.value = null
+    return
+  }
+  // 拿到选中文字在屏幕上的位置，把按钮放在它正下方
+  const rect = sel.getRangeAt(0).getBoundingClientRect()
+  selBtn.value = { x: rect.left + rect.width / 2, y: rect.bottom + 8, text }
+}
+
+// 点击按钮：把选中的文字连同章节信息一起交给 AI
+function askSelected() {
+  const text = selBtn.value.text.slice(0, 300)
+  ai.ask(`我正在读第 ${current.value.no} 讲「${current.value.title}」，请结合教材解释这段内容：\n「${text}」`)
+  selBtn.value = null
+  window.getSelection().removeAllRanges()
+}
+
 // ===== 点击插图放大 =====
 // 正在放大查看的图片地址，空字符串表示没有放大
 const zoomSrc = ref('')
@@ -76,6 +103,59 @@ function toggle(name) {
   openGroups.value[name] = !openGroups.value[name]
 }
 </script>
+
+<template>
+  <div class="camp">
+    <!-- 左侧：章节目录 -->
+    <aside class="toc glass">
+      <div v-if="loading" class="hint">正在加载目录…</div>
+      <div v-else-if="error" class="error">{{ error }}</div>
+
+      <div v-for="g in groups" :key="g.name" class="group">
+        <button class="group-title" @click="toggle(g.name)">
+          <span class="arrow" :class="{ open: openGroups[g.name] }">▶</span>
+          {{ g.name }}
+          <span class="count">{{ g.chapters.length }}</span>
+        </button>
+
+        <ul v-if="openGroups[g.name]" class="chapters">
+          <li
+            v-for="c in g.chapters"
+            :key="c.id"
+            :class="{ active: current?.id === c.id }"
+            :title="c.title"
+            @click="openChapter(c)"
+          >
+            <span class="no">{{ c.no }}</span>
+            <span class="name">{{ shortTitle(c.title) }}</span>
+          </li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- 右侧：阅读区 -->
+    <section class="reader glass" ref="readerEl" @scroll="selBtn = null">
+      <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
+      <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
+      <article v-else class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
+    </section>
+
+    <!-- 放大查看插图：点黑色背景任意位置关闭 -->
+    <div v-if="zoomSrc" class="zoom" @click="zoomSrc = ''">
+      <img :src="zoomSrc" />
+    </div>
+
+    <!-- 选中文字后出现的「问 AI」按钮 -->
+    <button
+      v-if="selBtn"
+      class="ask-btn"
+      :style="{ left: selBtn.x + 'px', top: selBtn.y + 'px' }"
+      @mousedown.prevent
+      @click="askSelected"
+    >🤖 问 AI</button>
+  </div>
+</template>
+
 
 <template>
   <div class="camp">

@@ -1,16 +1,18 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import ChatPanel from './components/ChatPanel.vue'
+import { useAiStore } from './stores/ai.js'
 
 // 当前所在的页面信息（网址、标题等）
 const route = useRoute()
 // 是不是在大厅
 const inLobby = computed(() => route.path === '/')
 
-// AI 悬浮窗是否展开
-const aiOpen = ref(false)
+// AI 面板的开关放在公告板里，这样训练营等页面也能打开它
+const ai = useAiStore()
 </script>
+
 
 <template>
   <!-- 大厅：整屏显示，不要顶栏 -->
@@ -30,8 +32,9 @@ const aiOpen = ref(false)
 
     <!-- AI 悬浮窗：在「白帽导师」页不需要，因为整页就是对话 -->
     <template v-if="route.path !== '/mentor'">
-      <div v-if="aiOpen" class="ai-panel"><ChatPanel /></div>
-      <button class="ai-fab" @click="aiOpen = !aiOpen">🤖</button>
+      <!-- 用 v-show 而不是 v-if：面板收起时只是隐藏，聊天记录不会丢 -->
+      <div v-show="ai.open" class="ai-panel"><ChatPanel /></div>
+      <button class="ai-fab" @click="ai.toggle()">🤖</button>
     </template>
   </div>
 </template>

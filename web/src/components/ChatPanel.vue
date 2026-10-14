@@ -1,5 +1,6 @@
 <script setup>
 import { ref, nextTick } from 'vue'
+import { useAiStore } from '../stores/ai.js'
 
 // 对话记录：每条是 { role: 'user' | 'bot', text, sources, error }
 const messages = ref([])
@@ -34,8 +35,22 @@ function renderMarkdown(md) {
     .join('')
 }
 
-async function send() {
-  const question = input.value.trim()
+  // 别的页面（比如训练营选中文字）通过公告板塞进来的问题，自动发出去
+const ai = useAiStore()
+watch(
+  () => ai.pending,
+  (q) => {
+    if (!q) return
+    ai.pending = ''
+    send(q)
+  },
+  { immediate: true }
+)
+
+// text 不传时，发送输入框里的内容
+async function send(text) {
+  const question = (typeof text === 'string' ? text : input.value).trim()
+
   if (!question || loading.value) return
 
   messages.value.push({ role: 'user', text: question })

@@ -14,3 +14,12 @@ body {
 body {
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
+
+/* 选中文字后弹出的按钮：固定在屏幕上，跟着选中位置走 */
+.ask-btn {
+  position: fixed; transform: translateX(-50%); z-index: 50;
+  padding: 6px 14px; border: none; border-radius: 999px;
+  background: #1f2329; color: #fff; font-size: 13px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+.ask-btn:hover { background: #2556b6; }
