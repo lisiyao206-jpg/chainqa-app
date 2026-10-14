@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import { useAiStore } from '../stores/ai.js'
+import { useNotesStore } from '../stores/notes.js'
 import MindmapModal from '../components/MindmapModal.vue'
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
@@ -92,6 +93,18 @@ function askSelected() {
   window.getSelection().removeAllRanges()
 }
 
+// 点击「存到笔记」：把选中的文字摘录进这一章的笔记
+const notes = useNotesStore()
+// 屏幕底部的小提示，2 秒后自动消失
+const toast = ref('')
+function saveSelected() {
+  const note = notes.clip(current.value, selBtn.value.text)
+  selBtn.value = null
+  window.getSelection().removeAllRanges()
+  toast.value = `📝 已存到笔记「${note.title}」`
+  setTimeout(() => (toast.value = ''), 2000)
+}
+
 // ===== 思维导图 =====
 const showMindmap = ref(false)
 
@@ -158,14 +171,19 @@ function toggle(name) {
       <img :src="zoomSrc" />
     </div>
 
-    <!-- 选中文字后出现的「问 AI」按钮 -->
-    <button
+    <!-- 选中文字后出现的按钮：问 AI / 存到笔记 -->
+    <div
       v-if="selBtn"
-      class="ask-btn"
+      class="sel-menu"
       :style="{ left: selBtn.x + 'px', top: selBtn.y + 'px' }"
       @mousedown.prevent
-      @click="askSelected"
-    >🤖 问 AI</button>
+    >
+      <button @click="askSelected">🤖 问 AI</button>
+      <button @click="saveSelected">📝 存到笔记</button>
+    </div>
+
+    <!-- 底部小提示 -->
+    <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
 </template>
 
@@ -251,12 +269,23 @@ function toggle(name) {
 }
 .tools button:hover { background: #e8eefb; border-color: #2556b6; color: #2556b6; }
 
-/* 选中文字后弹出的按钮：固定在屏幕上，跟着选中位置走 */
-.ask-btn {
+/* 选中文字后弹出的按钮组：固定在屏幕上，跟着选中位置走 */
+.sel-menu {
   position: fixed; transform: translateX(-50%); z-index: 50;
-  padding: 6px 14px; border: none; border-radius: 999px;
-  background: #1f2329; color: #fff; font-size: 13px; cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  display: flex; overflow: hidden; border-radius: 999px;
+  background: #1f2329; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
 }
-.ask-btn:hover { background: #2556b6; }
+.sel-menu button {
+  padding: 6px 14px; border: none; background: none;
+  color: #fff; font-size: 13px; cursor: pointer;
+}
+.sel-menu button + button { border-left: 1px solid rgba(255, 255, 255, 0.2); }
+.sel-menu button:hover { background: #2556b6; }
+
+/* 底部小提示 */
+.toast {
+  position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 60;
+  padding: 10px 20px; border-radius: 999px;
+  background: #1f2329; color: #fff; font-size: 14px;
+}
 </style>
