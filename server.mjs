@@ -6,11 +6,15 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { answer } from "./rag.mjs";
-import { listChapters, readChapter } from "./chapters.mjs";
+import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = "public";
-const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript" };
+const TYPES = {
+  ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+  ".svg": "image/svg+xml", ".webp": "image/webp",
+};
 
 // 读取请求体（问题以 JSON 形式发过来）
 function readBody(req) {
@@ -78,6 +82,17 @@ function handleChapter(req, res, id) {
   sendJSON(res, 200, { id, text });
 }
 
+// GET /api/chapters/02_ValueTypes/files/img/2-1.png：教材里的插图
+function handleChapterFile(req, res, id, relPath) {
+  const file = chapterFile(decodeURIComponent(id), decodeURIComponent(relPath));
+  if (!file) {
+    res.writeHead(404);
+    return res.end("Not Found");
+  }
+  res.writeHead(200, { "Content-Type": TYPES[path.extname(file).toLowerCase()] || "application/octet-stream" });
+  fs.createReadStream(file).pipe(res);
+}
+
 // 其余请求：返回 public/ 下的静态文件
 function handleStatic(req, res) {
   const urlPath = req.url === "/" ? "/index.html" : decodeURIComponent(req.url.split("?")[0]);
@@ -94,9 +109,11 @@ function handleStatic(req, res) {
 http
   .createServer((req, res) => {
     const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
+    const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
+    else if (req.method === "GET" && fileMatch) handleChapterFile(req, res, fileMatch[1], fileMatch[2]);
     else if (req.method === "GET") handleStatic(req, res);
     else {
       res.writeHead(405);

@@ -38,6 +38,15 @@ function shortTitle(title) {
   return title.replace(/\s*[（(][^）)]*[）)]/g, '').trim() || title
 }
 
+// 教材里的插图写的是相对路径（如 ./img/2-1.png），浏览器找不到，
+// 所以改成后端的图片接口：/api/chapters/02_ValueTypes/files/img/2-1.png
+function fixImages(html, id) {
+  return html.replace(
+    /(<img[^>]*src=")(?!https?:|data:|\/)(?:\.\/)?([^"]+)"/g,
+    `$1/api/chapters/${id}/files/$2"`
+  )
+}
+
 // 点击某一章：向后端要这一章的原文，再把 Markdown 转成 HTML 显示
 async function openChapter(c) {
   current.value = c
@@ -47,12 +56,19 @@ async function openChapter(c) {
     const res = await fetch('/api/chapters/' + c.id)
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || '加载失败')
-    content.value = marked.parse(data.text)
+    content.value = fixImages(marked.parse(data.text), c.id)
   } catch (err) {
     content.value = `<p class="error">${err.message}</p>`
   }
   contentLoading.value = false
   if (readerEl.value) readerEl.value.scrollTop = 0
+}
+
+// ===== 点击插图放大 =====
+// 正在放大查看的图片地址，空字符串表示没有放大
+const zoomSrc = ref('')
+function onArticleClick(e) {
+  if (e.target.tagName === 'IMG') zoomSrc.value = e.target.src
 }
 
 // 点击分组标题：展开 ↔ 收起
@@ -91,11 +107,16 @@ function toggle(name) {
     </aside>
 
     <!-- 右侧：阅读区 -->
-      <section class="reader glass" ref="readerEl">
+    <section class="reader glass" ref="readerEl">
       <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
       <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
-      <article v-else class="article" v-html="content"></article>
+      <article v-else class="article" v-html="content" @click="onArticleClick"></article>
     </section>
+
+    <!-- 放大查看插图：点黑色背景任意位置关闭 -->
+    <div v-if="zoomSrc" class="zoom" @click="zoomSrc = ''">
+      <img :src="zoomSrc" />
+    </div>
   </div>
 </template>
 
@@ -160,9 +181,16 @@ function toggle(name) {
 .article :deep(blockquote) { margin: 12px 0; padding: 4px 16px; border-left: 4px solid #e5e7eb; color: #6b7280; }
 .article :deep(table) { border-collapse: collapse; margin: 12px 0; }
 .article :deep(th), .article :deep(td) { border: 1px solid #e5e7eb; padding: 6px 12px; }
-.article :deep(img) { max-width: 100%; }
+.article :deep(img) { max-width: 100%; cursor: zoom-in; border-radius: 6px; }
 .article :deep(a) { color: #2556b6; }
 .hint { color: #9ca3af; }
 .error { color: #b91c1c; }
-</style>
 
+/* 放大查看：黑色半透明背景铺满全屏，图片居中 */
+.zoom {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.8); cursor: zoom-out;
+}
+.zoom img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+</style>

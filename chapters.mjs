@@ -52,3 +52,13 @@ export function readChapter(id) {
   const file = path.join(BOOK_DIR, id, "readme.md");
   return fs.existsSync(file) ? fs.readFileSync(file, "utf-8") : null;
 }
+
+// 找到某一章文件夹里的附带文件（插图等），返回完整路径；不安全或不存在就返回 null
+export function chapterFile(id, relPath) {
+  if (!/^(\d{2}|S\d{2})_[\w-]+$/.test(id)) return null;
+  const chapterDir = path.resolve(BOOK_DIR, id);
+  const file = path.resolve(chapterDir, relPath);
+  // 防止 ../ 跳出这一章的文件夹
+  if (!file.startsWith(chapterDir + path.sep)) return null;
+  return fs.existsSync(file) && fs.statSync(file).isFile() ? file : null;
+}
