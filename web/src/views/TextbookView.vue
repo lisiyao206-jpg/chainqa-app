@@ -156,50 +156,6 @@ function toggle(name) {
   </div>
 </template>
 
-
-<template>
-  <div class="camp">
-    <!-- 左侧：章节目录 -->
-    <aside class="toc glass">
-      <div v-if="loading" class="hint">正在加载目录…</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
-
-      <div v-for="g in groups" :key="g.name" class="group">
-        <button class="group-title" @click="toggle(g.name)">
-          <span class="arrow" :class="{ open: openGroups[g.name] }">▶</span>
-          {{ g.name }}
-          <span class="count">{{ g.chapters.length }}</span>
-        </button>
-
-        <ul v-if="openGroups[g.name]" class="chapters">
-          <li
-            v-for="c in g.chapters"
-            :key="c.id"
-            :class="{ active: current?.id === c.id }"
-            :title="c.title"
-            @click="openChapter(c)"
-          >
-            <span class="no">{{ c.no }}</span>
-            <span class="name">{{ shortTitle(c.title) }}</span>
-          </li>
-        </ul>
-      </div>
-    </aside>
-
-    <!-- 右侧：阅读区 -->
-    <section class="reader glass" ref="readerEl">
-      <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
-      <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
-      <article v-else class="article" v-html="content" @click="onArticleClick"></article>
-    </section>
-
-    <!-- 放大查看插图：点黑色背景任意位置关闭 -->
-    <div v-if="zoomSrc" class="zoom" @click="zoomSrc = ''">
-      <img :src="zoomSrc" />
-    </div>
-  </div>
-</template>
-
 <style scoped>
 /* 整个训练营的底图：先铺 /camp/bg.jpg，图片还没放进来时显示下面的渐变 */
 .camp {
@@ -262,9 +218,6 @@ function toggle(name) {
 .article :deep(table) { border-collapse: collapse; margin: 12px 0; }
 .article :deep(th), .article :deep(td) { border: 1px solid #e5e7eb; padding: 6px 12px; }
 .article :deep(img) { max-width: 100%; cursor: zoom-in; border-radius: 6px; }
-.article :deep(a) { color: #2556b6; }
-.hint { color: #9ca3af; }
-.error { color: #b91c1c; }
 
 /* 放大查看：黑色半透明背景铺满全屏，图片居中 */
 .zoom {
@@ -273,4 +226,16 @@ function toggle(name) {
   background: rgba(0, 0, 0, 0.8); cursor: zoom-out;
 }
 .zoom img { max-width: 92vw; max-height: 92vh; border-radius: 8px; }
+.article :deep(a) { color: #2556b6; }
+.hint { color: #9ca3af; }
+.error { color: #b91c1c; }
+
+/* 选中文字后弹出的按钮：固定在屏幕上，跟着选中位置走 */
+.ask-btn {
+  position: fixed; transform: translateX(-50%); z-index: 50;
+  padding: 6px 14px; border: none; border-radius: 999px;
+  background: #1f2329; color: #fff; font-size: 13px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+.ask-btn:hover { background: #2556b6; }
 </style>
