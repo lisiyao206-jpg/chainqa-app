@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { marked } from 'marked'
 import { useAiStore } from '../stores/ai.js'
+import MindmapModal from '../components/MindmapModal.vue'
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
 const groups = ref([])
@@ -91,6 +92,9 @@ function askSelected() {
   window.getSelection().removeAllRanges()
 }
 
+// ===== 思维导图 =====
+const showMindmap = ref(false)
+
 // ===== 点击插图放大 =====
 // 正在放大查看的图片地址，空字符串表示没有放大
 const zoomSrc = ref('')
@@ -137,8 +141,17 @@ function toggle(name) {
     <section class="reader glass" ref="readerEl" @scroll="selBtn = null">
       <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
       <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
-      <article v-else class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
+      <template v-else>
+        <!-- 本章工具栏 -->
+        <div class="tools">
+          <button @click="showMindmap = true">🧠 本章思维导图</button>
+        </div>
+        <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
+      </template>
     </section>
+
+    <!-- 思维导图弹窗：换一章时 :key 变化，弹窗会重新生成 -->
+    <MindmapModal v-if="showMindmap" :key="current.id" :chapter="current" @close="showMindmap = false" />
 
     <!-- 放大查看插图：点黑色背景任意位置关闭 -->
     <div v-if="zoomSrc" class="zoom" @click="zoomSrc = ''">
@@ -229,6 +242,14 @@ function toggle(name) {
 .article :deep(a) { color: #2556b6; }
 .hint { color: #9ca3af; }
 .error { color: #b91c1c; }
+
+/* 本章工具栏 */
+.tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.tools button {
+  padding: 6px 14px; border: 1px solid #e5e7eb; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8); font-size: 13px; cursor: pointer;
+}
+.tools button:hover { background: #e8eefb; border-color: #2556b6; color: #2556b6; }
 
 /* 选中文字后弹出的按钮：固定在屏幕上，跟着选中位置走 */
 .ask-btn {
