@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick,watch } from 'vue'
 import { useAiStore } from '../stores/ai.js'
 
 // 对话记录：每条是 { role: 'user' | 'bot', text, sources, error }
@@ -35,7 +35,7 @@ function renderMarkdown(md) {
     .join('')
 }
 
-  // 别的页面（比如训练营选中文字）通过公告板塞进来的问题，自动发出去
+// 别的页面（比如训练营选中文字）通过公告板塞进来的问题，自动发出去
 const ai = useAiStore()
 watch(
   () => ai.pending,
@@ -57,7 +57,7 @@ async function send(text) {
   // 先放一条空的 AI 消息，后面一个字一个字往里填
   messages.value.push({ role: 'bot', text: '', sources: [], error: '' })
   const bot = messages.value[messages.value.length - 1]
-  input.value = ''
+  if (typeof text !== 'string') input.value = ''
   loading.value = true
   scrollToBottom()
 

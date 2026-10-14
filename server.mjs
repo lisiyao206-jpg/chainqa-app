@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { answer } from "./rag.mjs";
 import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
+import { getMindmap } from "./mindmap.mjs";
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = "public";
@@ -82,6 +83,17 @@ function handleChapter(req, res, id) {
   sendJSON(res, 200, { id, text });
 }
 
+// GET /api/chapters/23_Delegatecall/mindmap：AI 生成的本章思维导图
+async function handleMindmap(req, res, id) {
+  try {
+    const markdown = await getMindmap(decodeURIComponent(id));
+    if (markdown === null) return sendJSON(res, 404, { error: "没有这一章" });
+    sendJSON(res, 200, { id, markdown });
+  } catch (err) {
+    sendJSON(res, 500, { error: err.message });
+  }
+}
+
 // GET /api/chapters/02_ValueTypes/files/img/2-1.png：教材里的插图
 function handleChapterFile(req, res, id, relPath) {
   const file = chapterFile(decodeURIComponent(id), decodeURIComponent(relPath));
@@ -110,9 +122,11 @@ http
   .createServer((req, res) => {
     const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
     const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
+    const mindmapMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/mindmap$/);
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
+    else if (req.method === "GET" && mindmapMatch) handleMindmap(req, res, mindmapMatch[1]);
     else if (req.method === "GET" && fileMatch) handleChapterFile(req, res, fileMatch[1], fileMatch[2]);
     else if (req.method === "GET") handleStatic(req, res);
     else {
