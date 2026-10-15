@@ -43,8 +43,11 @@ async function logout() {
       <header class="topbar">
         <RouterLink to="/" class="back">← 返回大厅</RouterLink>
         <div class="page-title">{{ route.meta.title }}</div>
-                <div class="avatar" :title="`${userStore.user?.nickname}（点击退出）`" @click="logout">
-          {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
+        <div class="right">
+          <!-- 只有管理员才看得到这个入口 -->
+          <div class="avatar" :title="`${userStore.user?.nickname}（点击退出）`" @click="logout">
+            {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
+          </div>
         </div>
 
       </header>
@@ -80,8 +83,9 @@ async function logout() {
 }
 .back { color: #2556b6; text-decoration: none; }
 .page-title { font-weight: bold; font-size: 18px; }
+.right { justify-self: end; display: flex; align-items: center; gap: 16px; }
+.admin-link { color: #2556b6; text-decoration: none; font-size: 14px; }
 .avatar {
-  justify-self: end;
   width: 36px; height: 36px; border-radius: 50%;
   background: #2556b6; color: #fff;
   display: flex; align-items: center; justify-content: center;

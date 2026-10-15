@@ -97,9 +97,10 @@ function askSelected() {
 const notes = useNotesStore()
 // 屏幕底部的小提示，2 秒后自动消失
 const toast = ref('')
-function saveSelected() {
-  const note = notes.clip(current.value, selBtn.value.text)
+async function saveSelected() {
+  const text = selBtn.value.text
   selBtn.value = null
+  const note = await notes.clip(current.value, text)
   window.getSelection().removeAllRanges()
   toast.value = `📝 已存到笔记「${note.title}」`
   setTimeout(() => (toast.value = ''), 2000)

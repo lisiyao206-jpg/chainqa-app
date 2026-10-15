@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import ImgSlot from '../components/ImgSlot.vue'
+import ProfileModal from '../components/ProfileModal.vue'
+import { useUserStore } from '../stores/user.js'
 
 // 大厅的四个入口：to 对应 router.js 里的 path
 // icon 是图标图片的文件名，放在 web/public/lobby/ 里
@@ -15,6 +17,9 @@ const entries = [
 // 用 ref 包起来，数据一变，血条就会跟着动
 const player = ref({ title: '新人审计员', level: 1, xp: 30 })
 
+// 点身份卡：打开个人资料弹窗
+const userStore = useUserStore()
+const showProfile = ref(false)
 // 测试用：每点一次加 10 经验，满 100 升一级
 function gainXp() {
   player.value.xp += 10
@@ -30,14 +35,19 @@ function gainXp() {
     <h1 class="title">链上安全局</h1>
 
     <!-- 左上角：身份卡 -->
-    <div class="id-card">
+    <div class="id-card" title="点击查看我的档案" @click="showProfile = true">
       <div class="avatar"><ImgSlot src="/lobby/avatar.png" fallback="🕵️" label="avatar.png" compact /></div>
       <div>
         <div class="id-label">角色身份卡</div>
         <div class="id-title">{{ player.title }}</div>
+        <div class="id-name">代号：{{ userStore.user?.nickname }}</div>
       </div>
     </div>
 
+    <!-- 个人资料弹窗 -->
+    <ProfileModal v-if="showProfile" @close="showProfile = false" />
+    <!-- 管理后台入口：只有管理员才看得到 -->
+    <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin-entry">🛠 管理后台</RouterLink>
     <!-- 右侧：等级条 -->
     <div class="level">
       <div class="level-bar"><div class="level-fill" :style="{ height: player.xp + '%' }"></div></div>
@@ -162,4 +172,16 @@ function gainXp() {
   transform: translateY(-4px);
 }
 .entry-icon { width: 32px; height: 32px; font-size: 32px; }
+.id-name { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+.id-card { cursor: pointer; transition: transform 0.2s; }
+.id-card:hover { transform: translateY(-2px); }
+/* 管理后台入口：放在身份卡正下方 */
+.admin-entry {
+  position: absolute; top: 180px; left: 40px;
+  padding: 6px 14px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb; text-decoration: none; font-size: 13px;
+  transition: all 0.2s;
+}
+.admin-entry:hover { background: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
 </style>

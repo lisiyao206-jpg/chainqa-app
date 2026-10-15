@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed ,onMounted} from 'vue'
 import { levels } from '../data/levels.js'
 import { useGameStore } from '../stores/game.js'
 import { useMistakesStore } from '../stores/mistakes.js'
@@ -8,6 +8,9 @@ import { useAiStore } from '../stores/ai.js'
 const game = useGameStore()
 const mistakes = useMistakesStore()
 const ai = useAiStore()
+
+// 打开页面时，从数据库读取我的通关记录
+onMounted(() => game.load())
 
 // 第 1 关一开始就能玩；之后每关要先通过上一关才解锁
 function unlocked(lv) {
@@ -43,7 +46,8 @@ function submit() {
       // 机会用完：这道题自动进错题本
       mistakes.add(
         `【漏洞猎人 · ${level.value.title}】这份合约的漏洞在哪？属于什么类型？\n\n${level.value.code.join('\n')}`,
-        `漏洞类型：${level.value.type}\n${level.value.explanation}`
+        `漏洞类型：${level.value.type}\n${level.value.explanation}`,
+        'game'
       )
     }
   }

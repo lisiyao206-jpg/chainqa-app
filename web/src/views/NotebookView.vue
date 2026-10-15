@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed ,onMounted} from 'vue'
 import { useNotesStore } from '../stores/notes.js'
 import { useMistakesStore } from '../stores/mistakes.js'
 import MistakesModal from '../components/MistakesModal.vue'
@@ -11,16 +11,22 @@ const mistakes = useMistakesStore()
 const showMistakes = ref(false)
 
 // 当前正在编辑的笔记 id
-const currentId = ref(notes.list[0]?.id ?? null)
+const currentId = ref(null)
 const current = computed(() => notes.list.find((n) => n.id === currentId.value))
 
-function newNote() {
-  currentId.value = notes.create()
+// 打开页面时，从数据库读取我的笔记和错题
+onMounted(async () => {
+  await Promise.all([notes.load(), mistakes.load()])
+  currentId.value = notes.list[0]?.id ?? null
+})
+
+async function newNote() {
+  currentId.value = await notes.create()
 }
 
-function removeNote() {
+async function removeNote() {
   if (!confirm(`确定删除「${current.value.title || '无标题笔记'}」吗？`)) return
-  notes.remove(currentId.value)
+  await notes.remove(currentId.value)
   currentId.value = notes.list[0]?.id ?? null
 }
 

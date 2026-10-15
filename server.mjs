@@ -8,7 +8,10 @@ import path from "node:path";
 import { answer } from "./rag.mjs";
 import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
 import { getMindmap } from "./mindmap.mjs";
-import { register, login, logout, userFromToken } from "./auth.mjs";
+import { register, login, logout, userFromToken, getProfile, updateNickname, changePassword } from "./auth.mjs";
+import * as data from "./data.mjs";
+import * as admin from "./admin.mjs";
+
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = "public";
@@ -154,6 +157,66 @@ function handleMe(req, res) {
   if (!user) return sendJSON(res, 401, { error: "未登录或登录已过期" });
   sendJSON(res, 200, { user });
 }
+// ===== 笔记 / 错题 / 关卡进度（都要先登录）=====
+// 统一处理：先认人，没登录就返回 401；出错就返回 400 和错误提示
+async function withUser(req, res, fn,{admin=false}={}) {
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "请先登录" });
+   if (admin && user.role !== "admin") return sendJSON(res, 403, { error: "只有管理员可以访问" });
+  try {
+    const body = ["POST", "PUT"].includes(req.method) ? await readJSON(req) : {};
+    sendJSON(res, 200, (await fn(user.userId, body)) ?? { ok: true });
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+  }
+}
+
+// 根据「方法 + 网址」找到对应的数据操作；找不到就返回 null
+function routeData(req, res) {
+  const { method, url } = req;
+  const m = url.match(/^\/api\/(notes|mistakes)\/(\d+)$/); // 例如 /api/notes/12
+  const id = m ? Number(m[2]) : null;
+  const W = (fn) => withUser(req, res, fn);
+
+  if (url === "/api/notes" && method === "GET") return W((uid) => data.listNotes(uid));
+  if (url === "/api/notes" && method === "POST") return W((uid, b) => data.createNote(uid, b));
+  if (m?.[1] === "notes" && method === "PUT") return W((uid, b) => data.updateNote(uid, id, b));
+  if (m?.[1] === "notes" && method === "DELETE") return W((uid) => data.deleteNote(uid, id));
+
+  if (url === "/api/mistakes" && method === "GET") return W((uid) => data.listMistakes(uid));
+  if (url === "/api/mistakes" && method === "POST") return W((uid, b) => data.addMistake(uid, b));
+  if (m?.[1] === "mistakes" && method === "PUT") return W((uid, b) => data.setMistakeStatus(uid, id, b.status));
+  if (m?.[1] === "mistakes" && method === "DELETE") return W((uid) => data.deleteMistake(uid, id));
+
+  if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
+  if (url === "/api/progress" && method === "POST") return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));
+  
+  if (url === "/api/profile" && method === "GET") return W((uid) => getProfile(uid));
+  if (url === "/api/profile" && method === "PUT") return W((uid, b) => updateNickname(uid, b.nickname));
+  if (url === "/api/password" && method === "PUT") return W((uid, b) => changePassword(uid, b.oldPwd, b.newPwd));
+  return null;
+}
+// ===== 管理员后台（只有管理员能用）=====
+function routeAdmin(req, res) {
+  const { method } = req;
+  // 网址可能带查询参数，例如 /api/admin/users?q=abc：问号前是路径，问号后是参数
+  const [pathname, query] = req.url.split("?");
+  if (!pathname.startsWith("/api/admin/")) return null;
+  const m = pathname.match(/^\/api\/admin\/users\/(\d+)$/); // 例如 /api/admin/users/3
+  const id = m ? Number(m[1]) : null;
+  const A = (fn) => withUser(req, res, fn, { admin: true });
+
+  if (pathname === "/api/admin/users" && method === "GET") {
+    const q = new URLSearchParams(query).get("q") || "";
+    return A(() => admin.listUsers(q));
+  }
+  if (pathname === "/api/admin/logins" && method === "GET") return A(() => admin.listLogins());
+  if (m && method === "GET") return A(() => admin.userDetail(id));
+  if (m && method === "PUT") return A((uid, b) => admin.setUserStatus(uid, id, b.status));
+  if (m && method === "DELETE") return A((uid) => admin.deleteUser(uid, id));
+  return sendJSON(res, 404, { error: "没有这个接口" });
+}
+
 
 // 其余请求：返回 public/ 下的静态文件
 function handleStatic(req, res) {
@@ -173,6 +236,8 @@ http
     const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
     const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
     const mindmapMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/mindmap$/);
+    if (routeData(req, res) !== null) return; // 笔记、错题、关卡进度
+    if (routeAdmin(req, res) !== null) return; // 管理员后台
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);

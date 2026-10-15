@@ -67,3 +67,10 @@ CREATE TABLE IF NOT EXISTS game_progress (
   PRIMARY KEY (user_id, level_id)
 );
 `);
+
+// 给「已经建好的旧表」补上新加的列。
+// CREATE TABLE IF NOT EXISTS 只管「表不存在」的情况，表已经有了就整句跳过，新加的列不会自动出现，
+// 所以要用 ALTER TABLE 补；列已经存在时会报错，直接忽略就行
+try {
+  db.exec("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'");
+} catch {}
