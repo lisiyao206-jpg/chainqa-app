@@ -4,6 +4,7 @@ import { levels } from '../data/levels.js'
 import { useGameStore } from '../stores/game.js'
 import { useMistakesStore } from '../stores/mistakes.js'
 import { useAiStore } from '../stores/ai.js'
+import MedalPopup from '../components/MedalPopup.vue'
 
 const game = useGameStore()
 const mistakes = useMistakesStore()
@@ -23,7 +24,8 @@ const picked = ref(null)      // 玩家点中的行号
 const wrongTimes = ref(0)     // 已经点错几次
 const result = ref('')        // '' 还在找 / 'win' 找对了 / 'lose' 机会用完
 const MAX_TRIES = 3
-
+// 勋章弹窗：答对时设为 { stars, firstTime }，关掉时设回 null
+const medal = ref(null)
 function start(lv) {
   if (!unlocked(lv)) return
   level.value = lv
@@ -37,7 +39,12 @@ function submit() {
   if (picked.value === null) return
   if (level.value.bugLines.includes(picked.value)) {
     result.value = 'win'
-    game.clear(level.value.id, MAX_TRIES - wrongTimes.value) // 一次就对 3 星
+    const stars = MAX_TRIES - wrongTimes.value // 一次就对 3 星
+    // 先记下「之前有没有通过」，再保存成绩，这样才知道是不是第一次拿到这枚勋章
+    const firstTime = !game.cleared[level.value.id]
+    game.clear(level.value.id, stars)
+    medal.value = { stars, firstTime }
+
   } else {
     wrongTimes.value++
     picked.value = null
@@ -128,9 +135,19 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
         <button @click="start(level)">🔄 再玩一次</button>
         <button v-if="result === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一关 →</button>
       </div>
-    </div>
+        </div>
+
+    <!-- 答对时弹出勋章 -->
+    <MedalPopup
+      v-if="medal"
+      :level="level"
+      :stars="medal.stars"
+      :first-time="medal.firstTime"
+      @close="medal = null"
+    />
   </div>
 </template>
+
 
 <style scoped>
 .select h2 { margin: 0 0 6px; }
