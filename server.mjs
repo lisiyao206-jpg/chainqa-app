@@ -8,6 +8,7 @@ import path from "node:path";
 import { answer } from "./rag.mjs";
 import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
 import { getMindmap } from "./mindmap.mjs";
+import { register, login, logout, userFromToken } from "./auth.mjs";
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = "public";
@@ -105,6 +106,55 @@ function handleChapterFile(req, res, id, relPath) {
   fs.createReadStream(file).pipe(res);
 }
 
+// ===== 账号相关 =====
+// 前端每次请求都在请求头里带上 Authorization: Bearer <token>，这里把 token 取出来
+function getToken(req) {
+  const h = req.headers.authorization || "";
+  return h.startsWith("Bearer ") ? h.slice(7) : "";
+}
+
+// 读取 JSON 格式的请求体
+async function readJSON(req) {
+  try {
+    return JSON.parse(await readBody(req));
+  } catch {
+    return {};
+  }
+}
+
+// POST /api/register：注册（成功后直接登录）
+async function handleRegister(req, res) {
+  const { account, pwd, nickname } = await readJSON(req);
+  try {
+    sendJSON(res, 200, register(account, pwd, nickname));
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+  }
+}
+
+// POST /api/login：登录
+async function handleLogin(req, res) {
+  const { account, pwd } = await readJSON(req);
+  try {
+    sendJSON(res, 200, login(account, pwd));
+  } catch (err) {
+    sendJSON(res, 401, { error: err.message });
+  }
+}
+
+// POST /api/logout：退出
+function handleLogout(req, res) {
+  logout(getToken(req));
+  sendJSON(res, 200, { ok: true });
+}
+
+// GET /api/me：我是谁（前端刷新页面后，用它确认还在不在登录状态）
+function handleMe(req, res) {
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "未登录或登录已过期" });
+  sendJSON(res, 200, { user });
+}
+
 // 其余请求：返回 public/ 下的静态文件
 function handleStatic(req, res) {
   const urlPath = req.url === "/" ? "/index.html" : decodeURIComponent(req.url.split("?")[0]);
@@ -124,6 +174,10 @@ http
     const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
     const mindmapMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/mindmap$/);
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
+    else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
+    else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);
+    else if (req.method === "POST" && req.url === "/api/logout") handleLogout(req, res);
+    else if (req.method === "GET" && req.url === "/api/me") handleMe(req, res);
     else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
     else if (req.method === "GET" && mindmapMatch) handleMindmap(req, res, mindmapMatch[1]);

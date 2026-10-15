@@ -4,11 +4,14 @@ import TextbookView from './views/TextbookView.vue'
 import MentorView from './views/MentorView.vue'
 import NotebookView from './views/NotebookView.vue'
 import GameView from './views/GameView.vue'
+import LoginView from './views/LoginView.vue'
+import { useUserStore } from './stores/user.js'
 
-export default createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes: [
     // title 是页面名字，顶栏会显示它
+    { path: '/login', component: LoginView, meta: { title: '登录', public: true } },
     { path: '/', component: LobbyView, meta: { title: '大厅' } },
     { path: '/camp', component: TextbookView, meta: { title: '训练营' } },
     { path: '/mentor', component: MentorView, meta: { title: '白帽导师' } },
@@ -16,3 +19,18 @@ export default createRouter({
     { path: '/mission', component: GameView, meta: { title: '实战任务' } },
   ],
 })
+
+// 路由守卫：每次换页面之前检查一下——没登录就送去登录页
+let checked = false
+router.beforeEach(async (to) => {
+  const userStore = useUserStore()
+  // 刷新页面后，第一次跳转时用存着的 token 问一下后端「我是谁」
+  if (!checked) {
+    await userStore.fetchMe()
+    checked = true
+  }
+  if (!to.meta.public && !userStore.isLoggedIn) return '/login'
+  if (to.path === '/login' && userStore.isLoggedIn) return '/'
+})
+
+export default router

@@ -9,3 +9,6 @@ knowledge/
 
 # 依赖
 node_modules/
+
+# 数据库：存着用户账号和加密密码，不能上传
+chainqa.db
