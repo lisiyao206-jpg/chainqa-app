@@ -5,6 +5,7 @@ import ChatPanel from './components/ChatPanel.vue'
 import VeilTransition from './components/VeilTransition.vue'
 import CyberOverlay from './components/CyberOverlay.vue'
 import ProfileModal from './components/ProfileModal.vue'
+import UserAvatar from './components/UserAvatar.vue'
 import { useAiStore } from './stores/ai.js'
 import { useUserStore } from './stores/user.js'
 import { useThemeStore } from './stores/theme.js'
@@ -39,6 +40,7 @@ const nav = [
   { to: '/mentor', title: '白帽导师' },
   { to: '/archive', title: '案件档案' },
   { to: '/mission', title: '实战任务' },
+  { to: '/social', title: '情报站' },
 ]
 
 const userStore = useUserStore()
@@ -82,8 +84,8 @@ async function logout() {
       <div class="me">
         <RouterLink v-if="userStore.isAdmin" to="/admin" active-class="on">管理后台</RouterLink>
         <a class="logout" @click="logout">退出</a>
-        <button class="avatar" title="我的档案" @click="showProfile = true">
-          {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
+        <button class="me-btn" title="我的档案" @click="showProfile = true">
+          <UserAvatar :user="userStore.user" :size="34" />
         </button>
       </div>
     </header>
@@ -128,12 +130,8 @@ async function logout() {
   border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent);
 }
 .brand { color: #fff !important; letter-spacing: 3px; margin-right: 10px; }
-.avatar {
-  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
-  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.05);
-  color: #fff; font-size: 13px; font-family: var(--font);
-}
-.avatar:hover { border-color: #fff; }
+.me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }
+.me-btn:hover { box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
 
 .content { flex: 1; padding: 8px 36px 28px; overflow: auto; }
 

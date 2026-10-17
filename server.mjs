@@ -8,9 +8,10 @@ import path from "node:path";
 import { answer } from "./rag.mjs";
 import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
 import { getMindmap } from "./mindmap.mjs";
-import { register, login, logout, userFromToken, getProfile, updateNickname, changePassword } from "./auth.mjs";
+import { register, login, logout, userFromToken, getProfile, updateNickname, changePassword, setAvatar } from "./auth.mjs";
 import * as data from "./data.mjs";
 import * as admin from "./admin.mjs";
+import * as social from "./social.mjs";
 
 const PORT = process.env.PORT || 3000;
 // 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
@@ -195,6 +196,7 @@ function routeData(req, res) {
 
   if (url === "/api/profile" && method === "GET") return W((uid) => getProfile(uid));
   if (url === "/api/profile" && method === "PUT") return W((uid, b) => updateNickname(uid, b.nickname));
+  if (url === "/api/avatar" && method === "PUT") return W((uid, b) => setAvatar(uid, b.avatar));
   if (url === "/api/password" && method === "PUT") return W((uid, b) => changePassword(uid, b.oldPwd, b.newPwd));
   return null;
 }
@@ -217,6 +219,70 @@ function routeAdmin(req, res) {
   if (m && method === "GET") return A(() => admin.userDetail(id));
   if (m && method === "PUT") return A((uid, b) => admin.setUserStatus(uid, id, b.status));
   if (m && method === "DELETE") return A((uid) => admin.deleteUser(uid, id));
+  return sendJSON(res, 404, { error: "没有这个接口" });
+}
+
+// ===== 情报站：好友、聊天、好友圈、文件（都要先登录）=====
+function routeSocial(req, res) {
+  const { method } = req;
+  const [pathname, query] = req.url.split("?");
+  if (!pathname.startsWith("/api/social/")) return null;
+  const p = pathname.slice("/api/social".length); // 例如 /rooms/3/messages
+  const q = new URLSearchParams(query);
+  const W = (fn) => withUser(req, res, fn);
+  let m;
+
+  // 好友
+  if (p === "/search" && method === "GET") return W((uid) => social.searchUser(uid, q.get("account")));
+  if (p === "/friends" && method === "GET") return W((uid) => social.listFriends(uid));
+  if (p === "/friends" && method === "POST") return W((uid, b) => social.sendRequest(uid, b.account));
+  if ((m = p.match(/^\/friends\/(\d+)$/)) && method === "DELETE") return W((uid) => social.removeFriend(uid, Number(m[1])));
+  if (p === "/requests" && method === "GET") return W((uid) => social.listRequests(uid));
+  if ((m = p.match(/^\/requests\/(\d+)$/)) && method === "PUT") return W((uid, b) => social.respondRequest(uid, Number(m[1]), !!b.accept));
+
+  // 聊天室
+  if (p === "/rooms" && method === "GET") return W((uid) => social.listRooms(uid));
+  if (p === "/rooms/dm" && method === "POST") return W((uid, b) => social.openDM(uid, Number(b.friendId)));
+  if (p === "/rooms/group" && method === "POST") return W((uid, b) => social.createGroup(uid, b.name, b.memberIds || []));
+  if ((m = p.match(/^\/rooms\/(\d+)\/members$/))) {
+    if (method === "GET") return W((uid) => social.roomMembers(uid, Number(m[1])));
+    if (method === "POST") return W((uid, b) => social.addMembers(uid, Number(m[1]), b.memberIds || []));
+  }
+  if ((m = p.match(/^\/rooms\/(\d+)\/messages$/))) {
+    if (method === "GET") return W((uid) => social.listMessages(uid, Number(m[1]), Number(q.get("after") || 0)));
+    if (method === "POST") return W((uid, b) => social.sendMessage(uid, Number(m[1]), b));
+  }
+  if ((m = p.match(/^\/rooms\/(\d+)$/)) && method === "DELETE") return W((uid) => social.leaveRoom(uid, Number(m[1])));
+
+  // 好友圈
+  if (p === "/posts" && method === "GET") return W((uid) => social.listPosts(uid));
+  if (p === "/posts" && method === "POST") return W((uid, b) => social.createPost(uid, b));
+  if ((m = p.match(/^\/posts\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deletePost(uid, Number(m[1])));
+  if ((m = p.match(/^\/posts\/(\d+)\/like$/)) && method === "POST") return W((uid) => social.toggleLike(uid, Number(m[1])));
+  if ((m = p.match(/^\/posts\/(\d+)\/comments$/)) && method === "POST") return W((uid, b) => social.addComment(uid, Number(m[1]), b.text));
+  if ((m = p.match(/^\/comments\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deleteComment(uid, Number(m[1])));
+
+  // 文件：上传的请求体是文件本身，不能交给 withUser（它会当成 JSON 来读），所以单独处理
+  if (p === "/files" && method === "POST") {
+    const user = userFromToken(getToken(req));
+    if (!user) return sendJSON(res, 401, { error: "请先登录" });
+    return social.saveUpload(user.userId, req).then(
+      (file) => sendJSON(res, 200, file),
+      (err) => sendJSON(res, 400, { error: err.message }),
+    );
+  }
+  if ((m = p.match(/^\/files\/([0-9a-f]{32})$/)) && method === "GET") {
+    const user = userFromToken(getToken(req));
+    const file = user && social.getFile(user.userId, m[1]);
+    if (!file || !fs.existsSync(file.path)) return sendJSON(res, 404, { error: "文件不存在或没有权限" });
+    res.writeHead(200, {
+      // 图片按图片发（聊天里能直接显示）；其他文件一律当「下载」，浏览器不会去打开执行它
+      "Content-Type": file.isImage ? TYPES[file.ext] : "application/octet-stream",
+      "Content-Disposition": `${file.isImage ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      "X-Content-Type-Options": "nosniff",
+    });
+    return fs.createReadStream(file.path).pipe(res);
+  }
   return sendJSON(res, 404, { error: "没有这个接口" });
 }
 
@@ -249,6 +315,7 @@ http
     const mindmapMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/mindmap$/);
     if (routeData(req, res) !== null) return; // 笔记、错题、关卡进度
     if (routeAdmin(req, res) !== null) return; // 管理员后台
+    if (routeSocial(req, res) !== null) return; // 情报站
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);

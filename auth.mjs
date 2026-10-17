@@ -30,7 +30,7 @@ function checkPassword(pwd, stored) {
 
 // 只把这些字段给前端，绝不返回密码
 function publicUser(u) {
-  return { userId: u.user_id, account: u.account, nickname: u.nickname, role: u.role };
+  return { userId: u.user_id, account: u.account, nickname: u.nickname, role: u.role, avatar: u.avatar || null };
 }
 
 // ===== 注册 =====
@@ -93,6 +93,18 @@ export function updateNickname(userId, nickname) {
   if (!nickname || nickname.length > 12) throw new Error("昵称要 1~12 个字");
   db.prepare("UPDATE users SET nickname = ? WHERE user_id = ?").run(nickname, userId);
   return { nickname };
+}
+
+// ===== 修改头像 =====
+// 只接受两种：系统头像 preset:1~6；或者自己上传过的图片 file:文件id（先用 /api/social/files 上传）
+export function setAvatar(userId, avatar) {
+  avatar = String(avatar || "");
+  const preset = /^preset:[1-6]$/.test(avatar);
+  const m = avatar.match(/^file:([0-9a-f]{32})$/);
+  const f = m && db.prepare("SELECT name FROM files WHERE file_id = ? AND user_id = ?").get(m[1], userId);
+  if (!preset && !(f && /\.(png|jpe?g|gif|webp)$/i.test(f.name))) throw new Error("头像只能用系统头像或自己上传的图片");
+  db.prepare("UPDATE users SET avatar = ? WHERE user_id = ?").run(avatar, userId);
+  return { avatar };
 }
 
 // ===== 修改密码：必须先输对旧密码 =====

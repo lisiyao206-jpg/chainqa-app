@@ -5,6 +5,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ProfileModal from '../components/ProfileModal.vue'
+import UserAvatar from '../components/UserAvatar.vue'
 import { useUserStore } from '../stores/user.js'
 
 const router = useRouter()
@@ -21,6 +22,8 @@ const spots = [
     desc: '你的笔记和错题都存放在这里。笔记打字自动保存；错题可以重做，掌握了就标记出来。' },
   { no: '04', to: '/mission', title: '实战任务', en: 'Field Mission', x: 70, y: 64,
     desc: '每一关是一份出了事的合约。像审计员一样逐行阅读，找出藏着漏洞的那一行，赢得勋章。' },
+  { no: '05', to: '/social', title: '情报站', en: 'Intel Hub', x: 52, y: 84,
+    desc: '审计员之间交流的地方。加好友、私聊、建讨论组一起研究题目，可以互相传资料；好友圈里分享你的学习心得。' },
 ]
 
 // 当前「点亮」的入口：鼠标移到发光点或左侧目录上时设置，移开时清空
@@ -43,8 +46,8 @@ function go(s) {
       <div class="me">
         <!-- 只有管理员看得到 -->
         <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin">管理后台</RouterLink>
-        <button class="avatar" title="我的档案" @click="showProfile = true">
-          {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
+        <button class="me-btn" title="我的档案" @click="showProfile = true">
+          <UserAvatar :user="userStore.user" :size="34" />
         </button>
       </div>
     </header>
@@ -111,12 +114,8 @@ function go(s) {
 .me { display: flex; align-items: center; gap: 18px; font-size: 13px; }
 .admin { color: rgba(233, 230, 255, 0.6); text-decoration: none; }
 .admin:hover { color: #fff; }
-.avatar {
-  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
-  border: 1px solid rgba(233, 230, 255, 0.4); background: rgba(255, 255, 255, 0.05);
-  color: #fff; font-size: 13px;
-}
-.avatar:hover { border-color: #fff; }
+.me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }
+.me-btn:hover { box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
 
 /* ===== 中间标题 ===== */
 .headline {
