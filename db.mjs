@@ -136,6 +136,13 @@ CREATE TABLE IF NOT EXISTS post_likes (
   user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   PRIMARY KEY (post_id, user_id)
 );
+-- 收藏：收藏和点赞过的帖子，都会出现在「学习站」里
+CREATE TABLE IF NOT EXISTS post_favorites (
+  post_id     INTEGER NOT NULL REFERENCES posts(post_id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  create_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  PRIMARY KEY (post_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS post_comments (
   comment_id  INTEGER PRIMARY KEY AUTOINCREMENT,
   post_id     INTEGER NOT NULL REFERENCES posts(post_id) ON DELETE CASCADE,

@@ -260,6 +260,11 @@ function routeSocial(req, res) {
   if (p === "/posts" && method === "POST") return W((uid, b) => social.createPost(uid, b));
   if ((m = p.match(/^\/posts\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deletePost(uid, Number(m[1])));
   if ((m = p.match(/^\/posts\/(\d+)\/like$/)) && method === "POST") return W((uid) => social.toggleLike(uid, Number(m[1])));
+  if ((m = p.match(/^\/posts\/(\d+)\/favorite$/)) && method === "POST") return W((uid) => social.toggleFavorite(uid, Number(m[1])));
+
+  // 学习站
+  if (p === "/study" && method === "GET") return W((uid) => social.listStudy(uid, q.get("kind")));
+  if ((m = p.match(/^\/study\/(\d+)$/)) && method === "DELETE") return W((uid) => social.removeFromStudy(uid, Number(m[1])));
   if ((m = p.match(/^\/posts\/(\d+)\/comments$/)) && method === "POST") return W((uid, b) => social.addComment(uid, Number(m[1]), b.text));
   if ((m = p.match(/^\/comments\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deleteComment(uid, Number(m[1])));
 

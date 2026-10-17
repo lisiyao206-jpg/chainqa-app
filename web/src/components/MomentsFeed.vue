@@ -83,6 +83,8 @@ function publish() {
   })
 }
 const like = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/like`, {}))
+// 收藏：收藏和点赞过的帖子都会进「学习站」
+const favorite = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/favorite`, {}))
 const remove = (p) => confirm('删除这条帖子？') && act(() => userStore.api(`/api/social/posts/${p.id}`, null, 'DELETE'))
 const removeComment = (c) => act(() => userStore.api(`/api/social/comments/${c.id}`, null, 'DELETE'))
 function comment(p) {
@@ -150,6 +152,9 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
 
       <div class="actions">
         <button :class="['like', { on: p.liked }]" @click="like(p)">{{ p.liked ? '♥' : '♡' }} {{ p.likes.length || '赞' }}</button>
+        <button :class="['like', 'fav', { on: p.favorited }]" title="收藏后可以在「学习站」里随时复习" @click="favorite(p)">
+          {{ p.favorited ? '★ 已收藏' : '☆ 收藏' }}
+        </button>
         <span class="count">💬 {{ p.comments.length }}</span>
       </div>
       <div v-if="p.likes.length" class="likes">♥ {{ p.likes.join('、') }}</div>
@@ -204,6 +209,7 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
 .actions { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
 .like { border: none; background: none; cursor: pointer; color: var(--text-dim); font-size: 13px; padding: 0; }
 .like.on { color: var(--accent-strong); }
+.fav.on { color: var(--gold); }
 .likes { margin-top: 8px; font-size: 12px; color: var(--accent-strong); }
 .comments { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 6px; }
 .comment { font-size: 13px; color: var(--text); display: flex; gap: 4px; }

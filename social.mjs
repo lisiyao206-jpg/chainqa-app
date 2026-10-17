@@ -210,6 +210,7 @@ function postRow(uid, p) {
     canDelete: p.user_id === uid || isAdmin(uid), // 管理员可以删掉广场上不合适的帖子
     likes: all("SELECT user_id FROM post_likes WHERE post_id = ?", p.post_id).map((r) => userBrief(r.user_id).nickname),
     liked: !!one("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?", p.post_id, uid),
+    favorited: !!one("SELECT 1 FROM post_favorites WHERE post_id = ? AND user_id = ?", p.post_id, uid),
     // 好友圈：评论只显示「我能看到的人」写的，和微信朋友圈一样；广场：所有评论都公开
     comments: all("SELECT * FROM post_comments WHERE post_id = ? ORDER BY comment_id", p.post_id)
       .filter((c) => p.visibility === "public" || c.user_id === uid || isFriend(uid, c.user_id))
@@ -256,6 +257,32 @@ export function toggleLike(uid, postId) {
   if (!canSeePost(uid, one("SELECT * FROM posts WHERE post_id = ?", postId))) throw new Error("这条动态不存在");
   const had = run("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?", postId, uid).changes;
   if (!had) run("INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)", postId, uid);
+}
+
+// 收藏 / 取消收藏（和点赞一样，点一下切换）
+export function toggleFavorite(uid, postId) {
+  if (!canSeePost(uid, one("SELECT * FROM posts WHERE post_id = ?", postId))) throw new Error("这条帖子不存在");
+  const had = run("DELETE FROM post_favorites WHERE post_id = ? AND user_id = ?", postId, uid).changes;
+  if (!had) run("INSERT INTO post_favorites (post_id, user_id) VALUES (?, ?)", postId, uid);
+}
+
+// ===== 学习站 =====
+// 我点赞过、收藏过的帖子都在这里，分成两类：kind = 'video' 带视频的 / 'text' 笔记和文本（其余的）
+// 还要再检查一次「现在还能不能看」：比如好友圈的动态，删了好友之后就不该再看到了
+export function listStudy(uid, kind = "text") {
+  return all(`SELECT DISTINCT p.* FROM posts p
+              WHERE p.post_id IN (SELECT post_id FROM post_likes WHERE user_id = ?)
+                 OR p.post_id IN (SELECT post_id FROM post_favorites WHERE user_id = ?)
+              ORDER BY p.post_id DESC`, uid, uid)
+    .filter((p) => canSeePost(uid, p))
+    .map((p) => postRow(uid, p))
+    .filter((p) => (kind === "video" ? p.file?.isVideo : !p.file?.isVideo));
+}
+
+// 移出学习站：同时取消点赞和收藏
+export function removeFromStudy(uid, postId) {
+  run("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?", postId, uid);
+  run("DELETE FROM post_favorites WHERE post_id = ? AND user_id = ?", postId, uid);
 }
 
 export function addComment(uid, postId, text) {
