@@ -71,8 +71,10 @@ const vertexShader = `
     // 当前半径：随时间从外往里缩，mod 让它到中心后回到外圈
     float r = mod(aR0 - uTime * aSpeed, uRadius) + 0.05;
     float k = r / uRadius;                 // 0 = 中心，1 = 最外圈
-    // 角度：旋臂本身的螺旋 + 越靠近中心转得越快的额外旋转
-    float angle = aBranch + r * uSpin + uTime * (0.15 + 0.9 * (1.0 - k) * (1.0 - k));
+    // 角度：旋臂本身的螺旋 + 整体慢慢自转 + 越靠近中心转得越快的额外旋转
+    // 注意：额外旋转不能写成「时间 × 转速」，那样时间越久转得越快（越转越快的 bug）。
+    // 要按「粒子走到这个半径时，一路累计转过的角度」来算：只跟半径有关，速度就一直稳定
+    float angle = aBranch + r * uSpin + uTime * 0.15 + 0.3 * uRadius * pow(1.0 - k, 3.0) / aSpeed;
     vec3 p = vec3(cos(angle) * r, 0.0, sin(angle) * r) + aOffset * r;
     p.y *= 0.6;
     vec4 mv = modelViewMatrix * vec4(p, 1.0);
@@ -172,7 +174,7 @@ function animate(now) {
   for (const b of blocks) {
     const r = ((b.userData.r - t * 0.3) % P.radius + P.radius) % P.radius + 0.3
     const k = r / P.radius
-    const a = (b.userData.branch / P.branches) * Math.PI * 2 + r * P.spin + t * (0.15 + 0.9 * (1 - k) * (1 - k))
+    const a = (b.userData.branch / P.branches) * Math.PI * 2 + r * P.spin + t * 0.15 + 0.3 * P.radius * (1 - k) ** 3 / 0.3 // 和粒子同样的算法，不会越转越快
     b.position.set(Math.cos(a) * r, 0.05, Math.sin(a) * r)
     b.scale.setScalar(Math.min(1, k * 4)) // 快到中心时变小消失
     b.rotation.x = t
