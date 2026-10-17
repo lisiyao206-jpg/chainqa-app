@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useNotesStore } from '../stores/notes.js'
 import { useMistakesStore } from '../stores/mistakes.js'
 import MistakesModal from '../components/MistakesModal.vue'
+import { useUserStore } from '../stores/user.js'
 
 const notes = useNotesStore()
 
@@ -28,6 +29,33 @@ async function removeNote() {
   if (!confirm(`确定删除「${current.value.title || '无标题笔记'}」吗？`)) return
   await notes.remove(currentId.value)
   currentId.value = notes.list[0]?.id ?? null
+}
+
+// ===== 发布讨论：把这条笔记发到情报站的广场或好友圈，和大家一起讨论 =====
+const userStore = useUserStore()
+const target = ref('public') // public 广场（所有人能看）/ friends 好友圈（只有好友能看）
+const publishing = ref(false)
+const published = ref(null)  // 发布结果提示：{ ok, text }
+
+async function publishNote() {
+  const n = current.value
+  if (!n.content.trim()) return (published.value = { ok: false, text: '笔记还是空的，写点内容再发布吧' })
+  const where = target.value === 'public' ? '广场（所有人都能看到）' : '好友圈（只有好友能看到）'
+  if (!confirm(`把「${n.title || '无标题笔记'}」发布到${where}？`)) return
+  publishing.value = true
+  published.value = null
+  try {
+    await userStore.api('/api/social/posts', {
+      title: n.title.trim() || '我的学习笔记',
+      text: n.content,
+      visibility: target.value,
+    })
+    published.value = { ok: true, text: '已发布！' }
+  } catch (err) {
+    published.value = { ok: false, text: err.message }
+  } finally {
+    publishing.value = false
+  }
 }
 
 // 把时间戳显示成「10月14日 21:30」
@@ -78,7 +106,23 @@ function formatTime(t) {
           placeholder="在这里记下你的理解、疑问、代码片段……"
           @input="notes.update(current.id, { content: $event.target.value })"
         ></textarea>
-        <div class="saved">✓ 已自动保存 · {{ formatTime(current.updatedAt) }}</div>
+        <!-- 笔记下方：左边是自动保存提示，右边是「发布讨论」 -->
+        <div class="foot">
+          <div class="saved">✓ 已自动保存 · {{ formatTime(current.updatedAt) }}</div>
+          <span v-if="published" :class="published.ok ? 'ok' : 'error'">
+            {{ published.text }}
+            <RouterLink v-if="published.ok" to="/social">去情报站看看 →</RouterLink>
+          </span>
+          <div class="publish">
+            <select v-model="target" class="target">
+              <option value="public">发布到广场</option>
+              <option value="friends">发布到好友圈</option>
+            </select>
+            <button class="btn primary" :disabled="publishing" @click="publishNote">
+              {{ publishing ? '发布中…' : '📤 发布讨论' }}
+            </button>
+          </div>
+        </div>
       </template>
     </section>
 
@@ -132,7 +176,16 @@ function formatTime(t) {
   font: inherit; font-size: 15px; line-height: 1.8; outline: none;
 }
 .content-input:focus { border-color: var(--accent); }
+.foot { display: flex; align-items: center; gap: 14px; }
 .saved { font-size: 12px; color: var(--text-faint); }
+.ok { font-size: 13px; color: var(--ok); }
+.error { font-size: 13px; color: var(--danger); }
+.publish { margin-left: auto; margin-right: 64px; display: flex; gap: 10px; align-items: center; } /* 右边让出位置给 AI 悬浮按钮 */
+.target {
+  padding: 8px 10px; font-size: 13px; font-family: var(--font); cursor: pointer; outline: none;
+  color: var(--text); background: rgba(6, 4, 20, 0.85); border: 1px solid var(--line-strong);
+}
+.target:focus { border-color: var(--accent); }
 .hint { color: var(--text-faint); font-size: 14px; }
 .center { margin: auto; }
 </style>
