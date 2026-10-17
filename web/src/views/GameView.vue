@@ -6,6 +6,7 @@ import { useMistakesStore } from '../stores/mistakes.js'
 import { useAiStore } from '../stores/ai.js'
 import MedalPopup from '../components/MedalPopup.vue'
 import MedalWall from '../components/MedalWall.vue'
+import CodeFrame from '../components/CodeFrame.vue'
 
 const game = useGameStore()
 const mistakes = useMistakesStore()
@@ -97,6 +98,13 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
           :class="['card', { locked: !unlocked(lv) }]"
           @click="start(lv)"
         >
+          <!-- 边框上流动的就是这一关的合约代码；没解锁的关卡只显示一串乱码 -->
+          <CodeFrame
+            :text="unlocked(lv) ? lv.code.filter((l) => l.trim()).map((l) => l.trim()).join('  ') : '0x?? ACCESS DENIED  0x00 LOCKED'"
+            :color="unlocked(lv) ? 'var(--accent)' : 'var(--text-faint)'"
+            :inset="9"
+            :duration="unlocked(lv) ? 30 : 60"
+          />
           <div class="card-no">CASE {{ String(lv.id).padStart(2, '0') }}</div>
           <div class="card-title">{{ unlocked(lv) ? lv.title : '未解锁' }}</div>
           <div class="card-type">{{ unlocked(lv) ? lv.type : '先通过上一关' }}</div>
@@ -182,7 +190,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; text-align: left; }
 /* 关卡卡片：深色毛玻璃 + 右上角切角 + 霓虹边框，鼠标移上去发光上浮 */
 .card {
-  position: relative; padding: 20px 18px 16px; cursor: pointer;
+  position: relative; padding: 24px 22px 20px; cursor: pointer; /* 四周留出边框上代码的位置 */
   background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--line-strong);
   clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);

@@ -6,6 +6,7 @@ import { computed, onMounted } from 'vue'
 import { levels } from '../data/levels.js'
 import { useGameStore } from '../stores/game.js'
 import ImgSlot from './ImgSlot.vue'
+import CodeFrame from './CodeFrame.vue'
 
 const emit = defineEmits(['close'])
 const game = useGameStore()
@@ -44,8 +45,19 @@ const rank = computed(() => {
 
       <div class="grid">
         <div v-for="lv in levels" :key="lv.id" :class="['medal', { on: game.cleared[lv.id] }]">
-          <div class="pic">
-            <ImgSlot :src="`/medals/level-${lv.id}.png`" fallback="🏅" :label="`level-${lv.id}.png`" compact />
+          <!-- 勋章外面一圈代码在转：获得了是金色这一关的代码，没获得是暗淡的乱码 -->
+          <div class="ring">
+            <CodeFrame
+              shape="circle"
+              :text="game.cleared[lv.id] ? lv.code.filter((l) => l.trim()).map((l) => l.trim()).join('  ') : '0x00 LOCKED  '"
+              :color="game.cleared[lv.id] ? 'var(--gold)' : 'var(--text-faint)'"
+              :size="8"
+              :inset="8"
+              :duration="game.cleared[lv.id] ? 18 : 40"
+            />
+            <div class="pic">
+              <ImgSlot :src="`/medals/level-${lv.id}.png`" fallback="🏅" :label="`level-${lv.id}.png`" compact />
+            </div>
           </div>
           <div class="name">{{ game.cleared[lv.id] ? `「${lv.type}猎手」` : '？？？' }}</div>
           <div class="sub">第 {{ lv.id }} 关 · {{ lv.title }}</div>
@@ -83,7 +95,8 @@ h3 { margin: 4px 0 0; font-size: 24px; font-weight: 300; letter-spacing: 6px; co
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; }
 .medal { padding: 18px 10px 14px; text-align: center; border: 1px dashed var(--line); }
-.pic { width: 90px; height: 90px; margin: 0 auto 10px; font-size: 70px; filter: grayscale(1) brightness(0.35); }
+.ring { position: relative; width: 124px; height: 124px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; }
+.pic { width: 76px; height: 76px; font-size: 58px; filter: grayscale(1) brightness(0.35); }
 .name { font-size: 14px; color: var(--text-faint); }
 .sub { margin-top: 4px; font-size: 11px; color: var(--text-faint); }
 .stars { margin-top: 8px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.15); }
