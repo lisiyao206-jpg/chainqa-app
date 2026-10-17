@@ -5,6 +5,7 @@ import { useGameStore } from '../stores/game.js'
 import { useMistakesStore } from '../stores/mistakes.js'
 import { useAiStore } from '../stores/ai.js'
 import MedalPopup from '../components/MedalPopup.vue'
+import MedalWall from '../components/MedalWall.vue'
 
 const game = useGameStore()
 const mistakes = useMistakesStore()
@@ -66,6 +67,7 @@ function askMentor() {
 }
 
 // 选关页顶部的总进度
+const showWall = ref(false) // 勋章墙开关
 const clearedCount = computed(() => levels.filter((l) => game.cleared[l.id]).length)
 const totalStars = computed(() => levels.reduce((n, l) => n + (game.cleared[l.id] || 0), 0))
 
@@ -85,7 +87,9 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
       <div class="summary">
         <span>已通关 <b>{{ clearedCount }}</b> / {{ levels.length }}</span>
         <span>星星 <b>{{ totalStars }}</b> / {{ levels.length * 3 }}</span>
+        <a class="wall-link" @click="showWall = true">🏅 勋章墙 →</a>
       </div>
+      <MedalWall v-if="showWall" @close="showWall = false" />
       <div class="cards">
         <div
           v-for="lv in levels"
@@ -172,6 +176,8 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
 .select h2 { margin: 8px 0 10px; font-size: 34px; font-weight: 300; letter-spacing: 10px; color: #fff; }
 .intro { color: var(--text-dim); margin: 0 0 18px; font-size: 14px; letter-spacing: 1px; }
 .summary { display: inline-flex; gap: 28px; margin-bottom: 34px; font-size: 13px; color: var(--text-dim); letter-spacing: 1px; }
+.wall-link { color: var(--gold); cursor: pointer; }
+.wall-link:hover { text-shadow: 0 0 8px var(--gold); }
 .summary b { color: var(--gold); font-size: 16px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; text-align: left; }
 /* 关卡卡片：深色毛玻璃 + 右上角切角 + 霓虹边框，鼠标移上去发光上浮 */

@@ -3,6 +3,7 @@
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
 import { useThemeStore, BACKGROUNDS } from '../stores/theme.js'
+import MedalWall from './MedalWall.vue'
 
 const emit = defineEmits(['close'])
 const userStore = useUserStore()
@@ -14,6 +15,7 @@ const oldPwd = ref('')
 const newPwd = ref('')
 // 操作结果提示：{ ok: true/false, text }
 const msg = ref(null)
+const showWall = ref(false) // 勋章墙开关
 
 onMounted(async () => {
   profile.value = await userStore.api('/api/profile')
@@ -67,6 +69,8 @@ async function savePassword() {
           <div><b>{{ profile.mistakeCount }}</b>错题</div>
           <div><b>{{ profile.clearedCount }}</b>通关</div>
         </div>
+        <button class="wall-btn" @click="showWall = true">🏅 查看我的勋章墙</button>
+        <MedalWall v-if="showWall" @close="showWall = false" />
 
         <!-- 改昵称 -->
         <!-- 背景主题：点一下就换，整个网站的背景马上跟着变 -->
@@ -122,6 +126,8 @@ header { display: flex; justify-content: space-between; align-items: center; fon
 .info dd { margin: 0; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; text-align: center; font-size: 12px; color: #9ca3af; }
 .stats div { padding: 10px 0; border-radius: 8px; background: rgba(255, 255, 255, 0.05); }
+.wall-btn { width: 100%; margin-top: 10px; padding: 8px; cursor: pointer; font-size: 13px; color: var(--gold); background: rgba(252, 238, 10, 0.06); border: 1px solid rgba(252, 238, 10, 0.4); }
+.wall-btn:hover { background: rgba(252, 238, 10, 0.14); }
 .stats b { display: block; font-size: 20px; color: #fff; }
 h4 { margin: 20px 0 8px; font-size: 14px; }
 .row { display: flex; gap: 8px; }
