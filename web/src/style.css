@@ -84,18 +84,11 @@ a { color: var(--accent); }
 /* 小标签上方的「眉标」：小号大写字母 + 字距，例如 01 / TRAINING CAMP */
 .eyebrow { font-size: 11px; letter-spacing: 3px; color: var(--text-faint); text-transform: uppercase; }
 
-/* ===== 页面切换动画：旧页面模糊、淡出；新页面从模糊中慢慢变清晰 ===== */
-.page-enter-active,
-.page-leave-active {
-  transition: opacity 0.45s ease, filter 0.45s ease, transform 0.45s ease;
-}
-.page-enter-from {
-  opacity: 0;
-  filter: blur(10px);
-  transform: scale(1.02);
-}
-.page-leave-to {
-  opacity: 0;
-  filter: blur(10px);
-  transform: scale(0.98);
+/* ===== 页面切换动画：新页面从下面轻轻滑上来 =====
+   只动位置，不动透明度：就算电脑很卡、动画没播完，页面也一直是看得见的，不会出现「页面空白」
+   （换页时的光幕扫过，已经足够有转场感了） */
+.page-in { animation: page-in 0.4s ease-out; }
+@keyframes page-in {
+  from { transform: translateY(14px); }
+  to { transform: none; }
 }

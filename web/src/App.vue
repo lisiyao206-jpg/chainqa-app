@@ -60,45 +60,48 @@ async function logout() {
   <!-- 光幕转场：盖在最上层，播完自动消失 -->
   <VeilTransition ref="rain" />
 
-  <!-- 外层转场：大厅 ↔ 其他页面切换时淡入淡出 -->
-  <Transition name="page" mode="out-in">
-    <!-- 大厅、登录：整屏显示，不要顶栏 -->
-    <RouterView v-if="inLobby" />
+  <!-- 换页动画说明：
+       以前用 <Transition mode="out-in">（先等旧页面淡出，再让新页面淡入），但旧页面的淡出偶尔会「卡住」，
+       新页面就一直出不来，看起来像页面空白、关卡打不开。
+       现在改成：旧页面直接消失，新页面用一段 CSS 动画淡入（style.css 里的 .page-in），不会卡住；
+       换页时还有光幕扫过，看不出旧页面是直接消失的 -->
 
-    <!-- 其他页面：顶栏 + 内容 -->
-    <div v-else class="page">
-      <!-- 顶栏：和大厅一样的极简小字 -->
-      <header class="topbar">
-        <nav class="links">
-          <RouterLink to="/" class="brand">链上安全局</RouterLink>
-          <RouterLink v-for="n in nav" :key="n.to" :to="n.to" active-class="on">{{ n.title }}</RouterLink>
-        </nav>
-        <div class="me">
-          <RouterLink v-if="userStore.isAdmin" to="/admin" active-class="on">管理后台</RouterLink>
-          <a class="logout" @click="logout">退出</a>
-          <button class="avatar" title="我的档案" @click="showProfile = true">
-            {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
-          </button>
-        </div>
-      </header>
+  <!-- 大厅、登录：整屏显示，不要顶栏。:key 让每换一页都重新播放淡入动画 -->
+  <RouterView v-if="inLobby" v-slot="{ Component }">
+    <component :is="Component" :key="route.path" class="page-in" />
+  </RouterView>
 
-      <main class="content">
-        <!-- 内层转场：训练营 ↔ 案件档案 等页面之间切换 -->
-        <RouterView v-slot="{ Component }">
-          <Transition name="page" mode="out-in">
-            <component :is="Component" />
-          </Transition>
-        </RouterView>
-      </main>
+  <!-- 其他页面：顶栏 + 内容 -->
+  <div v-else class="page">
+    <!-- 顶栏：和大厅一样的极简小字 -->
+    <header class="topbar">
+      <nav class="links">
+        <RouterLink to="/" class="brand">链上安全局</RouterLink>
+        <RouterLink v-for="n in nav" :key="n.to" :to="n.to" active-class="on">{{ n.title }}</RouterLink>
+      </nav>
+      <div class="me">
+        <RouterLink v-if="userStore.isAdmin" to="/admin" active-class="on">管理后台</RouterLink>
+        <a class="logout" @click="logout">退出</a>
+        <button class="avatar" title="我的档案" @click="showProfile = true">
+          {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
+        </button>
+      </div>
+    </header>
 
-      <!-- AI 悬浮窗：在「白帽导师」页不需要，因为整页就是对话 -->
-      <template v-if="route.path !== '/mentor'">
-        <!-- 用 v-show 而不是 v-if：面板收起时只是隐藏，聊天记录不会丢 -->
-        <div v-show="ai.open" class="ai-panel glass"><ChatPanel /></div>
-        <button class="ai-fab" title="AI 小助手" @click="ai.toggle()">AI</button>
-      </template>
-    </div>
-  </Transition>
+    <main class="content">
+      <!-- 训练营 ↔ 案件档案 等页面之间切换：新页面淡入 -->
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" :key="route.path" class="page-in" />
+      </RouterView>
+    </main>
+
+    <!-- AI 悬浮窗：在「白帽导师」页不需要，因为整页就是对话 -->
+    <template v-if="route.path !== '/mentor'">
+      <!-- 用 v-show 而不是 v-if：面板收起时只是隐藏，聊天记录不会丢 -->
+      <div v-show="ai.open" class="ai-panel glass"><ChatPanel /></div>
+      <button class="ai-fab" title="AI 小助手" @click="ai.toggle()">AI</button>
+    </template>
+  </div>
 
   <ProfileModal v-if="showProfile" @close="showProfile = false" />
 </template>

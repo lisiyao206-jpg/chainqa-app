@@ -69,82 +69,86 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
 </script>
 
 <template>
-  <!-- ===== 选关界面 ===== -->
-  <div v-if="!level" class="select">
-    <h2>🎯 实战任务 · 漏洞猎人</h2>
-    <p class="intro">你是链上安全局的审计员。每一关是一份出了事的合约，找出藏着漏洞的那一行。</p>
-    <div class="cards">
-      <div
-        v-for="lv in levels"
-        :key="lv.id"
-        :class="['card', { locked: !unlocked(lv) }]"
-        @click="start(lv)"
-      >
-        <div class="card-no">第 {{ lv.id }} 关</div>
-        <div class="card-title">{{ unlocked(lv) ? lv.title : '🔒 未解锁' }}</div>
-        <div class="card-type">{{ unlocked(lv) ? lv.type : '先通过上一关' }}</div>
-        <div class="stars">
-          <span v-for="i in 3" :key="i">{{ i <= (game.cleared[lv.id] || 0) ? '⭐' : '☆' }}</span>
+  <!-- 最外层只能有一个固定的元素：页面切换动画（App.vue 里的 Transition）套在这个组件外面，
+       如果最外层是 v-if / v-else 来回切换，动画会以为「换页了」，卡在半透明状态，关卡就打不开 -->
+  <div class="game">
+    <!-- ===== 选关界面 ===== -->
+    <div v-if="!level" class="select">
+      <h2>🎯 实战任务 · 漏洞猎人</h2>
+      <p class="intro">你是链上安全局的审计员。每一关是一份出了事的合约，找出藏着漏洞的那一行。</p>
+      <div class="cards">
+        <div
+          v-for="lv in levels"
+          :key="lv.id"
+          :class="['card', { locked: !unlocked(lv) }]"
+          @click="start(lv)"
+        >
+          <div class="card-no">第 {{ lv.id }} 关</div>
+          <div class="card-title">{{ unlocked(lv) ? lv.title : '🔒 未解锁' }}</div>
+          <div class="card-type">{{ unlocked(lv) ? lv.type : '先通过上一关' }}</div>
+          <div class="stars">
+            <span v-for="i in 3" :key="i">{{ i <= (game.cleared[lv.id] || 0) ? '⭐' : '☆' }}</span>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ===== 游戏界面 ===== -->
-  <div v-else class="play">
-    <div class="play-head">
-      <button class="back" @click="level = null">← 选关</button>
-      <span>第 {{ level.id }} 关 · {{ level.title }}</span>
-      <span class="tries">剩余机会：{{ MAX_TRIES - wrongTimes }}</span>
-    </div>
-
-    <div class="story">📋 案情：{{ level.story }}</div>
-
-    <!-- 代码：每一行都能点 -->
-    <div class="code">
-      <div
-        v-for="(line, i) in level.code"
-        :key="i"
-        :class="['line', {
-          picked: picked === i + 1,
-          bug: result && level.bugLines.includes(i + 1),
-        }]"
-        @click="!result && (picked = i + 1)"
-      >
-        <span class="ln">{{ i + 1 }}</span>
-        <pre>{{ line || ' ' }}</pre>
+    <!-- ===== 游戏界面 ===== -->
+    <div v-else class="play">
+      <div class="play-head">
+        <button class="back" @click="level = null">← 选关</button>
+        <span>第 {{ level.id }} 关 · {{ level.title }}</span>
+        <span class="tries">剩余机会：{{ MAX_TRIES - wrongTimes }}</span>
       </div>
-    </div>
 
-    <!-- 还在找 -->
-    <div v-if="!result" class="actions">
-      <span v-if="wrongTimes > 0" class="hint">❌ 不对哦。提示：{{ level.hint }}</span>
-      <span v-else class="hint">点击你认为有漏洞的那一行，然后提交</span>
-      <button class="primary" :disabled="picked === null" @click="submit">提交第 {{ picked ?? '?' }} 行</button>
-    </div>
+      <div class="story">📋 案情：{{ level.story }}</div>
 
-    <!-- 结果 -->
-    <div v-else :class="['result', result]">
-      <div class="result-title">
-        {{ result === 'win' ? '🎉 漏洞找到了！' : '💥 机会用完了，这道题已经放进错题本' }}
+      <!-- 代码：每一行都能点 -->
+      <div class="code">
+        <div
+          v-for="(line, i) in level.code"
+          :key="i"
+          :class="['line', {
+            picked: picked === i + 1,
+            bug: result && level.bugLines.includes(i + 1),
+          }]"
+          @click="!result && (picked = i + 1)"
+        >
+          <span class="ln">{{ i + 1 }}</span>
+          <pre>{{ line || ' ' }}</pre>
+        </div>
       </div>
-      <div><b>漏洞类型：</b>{{ level.type }}</div>
-      <div class="explain">{{ level.explanation }}</div>
-      <div class="result-actions">
-        <button @click="askMentor">🧑‍💻 请白帽导师结合教材再讲讲</button>
-        <button @click="start(level)">🔄 再玩一次</button>
-        <button v-if="result === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一关 →</button>
-      </div>
-    </div>
 
-    <!-- 答对时弹出勋章 -->
-    <MedalPopup
-      v-if="medal"
-      :level="level"
-      :stars="medal.stars"
-      :first-time="medal.firstTime"
-      @close="medal = null"
-    />
+      <!-- 还在找 -->
+      <div v-if="!result" class="actions">
+        <span v-if="wrongTimes > 0" class="hint">❌ 不对哦。提示：{{ level.hint }}</span>
+        <span v-else class="hint">点击你认为有漏洞的那一行，然后提交</span>
+        <button class="primary" :disabled="picked === null" @click="submit">提交第 {{ picked ?? '?' }} 行</button>
+      </div>
+
+      <!-- 结果 -->
+      <div v-else :class="['result', result]">
+        <div class="result-title">
+          {{ result === 'win' ? '🎉 漏洞找到了！' : '💥 机会用完了，这道题已经放进错题本' }}
+        </div>
+        <div><b>漏洞类型：</b>{{ level.type }}</div>
+        <div class="explain">{{ level.explanation }}</div>
+        <div class="result-actions">
+          <button @click="askMentor">🧑‍💻 请白帽导师结合教材再讲讲</button>
+          <button @click="start(level)">🔄 再玩一次</button>
+          <button v-if="result === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一关 →</button>
+        </div>
+      </div>
+
+      <!-- 答对时弹出勋章 -->
+      <MedalPopup
+        v-if="medal"
+        :level="level"
+        :stars="medal.stars"
+        :first-time="medal.firstTime"
+        @close="medal = null"
+      />
+    </div>
   </div>
 </template>
 

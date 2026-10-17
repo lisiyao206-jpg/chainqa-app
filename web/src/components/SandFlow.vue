@@ -13,7 +13,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
 const props = defineProps({
-  text: { type: String, default: '链上安全局' }, // 沙字内容，传空字符串就不聚字
+  text: { type: String, default: '' }, // 沙字内容：默认不聚字；想要沙字就传 text="链上安全局"
   textY: { type: Number, default: 0.16 },        // 沙字在屏幕高度的什么位置（0 顶部 ~ 1 底部）
 })
 

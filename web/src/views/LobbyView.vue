@@ -49,19 +49,6 @@ function go(s) {
       </div>
     </header>
 
-    <!-- 左侧：章节目录，和发光点联动 -->
-    <aside class="chapters">
-      <div
-        v-for="s in spots"
-        :key="s.no"
-        :class="['chapter', { on: active === s.no }]"
-        @mouseenter="active = s.no"
-        @mouseleave="active = null"
-        @click="go(s)"
-      >
-        <span class="no">{{ s.no }}</span>{{ s.title }}
-      </div>
-    </aside>
 
     <!-- 中间：一行细字标题；有入口被点亮时淡出，让位给右侧介绍 -->
     <Transition name="fade">
@@ -130,15 +117,6 @@ function go(s) {
   color: #fff; font-size: 13px;
 }
 .avatar:hover { border-color: #fff; }
-
-/* ===== 左侧目录 ===== */
-.chapters {
-  position: absolute; left: 36px; top: 50%; transform: translateY(-50%); z-index: 5;
-  display: flex; flex-direction: column; gap: 14px; font-size: 12px;
-}
-.chapter { color: rgba(233, 230, 255, 0.45); cursor: pointer; transition: all 0.3s; letter-spacing: 1px; }
-.chapter .no { display: inline-block; width: 28px; opacity: 0.6; }
-.chapter.on, .chapter:hover { color: #fff; transform: translateX(6px); }
 
 /* ===== 中间标题 ===== */
 .headline {

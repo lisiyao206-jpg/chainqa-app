@@ -126,7 +126,7 @@ function mouseInfluence(x, y) {
 
 // 让 value 以「大约 0.4 秒」的速度平滑地追向 target
 function approach(value, target, dt) {
-  return value + (target - value) * (1 - Math.exp(-dt / 0.15))
+  return value + (target - value) * (1 - Math.exp(-dt / 12))
 }
 
 // 粒子在一生的进度 life（0~1）时的位置
