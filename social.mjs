@@ -17,6 +17,7 @@ function userBrief(id) {
   return u && { userId: u.user_id, account: u.account, nickname: u.nickname || u.account, avatar: u.avatar || null };
 }
 const isFriend = (uid, fid) => !!one("SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?", uid, fid);
+const isAdmin = (uid) => one("SELECT role FROM users WHERE user_id = ?", uid)?.role === "admin";
 const isMember = (uid, roomId) => !!one("SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?", roomId, uid);
 
 // 文字检查：去掉首尾空格，不能太长
@@ -162,7 +163,8 @@ export function roomMembers(uid, roomId) {
 
 function fileBrief(fileId) {
   const f = fileId && one("SELECT * FROM files WHERE file_id = ?", fileId);
-  return f ? { id: f.file_id, name: f.name, size: f.size, isImage: IMAGE_EXT.includes(path.extname(f.name).toLowerCase()) } : null;
+  const ext = f && path.extname(f.name).toLowerCase();
+  return f ? { id: f.file_id, name: f.name, size: f.size, isImage: IMAGE_EXT.includes(ext), isVideo: VIDEO_EXT.includes(ext) } : null;
 }
 function msgRow(r) {
   return { id: r.msg_id, from: userBrief(r.user_id), text: r.content, file: fileBrief(r.file_id), time: toISO(r.create_time) };
@@ -196,39 +198,58 @@ export function sendMessage(uid, roomId, { text, fileId }) {
 
 // ===== 好友圈 =====
 
-// 能不能看到这条动态：自己发的，或者好友发的
+// 能不能看到这条帖子：广场帖子所有人都能看；好友圈动态只有自己和好友能看
 function canSeePost(uid, post) {
-  return post && (post.user_id === uid || isFriend(uid, post.user_id));
+  return post && (post.visibility === "public" || post.user_id === uid || isFriend(uid, post.user_id));
 }
 function postRow(uid, p) {
   return {
-    id: p.post_id, author: userBrief(p.user_id), text: p.content, file: fileBrief(p.file_id), time: toISO(p.create_time),
+    id: p.post_id, author: userBrief(p.user_id), title: p.title, text: p.content, file: fileBrief(p.file_id), time: toISO(p.create_time),
     mine: p.user_id === uid,
+    friend: isFriend(uid, p.user_id), // 广场上看到不认识的人，可以直接加好友
+    canDelete: p.user_id === uid || isAdmin(uid), // 管理员可以删掉广场上不合适的帖子
     likes: all("SELECT user_id FROM post_likes WHERE post_id = ?", p.post_id).map((r) => userBrief(r.user_id).nickname),
     liked: !!one("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?", p.post_id, uid),
-    // 评论只显示「我能看到的人」写的，和微信朋友圈一样：不是好友的评论看不到
+    // 好友圈：评论只显示「我能看到的人」写的，和微信朋友圈一样；广场：所有评论都公开
     comments: all("SELECT * FROM post_comments WHERE post_id = ? ORDER BY comment_id", p.post_id)
-      .filter((c) => c.user_id === uid || isFriend(uid, c.user_id))
-      .map((c) => ({ id: c.comment_id, from: userBrief(c.user_id), text: c.content, mine: c.user_id === uid })),
+      .filter((c) => p.visibility === "public" || c.user_id === uid || isFriend(uid, c.user_id))
+      .map((c) => ({ id: c.comment_id, from: userBrief(c.user_id), text: c.content, mine: c.user_id === uid, canDelete: c.user_id === uid || isAdmin(uid) })),
   };
 }
 
+// 好友圈：自己和好友发的「好友圈动态」
 export function listPosts(uid) {
-  return all(`SELECT * FROM posts WHERE user_id = ? OR user_id IN (SELECT friend_id FROM friends WHERE user_id = ?)
+  return all(`SELECT * FROM posts WHERE visibility = 'friends'
+                AND (user_id = ? OR user_id IN (SELECT friend_id FROM friends WHERE user_id = ?))
               ORDER BY post_id DESC LIMIT 50`, uid, uid).map((p) => postRow(uid, p));
 }
 
-export function createPost(uid, { text, fileId }) {
-  text = cleanText(text, 500, "一条动态");
+// 广场：所有人的公开帖子。sort = 'new' 最新 / 'hot' 最热（按点赞数 + 评论数排）
+export function listSquare(uid, sort = "new") {
+  const order = sort === "hot"
+    ? `(SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.post_id)
+       + (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = p.post_id) DESC, p.post_id DESC`
+    : "p.post_id DESC";
+  return all(`SELECT * FROM posts p WHERE visibility = 'public' ORDER BY ${order} LIMIT 50`).map((p) => postRow(uid, p));
+}
+
+export function createPost(uid, { text, fileId, title, visibility }) {
+  const isPublic = visibility === "public";
+  text = cleanText(text, isPublic ? 2000 : 500, isPublic ? "帖子正文" : "一条动态");
+  title = isPublic ? cleanText(title, 40, "标题") : null;
+  if (isPublic && !title) throw new Error("给帖子起个标题吧");
   if (fileId && !one("SELECT 1 FROM files WHERE file_id = ? AND user_id = ?", fileId, uid)) throw new Error("文件不存在");
   if (!text && !fileId) throw new Error("写点什么再发吧");
   rateLimit(uid);
-  const { lastInsertRowid } = run("INSERT INTO posts (user_id, content, file_id) VALUES (?, ?, ?)", uid, text, fileId || null);
+  const { lastInsertRowid } = run("INSERT INTO posts (user_id, content, file_id, title, visibility) VALUES (?, ?, ?, ?, ?)",
+    uid, text, fileId || null, title, isPublic ? "public" : "friends");
   return postRow(uid, one("SELECT * FROM posts WHERE post_id = ?", lastInsertRowid));
 }
 
+// 自己的帖子自己能删；管理员能删任何帖子（广场是公开的，要有人管）
 export function deletePost(uid, postId) {
-  run("DELETE FROM posts WHERE post_id = ? AND user_id = ?", postId, uid);
+  if (isAdmin(uid)) run("DELETE FROM posts WHERE post_id = ?", postId);
+  else run("DELETE FROM posts WHERE post_id = ? AND user_id = ?", postId, uid);
 }
 
 export function toggleLike(uid, postId) {
@@ -246,6 +267,7 @@ export function addComment(uid, postId, text) {
 }
 
 export function deleteComment(uid, commentId) {
+  if (isAdmin(uid)) return void run("DELETE FROM post_comments WHERE comment_id = ?", commentId);
   run("DELETE FROM post_comments WHERE comment_id = ? AND user_id = ?", commentId, uid);
 }
 
@@ -253,10 +275,12 @@ export function deleteComment(uid, commentId) {
 // 文件存在项目根目录的 uploads/ 文件夹（记得把 uploads/ 写进 .gitignore，不要传到 GitHub）
 const UPLOAD_DIR = "uploads";
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-const MAX_SIZE = 10 * 1024 * 1024; // 单个文件最大 10MB
+const MAX_SIZE = 10 * 1024 * 1024;       // 普通文件最大 10MB
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 视频最大 50MB
 const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+const VIDEO_EXT = [".mp4", ".webm"]; // 浏览器都能直接播放的两种视频格式
 // 只允许这些类型：学习资料常用的格式。不允许 .exe、.html、.svg 这类可能带病毒或脚本的文件
-const ALLOWED_EXT = [...IMAGE_EXT, ".pdf", ".txt", ".md", ".sol", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
+const ALLOWED_EXT = [...IMAGE_EXT, ...VIDEO_EXT, ".pdf", ".txt", ".md", ".sol", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx", ".zip"];
 
 // 上传：请求体就是文件本身（不是 JSON），文件名放在请求头 X-File-Name 里
 export function saveUpload(uid, req) {
@@ -271,9 +295,11 @@ export function saveUpload(uid, req) {
       req.resume();
       return reject(new Error(`不支持这种文件，可以传：${ALLOWED_EXT.join(" ")}`));
     }
-    if (Number(req.headers["content-length"] || 0) > MAX_SIZE) {
+    const limit = VIDEO_EXT.includes(ext) ? MAX_VIDEO_SIZE : MAX_SIZE;
+    const limitText = `${VIDEO_EXT.includes(ext) ? "视频" : "文件"}不能超过 ${limit / 1024 / 1024}MB`;
+    if (Number(req.headers["content-length"] || 0) > limit) {
       req.resume();
-      return reject(new Error("文件不能超过 10MB"));
+      return reject(new Error(limitText));
     }
     const id = crypto.randomBytes(16).toString("hex");
     const file = path.join(UPLOAD_DIR, id);
@@ -282,11 +308,11 @@ export function saveUpload(uid, req) {
     req.on("data", (chunk) => {
       size += chunk.length;
       // 有人谎报大小：边收边数，超过就停
-      if (size > MAX_SIZE && !failed) {
+      if (size > limit && !failed) {
         failed = true;
         out.destroy();
         fs.rm(file, () => {});
-        reject(new Error("文件不能超过 10MB"));
+        reject(new Error(limitText));
       }
     });
     req.pipe(out);
@@ -311,5 +337,5 @@ export function getFile(uid, fileId) {
     all("SELECT * FROM posts WHERE file_id = ?", f.file_id).some((p) => canSeePost(uid, p));
   if (!ok) return null;
   const ext = path.extname(f.name).toLowerCase();
-  return { path: path.join(UPLOAD_DIR, f.file_id), name: f.name, isImage: IMAGE_EXT.includes(ext), ext };
+  return { path: path.join(UPLOAD_DIR, f.file_id), name: f.name, isMedia: IMAGE_EXT.includes(ext) || VIDEO_EXT.includes(ext), ext };
 }

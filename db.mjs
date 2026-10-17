@@ -155,3 +155,10 @@ try {
 try {
   db.exec("ALTER TABLE users ADD COLUMN avatar TEXT");
 } catch {}
+// 帖子分两种：'friends' 好友圈（只有好友能看）/ 'public' 广场帖子（所有人都能看），广场帖子还有标题
+try {
+  db.exec("ALTER TABLE posts ADD COLUMN visibility TEXT NOT NULL DEFAULT 'friends'");
+} catch {}
+try {
+  db.exec("ALTER TABLE posts ADD COLUMN title TEXT");
+} catch {}

@@ -19,7 +19,7 @@ const PUBLIC_DIR = path.join("web", "dist");
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript",
   ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
-  ".svg": "image/svg+xml", ".webp": "image/webp",
+  ".svg": "image/svg+xml", ".webp": "image/webp", ".mp4": "video/mp4", ".webm": "video/webm",
 };
 
 // 读取请求体（问题以 JSON 形式发过来）
@@ -256,6 +256,7 @@ function routeSocial(req, res) {
 
   // 好友圈
   if (p === "/posts" && method === "GET") return W((uid) => social.listPosts(uid));
+  if (p === "/square" && method === "GET") return W((uid) => social.listSquare(uid, q.get("sort")));
   if (p === "/posts" && method === "POST") return W((uid, b) => social.createPost(uid, b));
   if ((m = p.match(/^\/posts\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deletePost(uid, Number(m[1])));
   if ((m = p.match(/^\/posts\/(\d+)\/like$/)) && method === "POST") return W((uid) => social.toggleLike(uid, Number(m[1])));
@@ -276,9 +277,9 @@ function routeSocial(req, res) {
     const file = user && social.getFile(user.userId, m[1]);
     if (!file || !fs.existsSync(file.path)) return sendJSON(res, 404, { error: "文件不存在或没有权限" });
     res.writeHead(200, {
-      // 图片按图片发（聊天里能直接显示）；其他文件一律当「下载」，浏览器不会去打开执行它
-      "Content-Type": file.isImage ? TYPES[file.ext] : "application/octet-stream",
-      "Content-Disposition": `${file.isImage ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      // 图片、视频按原类型发（能直接显示、播放）；其他文件一律当「下载」，浏览器不会去打开执行它
+      "Content-Type": file.isMedia ? TYPES[file.ext] : "application/octet-stream",
+      "Content-Disposition": `${file.isMedia ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(file.name)}`,
       "X-Content-Type-Options": "nosniff",
     });
     return fs.createReadStream(file.path).pipe(res);

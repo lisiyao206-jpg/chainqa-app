@@ -1,38 +1,52 @@
 <script setup>
-// 好友圈：发动态（文字 + 可选一个文件/图片），好友可以点赞、评论
-// 只有自己和好友能看到；评论也只显示好友写的（和微信朋友圈一样）
-import { ref, onMounted, onUnmounted } from 'vue'
+// 帖子列表：好友圈和广场共用这一个组件，用 square 区分
+//   好友圈（square = false）：只有自己和好友能看到；评论也只显示好友写的（和微信朋友圈一样）
+//   广场（square = true）：所有人都能看到，不认识的人也能讨论；帖子有标题，可以按「最新 / 最热」排，
+//                         看到聊得来的人可以直接加好友；管理员可以删除不合适的帖子和评论
+// 两种都能带一个附件：图片、视频（mp4 / webm）或学习资料
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
-import { uploadFile } from '../utils/files.js'
+import { uploadFile, isVideoName } from '../utils/files.js'
 import FileChip from './FileChip.vue'
 import UserAvatar from './UserAvatar.vue'
 
+const props = defineProps({ square: Boolean })
 const userStore = useUserStore()
 const posts = ref([])
+const title = ref('')
 const text = ref('')
-const attached = ref(null) // 已上传、准备随动态一起发的文件
+const attached = ref(null) // 已上传、准备随帖子一起发的文件
 const busy = ref(false)
 const error = ref('')
-const drafts = ref({})     // 每条动态下面评论框里正在写的字：{ 动态id: 文字 }
+const tip = ref('')
+const drafts = ref({})     // 每条帖子下面评论框里正在写的字：{ 帖子id: 文字 }
 const fileInput = ref(null)
+const sort = ref('new')    // 广场的排序：new 最新 / hot 最热
+const maxLen = computed(() => (props.square ? 2000 : 500))
 let timer
 
 async function load() {
   try {
-    posts.value = await userStore.api('/api/social/posts')
+    posts.value = await userStore.api(props.square ? `/api/social/square?sort=${sort.value}` : '/api/social/posts')
   } catch (e) {
     error.value = e.message
   }
 }
 onMounted(() => {
   load()
-  timer = setInterval(load, 15000) // 每 15 秒刷新一次，看看好友有没有新动态
+  timer = setInterval(load, 15000) // 每 15 秒刷新一次，看看有没有新帖子
 })
 onUnmounted(() => clearInterval(timer))
+
+function changeSort(s) {
+  sort.value = s
+  load()
+}
 
 // 统一处理：执行操作 → 出错就显示 → 最后重新加载列表
 async function act(fn) {
   error.value = ''
+  tip.value = ''
   try {
     await fn()
     await load()
@@ -46,6 +60,7 @@ async function pickFile(e) {
   e.target.value = ''
   if (!file) return
   busy.value = true
+  error.value = ''
   try {
     attached.value = await uploadFile(file)
   } catch (err) {
@@ -57,13 +72,18 @@ async function pickFile(e) {
 
 function publish() {
   return act(async () => {
-    await userStore.api('/api/social/posts', { text: text.value, fileId: attached.value?.id })
-    text.value = ''
+    await userStore.api('/api/social/posts', {
+      text: text.value,
+      fileId: attached.value?.id,
+      title: title.value,
+      visibility: props.square ? 'public' : 'friends',
+    })
+    title.value = text.value = ''
     attached.value = null
   })
 }
 const like = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/like`, {}))
-const remove = (p) => confirm('删除这条动态？') && act(() => userStore.api(`/api/social/posts/${p.id}`, null, 'DELETE'))
+const remove = (p) => confirm('删除这条帖子？') && act(() => userStore.api(`/api/social/posts/${p.id}`, null, 'DELETE'))
 const removeComment = (c) => act(() => userStore.api(`/api/social/comments/${c.id}`, null, 'DELETE'))
 function comment(p) {
   const t = (drafts.value[p.id] || '').trim()
@@ -73,26 +93,46 @@ function comment(p) {
     drafts.value[p.id] = ''
   })
 }
+// 广场上看到不认识的人：一键发好友申请
+const addFriend = (p) =>
+  act(async () => {
+    tip.value = (await userStore.api('/api/social/friends', { account: p.author.account })).message
+  })
 
 const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
 </script>
 
 <template>
   <div class="feed">
-    <!-- 发动态 -->
+    <!-- 发帖 -->
     <div class="composer glass">
-      <textarea v-model="text" rows="3" maxlength="500" placeholder="分享今天学到的知识、遇到的难题……"></textarea>
+      <input v-if="props.square" v-model="title" class="title-input" maxlength="40" placeholder="帖子标题，例如：一文看懂重入攻击（附视频讲解）" />
+      <textarea
+        v-model="text"
+        :rows="props.square ? 4 : 3"
+        :maxlength="maxLen"
+        :placeholder="props.square ? '写下你的心得、问题或经验，所有审计员都能看到并参与讨论……' : '分享今天学到的知识、遇到的难题……'"
+      ></textarea>
       <div class="bar">
-        <button class="btn" :disabled="busy" @click="fileInput.click()">📎 {{ busy ? '上传中…' : '附件 / 图片' }}</button>
+        <button class="btn" :disabled="busy" @click="fileInput.click()">📎 {{ busy ? '上传中…' : '图片 / 视频 / 资料' }}</button>
         <input ref="fileInput" type="file" hidden @change="pickFile" />
-        <span v-if="attached" class="attached">{{ attached.name }} <a @click="attached = null">✕</a></span>
-        <span class="len">{{ text.length }} / 500</span>
-        <button class="btn primary" :disabled="busy || (!text.trim() && !attached)" @click="publish">发布</button>
+        <span v-if="attached" class="attached">{{ isVideoName(attached.name) ? '🎬' : '📄' }} {{ attached.name }} <a @click="attached = null">✕</a></span>
+        <span class="len">{{ text.length }} / {{ maxLen }}</span>
+        <button class="btn primary" :disabled="busy || (props.square && !title.trim()) || (!text.trim() && !attached)" @click="publish">发布</button>
       </div>
+      <div class="note">视频支持 mp4 / webm，最大 50MB；其他文件最大 10MB</div>
+    </div>
+
+    <div v-if="props.square" class="sorts">
+      <button :class="{ on: sort === 'new' }" @click="changeSort('new')">最新</button>
+      <button :class="{ on: sort === 'hot' }" @click="changeSort('hot')">最热</button>
     </div>
     <div v-if="error" class="error">{{ error }}</div>
+    <div v-if="tip" class="ok">{{ tip }}</div>
 
-    <div v-if="!posts.length" class="empty">还没有动态。加几个好友，或者先发一条吧</div>
+    <div v-if="!posts.length" class="empty">
+      {{ props.square ? '广场上还没有帖子，来发第一帖吧' : '还没有动态。加几个好友，或者先发一条吧' }}
+    </div>
 
     <article v-for="p in posts" :key="p.id" class="post glass">
       <header>
@@ -101,23 +141,26 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
           <b>{{ p.author.nickname }}</b>
           <div class="time">{{ shortTime(p.time) }}</div>
         </div>
-        <a v-if="p.mine" class="del" @click="remove(p)">删除</a>
+        <button v-if="props.square && !p.mine && !p.friend" class="btn add" @click="addFriend(p)">+ 加好友</button>
+        <a v-if="p.canDelete" class="del" @click="remove(p)">{{ p.mine ? '删除' : '管理员删除' }}</a>
       </header>
+      <h3 v-if="p.title" class="post-title">{{ p.title }}</h3>
       <div v-if="p.text" class="text">{{ p.text }}</div>
       <FileChip v-if="p.file" :file="p.file" class="file" />
 
       <div class="actions">
         <button :class="['like', { on: p.liked }]" @click="like(p)">{{ p.liked ? '♥' : '♡' }} {{ p.likes.length || '赞' }}</button>
+        <span class="count">💬 {{ p.comments.length }}</span>
       </div>
       <div v-if="p.likes.length" class="likes">♥ {{ p.likes.join('、') }}</div>
 
       <div class="comments">
         <div v-for="c in p.comments" :key="c.id" class="comment">
           <b>{{ c.from.nickname }}：</b>{{ c.text }}
-          <a v-if="c.mine" class="del" @click="removeComment(c)">删除</a>
+          <a v-if="c.canDelete" class="del" @click="removeComment(c)">删除</a>
         </div>
         <form class="comment-box" @submit.prevent="comment(p)">
-          <input v-model="drafts[p.id]" class="input" maxlength="200" placeholder="写评论…" />
+          <input v-model="drafts[p.id]" class="input" maxlength="200" :placeholder="props.square ? '参与讨论…' : '写评论…'" />
           <button class="btn">评论</button>
         </form>
       </div>
@@ -126,39 +169,45 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
 </template>
 
 <style scoped>
-.feed { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 30px; }
+.feed { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 30px; }
 .composer { padding: 14px 16px; }
-.composer textarea {
-  width: 100%; resize: vertical; padding: 8px 10px; font-size: 14px; font-family: var(--font); line-height: 1.6;
+.title-input, .composer textarea {
+  width: 100%; padding: 8px 10px; font-size: 14px; font-family: var(--font); line-height: 1.6;
   color: var(--text); background: rgba(6, 4, 20, 0.6); border: 1px solid var(--line-strong); outline: none;
 }
-.composer textarea:focus { border-color: var(--accent); }
+.title-input { margin-bottom: 8px; font-size: 15px; font-weight: 600; }
+.composer textarea { resize: vertical; }
+.title-input:focus, .composer textarea:focus { border-color: var(--accent); }
 .bar { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
-.attached { font-size: 12px; color: var(--accent); }
+.note { margin-top: 6px; font-size: 11px; color: var(--text-faint); }
+.attached { font-size: 12px; color: var(--accent); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attached a { cursor: pointer; margin-left: 4px; }
 .len { margin-left: auto; font-size: 12px; color: var(--text-faint); }
+.sorts { display: flex; gap: 18px; font-size: 13px; }
+.sorts button { padding: 0 0 4px; border: none; border-bottom: 2px solid transparent; background: none; color: var(--text-dim); cursor: pointer; letter-spacing: 2px; }
+.sorts button.on { color: #fff; border-bottom-color: var(--accent); }
 .error { color: var(--danger); font-size: 13px; }
+.ok { color: var(--ok); font-size: 13px; }
 .empty { text-align: center; color: var(--text-faint); font-size: 13px; padding: 30px 0; }
 
 .post { padding: 16px 18px; }
 .post header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.avatar {
-  width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--line-strong); color: #fff; font-size: 14px; background: rgba(0, 240, 255, 0.08);
-}
 .post header b { color: #fff; font-size: 14px; }
 .time { font-size: 11px; color: var(--text-faint); }
+.add { margin-left: auto; padding: 4px 12px; font-size: 12px; }
 .del { margin-left: auto; font-size: 12px; color: var(--text-faint); cursor: pointer; }
+.add + .del { margin-left: 12px; }
 .del:hover { color: var(--danger); }
+.post-title { margin: 0 0 8px; font-size: 17px; color: #fff; letter-spacing: 1px; }
 .text { white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: 14px; color: var(--text); }
 .file { margin-top: 10px; }
-.actions { margin-top: 10px; }
+.actions { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
 .like { border: none; background: none; cursor: pointer; color: var(--text-dim); font-size: 13px; padding: 0; }
 .like.on { color: var(--accent-strong); }
 .likes { margin-top: 8px; font-size: 12px; color: var(--accent-strong); }
 .comments { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 6px; }
 .comment { font-size: 13px; color: var(--text); display: flex; gap: 4px; }
-.comment b { color: var(--accent); font-weight: normal; }
+.comment b { color: var(--accent); font-weight: normal; flex-shrink: 0; }
 .comment-box { display: flex; gap: 8px; margin-top: 4px; }
 .comment-box .btn { padding: 5px 12px; font-size: 12px; flex-shrink: 0; }
 </style>

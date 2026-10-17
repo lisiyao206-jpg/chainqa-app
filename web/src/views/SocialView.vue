@@ -1,5 +1,6 @@
 <script setup>
-// 情报站：审计员之间交流的地方，分三栏
+// 情报站：审计员之间交流的地方，分四栏
+//   广场：外圈，所有人都能看、都能讨论，可以发帖、发视频分享心得（MomentsFeed.vue，square 模式）
 //   聊天：和好友私聊、建讨论组一起讨论题目，可以互相传文件（ChatRoom.vue）
 //   好友圈：发动态、点赞、评论（MomentsFeed.vue）
 //   好友：按账号加好友、处理好友申请、好友列表
@@ -10,7 +11,7 @@ import MomentsFeed from '../components/MomentsFeed.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 
 const userStore = useUserStore()
-const tab = ref('chat')
+const tab = ref('square')
 const rooms = ref([])
 const friends = ref([])
 const requests = ref([])
@@ -113,6 +114,7 @@ async function onLeft() {
       <div class="eyebrow">Intel Hub</div>
       <h2>情报站</h2>
       <nav class="tabs">
+        <button :class="{ on: tab === 'square' }" @click="tab = 'square'">广场</button>
         <button :class="{ on: tab === 'chat' }" @click="tab = 'chat'">
           聊天 <i v-if="totalUnread" class="dot">{{ totalUnread }}</i>
         </button>
@@ -124,8 +126,11 @@ async function onLeft() {
     </div>
     <div v-if="error" class="error">{{ error }}</div>
 
+    <!-- 广场：外圈，不认识的人也能一起讨论 -->
+    <MomentsFeed v-if="tab === 'square'" key="square" square />
+
     <!-- 聊天：左边聊天列表，右边聊天窗口 -->
-    <div v-if="tab === 'chat'" class="chat glass">
+    <div v-else-if="tab === 'chat'" class="chat glass">
       <aside>
         <button class="btn primary new" @click="showNew = !showNew">+ 新建讨论组</button>
         <form v-if="showNew" class="new-group" @submit.prevent="createGroup">
@@ -157,7 +162,7 @@ async function onLeft() {
       <div v-else class="placeholder">选一个聊天开始讨论</div>
     </div>
 
-    <MomentsFeed v-else-if="tab === 'moments'" />
+    <MomentsFeed v-else-if="tab === 'moments'" key="moments" />
 
     <!-- 好友 -->
     <div v-else class="friends">
