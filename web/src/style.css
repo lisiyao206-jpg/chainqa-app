@@ -35,6 +35,8 @@ html { background: var(--bg); }
 body { margin: 0; color: var(--text); font-family: var(--font); }
 a { color: var(--accent); }
 ::selection { background: rgba(0, 240, 255, 0.3); }
+/* 下拉框展开后的选项：Windows 上默认是白底，配上全站的浅色字就看不见了，统一改成深底浅字 */
+select, option { background: #0b0820; color: var(--text); }
 
 /* 滚动条：细、淡紫 */
 ::-webkit-scrollbar { width: 6px; height: 6px; }

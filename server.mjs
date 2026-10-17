@@ -233,7 +233,7 @@ function routeSocial(req, res) {
   let m;
 
   // 好友
-  if (p === "/search" && method === "GET") return W((uid) => social.searchUser(uid, q.get("account")));
+  if (p === "/search" && method === "GET") return W((uid) => social.searchUsers(uid, q.get("q")));
   if (p === "/friends" && method === "GET") return W((uid) => social.listFriends(uid));
   if (p === "/friends" && method === "POST") return W((uid, b) => social.sendRequest(uid, b.account));
   if ((m = p.match(/^\/friends\/(\d+)$/)) && method === "DELETE") return W((uid) => social.removeFriend(uid, Number(m[1])));

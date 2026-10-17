@@ -52,20 +52,26 @@ async function act(fn) {
 }
 
 // ===== 好友 =====
-const account = ref('')
-const found = ref(null)
+// 搜人：一边打字一边搜，按「一个一个字」匹配账号或昵称（只记得名字里的几个字也能找到）
+const keyword = ref('')
+const results = ref([])
 const tip = ref('')
+let searchTimer
+// 每打一个字都等 300 毫秒，停下来了才去搜，不会每按一个键就请求一次后端
+function onSearchInput() {
+  clearTimeout(searchTimer)
+  searchTimer = setTimeout(search, 300)
+}
 const search = () =>
   act(async () => {
     tip.value = ''
-    found.value = null
-    found.value = await userStore.api(`/api/social/search?account=${encodeURIComponent(account.value.trim())}`)
+    const k = keyword.value.trim()
+    results.value = k ? await userStore.api(`/api/social/search?q=${encodeURIComponent(k)}`) : []
   })
-const addFriend = () =>
+const addFriend = (u) =>
   act(async () => {
-    tip.value = (await userStore.api('/api/social/friends', { account: found.value.account })).message
-    found.value = null
-    account.value = ''
+    tip.value = (await userStore.api('/api/social/friends', { account: u.account })).message
+    await search() // 刷新一下按钮状态（加好友 → 已发送申请）
     loadFriends()
   })
 const respond = (r, accept) =>
@@ -169,15 +175,16 @@ async function onLeft() {
       <section class="glass box">
         <h4>添加好友</h4>
         <form class="row" @submit.prevent="search">
-          <input v-model="account" class="input" placeholder="输入对方的账号" />
+          <input v-model="keyword" class="input" placeholder="输入账号或昵称里的字，例如「小白」或「bo」" @input="onSearchInput" />
           <button class="btn">搜索</button>
         </form>
-        <div v-if="found" class="person">
-          <UserAvatar :user="found" :size="34" />
-          <span>{{ found.nickname }}<small>（{{ found.account }}）</small></span>
-          <button v-if="found.relation === 'none'" class="btn primary" @click="addFriend">加好友</button>
-          <span v-else class="faint">{{ { self: '这是你自己', friend: '已经是好友', pending: '已发送申请' }[found.relation] }}</span>
+        <div v-for="u in results" :key="u.userId" class="person">
+          <UserAvatar :user="u" :size="34" />
+          <span>{{ u.nickname }}<small>（{{ u.account }}）</small></span>
+          <button v-if="u.relation === 'none'" class="btn primary" @click="addFriend(u)">加好友</button>
+          <span v-else class="faint">{{ { self: '这是你自己', friend: '已经是好友', pending: '已发送申请' }[u.relation] }}</span>
         </div>
+        <div v-if="keyword.trim() && !results.length" class="faint pad">没有找到，换几个字试试</div>
         <div v-if="tip" class="ok">{{ tip }}</div>
       </section>
 

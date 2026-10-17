@@ -43,7 +43,24 @@ function rateLimit(uid) {
 export function searchUser(uid, account) {
   const u = one("SELECT user_id FROM users WHERE account = ? AND status = 'active'", String(account || "").trim());
   if (!u) throw new Error("没有找到这个账号");
-  const fid = u.user_id;
+  return relationOf(uid, u.user_id);
+}
+
+// 模糊搜人：按「一个一个字」匹配账号或昵称。
+// 输入「小白」→ 匹配模式 %小%白%：昵称里依次出现「小」和「白」就算找到（中间隔着别的字也行），
+// 所以只记得对方名字里的几个字也能搜到。最多返回 10 个人
+export function searchUsers(uid, keyword) {
+  const chars = [...String(keyword || "")].filter((c) => c.trim()).slice(0, 20); // 空格不算
+  if (!chars.length) return [];
+  // % 和 _ 在 LIKE 里有特殊含义，用户输入的要先「转义」成普通字符
+  const pattern = "%" + chars.map((c) => c.replace(/[\\%_]/g, (x) => "\\" + x)).join("%") + "%";
+  return all(`SELECT user_id FROM users WHERE status = 'active'
+              AND (account LIKE ? ESCAPE '\\' OR nickname LIKE ? ESCAPE '\\')
+              ORDER BY (account = ?) DESC, user_id LIMIT 10`, pattern, pattern, chars.join(""))
+    .map((u) => relationOf(uid, u.user_id));
+}
+
+function relationOf(uid, fid) {
   let relation = "none";
   if (fid === uid) relation = "self";
   else if (isFriend(uid, fid)) relation = "friend";

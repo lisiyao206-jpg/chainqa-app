@@ -27,11 +27,17 @@ async function load() {
 }
 watch(kind, load, { immediate: true })
 
-// 搜索：标题、正文、作者里有关键词就留下
+// 搜索：按「一个一个字」匹配。输入的每个字都在标题 / 正文 / 作者里依次出现就算找到，
+// 中间隔着别的字也没关系，例如输入「重攻」也能找到「重入攻击」
+function matchChars(text, chars) {
+  let i = 0
+  for (const c of text.toLowerCase()) if (c === chars[i]) i++
+  return i === chars.length
+}
 const shown = computed(() => {
-  const k = keyword.value.trim().toLowerCase()
-  if (!k) return items.value
-  return items.value.filter((p) => [p.title, p.text, p.author.nickname].some((s) => s?.toLowerCase().includes(k)))
+  const chars = [...keyword.value.toLowerCase()].filter((c) => c.trim())
+  if (!chars.length) return items.value
+  return items.value.filter((p) => [p.title, p.text, p.author.nickname].some((s) => s && matchChars(s, chars)))
 })
 
 async function remove(p) {
