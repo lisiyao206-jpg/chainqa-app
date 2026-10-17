@@ -65,6 +65,10 @@ function askMentor() {
   ai.ask(`我在漏洞猎人里遇到了「${level.value.type}」漏洞，请结合教材讲讲它的原理，以及怎么防范。`)
 }
 
+// 选关页顶部的总进度
+const clearedCount = computed(() => levels.filter((l) => game.cleared[l.id]).length)
+const totalStars = computed(() => levels.reduce((n, l) => n + (game.cleared[l.id] || 0), 0))
+
 const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1))
 </script>
 
@@ -74,8 +78,14 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
   <div class="game">
     <!-- ===== 选关界面 ===== -->
     <div v-if="!level" class="select">
-      <h2>🎯 实战任务 · 漏洞猎人</h2>
+      <div class="eyebrow">Field Mission · Bug Hunter</div>
+      <h2>漏洞猎人</h2>
       <p class="intro">你是链上安全局的审计员。每一关是一份出了事的合约，找出藏着漏洞的那一行。</p>
+      <!-- 总进度：已通关几关、一共拿了几颗星 -->
+      <div class="summary">
+        <span>已通关 <b>{{ clearedCount }}</b> / {{ levels.length }}</span>
+        <span>星星 <b>{{ totalStars }}</b> / {{ levels.length * 3 }}</span>
+      </div>
       <div class="cards">
         <div
           v-for="lv in levels"
@@ -83,12 +93,13 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
           :class="['card', { locked: !unlocked(lv) }]"
           @click="start(lv)"
         >
-          <div class="card-no">第 {{ lv.id }} 关</div>
-          <div class="card-title">{{ unlocked(lv) ? lv.title : '🔒 未解锁' }}</div>
+          <div class="card-no">CASE {{ String(lv.id).padStart(2, '0') }}</div>
+          <div class="card-title">{{ unlocked(lv) ? lv.title : '未解锁' }}</div>
           <div class="card-type">{{ unlocked(lv) ? lv.type : '先通过上一关' }}</div>
           <div class="stars">
-            <span v-for="i in 3" :key="i">{{ i <= (game.cleared[lv.id] || 0) ? '⭐' : '☆' }}</span>
+            <span v-for="i in 3" :key="i" :class="{ on: i <= (game.cleared[lv.id] || 0) }">★</span>
           </div>
+          <div class="card-go">{{ unlocked(lv) ? (game.cleared[lv.id] ? '再次挑战 →' : '开始调查 →') : '🔒' }}</div>
         </div>
       </div>
     </div>
@@ -153,48 +164,80 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
 </template>
 
 <style scoped>
-.select h2 { margin: 0 0 6px; }
-.intro { color: #6b7280; margin: 0 0 20px; }
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+/* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
+.game { max-width: 1100px; margin: 0 auto; padding: 20px 0 40px; color: var(--text); }
+
+/* ===== 选关界面 ===== */
+.select { text-align: center; }
+.select h2 { margin: 8px 0 10px; font-size: 34px; font-weight: 300; letter-spacing: 10px; color: #fff; }
+.intro { color: var(--text-dim); margin: 0 0 18px; font-size: 14px; letter-spacing: 1px; }
+.summary { display: inline-flex; gap: 28px; margin-bottom: 34px; font-size: 13px; color: var(--text-dim); letter-spacing: 1px; }
+.summary b { color: var(--gold); font-size: 16px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; text-align: left; }
+/* 关卡卡片：深色毛玻璃 + 右上角切角 + 霓虹边框，鼠标移上去发光上浮 */
 .card {
-  padding: 18px; border-radius: 12px; cursor: pointer;
-  background: #1f2329; color: #fff; transition: transform 0.15s;
+  position: relative; padding: 20px 18px 16px; cursor: pointer;
+  background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--line-strong);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+  transition: all 0.25s;
 }
-.card:hover { transform: translateY(-3px); }
-.card.locked { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; transform: none; }
-.card-no { font-size: 12px; opacity: 0.7; }
-.card-title { font-size: 18px; font-weight: bold; margin: 6px 0 4px; }
-.card-type { font-size: 13px; opacity: 0.8; }
-.stars { margin-top: 10px; }
+.card::before { /* 顶部一条品红 → 青的霓虹线 */
+  content: ''; position: absolute; left: 0; top: 0; right: 18px; height: 2px;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+}
+.card:hover { transform: translateY(-4px); border-color: var(--accent); box-shadow: 0 0 24px rgba(0, 240, 255, 0.25); background: rgba(0, 240, 255, 0.08); }
+.card.locked { cursor: not-allowed; border-style: dashed; border-color: var(--line); opacity: 0.55; }
+.card.locked::before { background: var(--line); }
+.card.locked:hover { transform: none; box-shadow: none; background: var(--glass); }
+.card-no { font-size: 11px; letter-spacing: 3px; color: var(--accent); font-family: var(--font-code); }
+.card-title { font-size: 18px; font-weight: 600; margin: 10px 0 4px; color: #fff; }
+.card-type { font-size: 12px; color: var(--text-dim); }
+.stars { margin-top: 14px; font-size: 16px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.18); }
+.stars .on { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
+.card-go { margin-top: 12px; font-size: 12px; letter-spacing: 1px; color: var(--accent-strong); }
 
-.play { display: flex; flex-direction: column; gap: 12px; max-width: 860px; }
-.play-head { display: flex; align-items: center; gap: 16px; font-weight: bold; }
-.back { border: none; background: none; color: #2556b6; cursor: pointer; font-size: 14px; }
-.tries { margin-left: auto; color: #b45309; }
-.story { padding: 12px 16px; border-radius: 8px; background: #fef3c7; color: #1f2329; line-height: 1.6; }
+/* ===== 游戏界面：答题板块放在页面正中间 ===== */
+.play { display: flex; flex-direction: column; gap: 14px; max-width: 820px; margin: 0 auto; }
+.play-head { display: flex; align-items: center; gap: 16px; font-weight: 500; letter-spacing: 1px; color: #fff; }
+.back { border: none; background: none; color: var(--accent); cursor: pointer; font-size: 14px; }
+.tries { margin-left: auto; color: var(--gold); font-size: 13px; }
+.story {
+  padding: 12px 16px; line-height: 1.7; color: var(--text);
+  background: rgba(252, 238, 10, 0.08); border-left: 3px solid var(--gold);
+}
 
-.code { background: #1f2329; border-radius: 10px; padding: 10px 0; overflow-x: auto; }
-.line { display: flex; cursor: pointer; }
-.line:hover { background: rgba(255, 255, 255, 0.06); }
-.line.picked { background: rgba(59, 130, 246, 0.35); }
-.line.bug { background: rgba(239, 68, 68, 0.4); }
-.ln { width: 44px; flex-shrink: 0; text-align: right; padding-right: 14px; color: #6b7280; user-select: none; }
-.line pre { margin: 0; color: #e5e7eb; font-family: Consolas, Menlo, monospace; font-size: 14px; line-height: 1.7; }
+.code {
+  padding: 12px 0; overflow-x: auto;
+  background: rgba(3, 2, 12, 0.85); border: 1px solid var(--line-strong);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.12);
+}
+.line { display: flex; cursor: pointer; transition: background 0.15s; }
+.line:hover { background: rgba(0, 240, 255, 0.08); }
+.line.picked { background: rgba(0, 240, 255, 0.22); box-shadow: inset 3px 0 0 var(--accent); }
+.line.bug { background: rgba(255, 107, 129, 0.25); box-shadow: inset 3px 0 0 var(--danger); }
+.ln { width: 44px; flex-shrink: 0; text-align: right; padding-right: 14px; color: var(--text-faint); user-select: none; font-family: var(--font-code); font-size: 13px; line-height: 1.7; }
+.line pre { margin: 0; color: #dff6ff; font-family: var(--font-code); font-size: 14px; line-height: 1.7; }
 
 .actions { display: flex; align-items: center; gap: 12px; }
-.hint { flex: 1; color: #6b7280; }
+.hint { flex: 1; color: var(--text-dim); font-size: 14px; }
 .primary {
-  padding: 10px 20px; border: none; border-radius: 8px;
-  background: #1f2329; color: #fff; cursor: pointer; font-size: 14px;
+  padding: 10px 22px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; color: #05020f;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
 }
-.primary:disabled { opacity: 0.4; cursor: default; }
+.primary:disabled { opacity: 0.35; cursor: default; }
 
-.result { padding: 16px; border-radius: 10px; line-height: 1.7; }
-.result.win { background: #dcfce7; }
-.result.lose { background: #fee2e2; }
-.result-title { font-size: 18px; font-weight: bold; margin-bottom: 6px; }
-.explain { margin-top: 6px; }
-.result-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
-.result-actions button { padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; cursor: pointer; }
-.result-actions .primary { border: none; background: #1f2329; color: #fff; }
+.result { padding: 16px 18px; line-height: 1.7; background: var(--glass-strong); border: 1px solid var(--line); }
+.result.win { border-color: var(--ok); box-shadow: 0 0 24px rgba(142, 230, 196, 0.2); }
+.result.lose { border-color: var(--danger); box-shadow: 0 0 24px rgba(255, 107, 129, 0.2); }
+.result-title { font-size: 18px; font-weight: bold; margin-bottom: 6px; color: #fff; }
+.explain { margin-top: 6px; color: var(--text-dim); }
+.result-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.result-actions button {
+  padding: 8px 14px; cursor: pointer; font-size: 13px; color: var(--text);
+  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.04);
+}
+.result-actions button:hover { border-color: var(--accent); color: #fff; }
+.result-actions .primary { border: none; color: #05020f; }
 </style>

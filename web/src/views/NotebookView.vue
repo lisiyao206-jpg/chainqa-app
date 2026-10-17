@@ -88,45 +88,51 @@ function formatTime(t) {
 </template>
 
 <style scoped>
-.archive { display: flex; gap: 20px; height: 100%; }
+/* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
+.archive { display: flex; gap: 20px; height: 100%; color: var(--text); }
 .list {
-  width: 240px; flex-shrink: 0; overflow-y: auto;
-  border-right: 1px solid #e5e7eb; padding-right: 12px;
+  width: 240px; flex-shrink: 0; overflow-y: auto; padding: 12px;
+  background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--line); border-radius: var(--radius);
 }
 .mistakes-btn {
   width: 100%; padding: 10px; margin-bottom: 8px;
   display: flex; justify-content: space-between; align-items: center;
-  border: none; border-radius: 8px; background: #1f2329; color: #fff;
-  cursor: pointer; font-size: 14px;
+  border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; color: #05020f;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
 }
-.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f59e0b; color: #fff; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #05020f; color: var(--gold); }
 .new-btn {
-  width: 100%; padding: 10px; margin-bottom: 10px;
-  border: 1px dashed #9ca3af; border-radius: 8px;
+  width: 100%; padding: 10px; margin-bottom: 10px; color: var(--text-dim);
+  border: 1px dashed var(--line-strong); border-radius: 4px;
   background: none; cursor: pointer; font-size: 14px;
 }
-.new-btn:hover { border-color: #2556b6; color: #2556b6; }
-.item { padding: 10px 12px; border-radius: 8px; cursor: pointer; }
-.item:hover { background: #f3f4f6; }
-.item.active { background: #e8eefb; }
-.item-title { font-size: 14px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item-time { font-size: 12px; color: #9ca3af; margin-top: 2px; }
-.editor { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.new-btn:hover { border-color: var(--accent); color: var(--accent); }
+.item { padding: 10px 12px; border-radius: 4px; cursor: pointer; border-left: 2px solid transparent; }
+.item:hover { background: rgba(0, 240, 255, 0.06); }
+.item.active { background: rgba(0, 240, 255, 0.12); border-left-color: var(--accent); }
+.item-title { font-size: 14px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+.item-time { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.editor {
+  flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 16px 20px;
+  background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
 .editor-head { display: flex; gap: 10px; }
 .title-input {
-  flex: 1; font-size: 20px; font-weight: bold;
-  border: none; border-bottom: 1px solid #e5e7eb; padding: 6px 0; outline: none;
+  flex: 1; font-size: 20px; font-weight: bold; color: #fff; background: transparent; font-family: var(--font);
+  border: none; border-bottom: 1px solid var(--line-strong); padding: 6px 0; outline: none;
 }
-.title-input:focus { border-bottom-color: #2556b6; }
-.del-btn { border: none; background: none; color: #9ca3af; cursor: pointer; }
-.del-btn:hover { color: #b91c1c; }
+.title-input:focus { border-bottom-color: var(--accent); }
+.del-btn { border: none; background: none; color: var(--text-faint); cursor: pointer; }
+.del-btn:hover { color: var(--danger); }
 .content-input {
-  flex: 1; resize: none; padding: 12px;
-  border: 1px solid #e5e7eb; border-radius: 8px;
+  flex: 1; resize: none; padding: 12px; color: var(--text);
+  background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); border-radius: 4px;
   font: inherit; font-size: 15px; line-height: 1.8; outline: none;
 }
-.content-input:focus { border-color: #2556b6; }
-.saved { font-size: 12px; color: #9ca3af; }
-.hint { color: #9ca3af; font-size: 14px; }
+.content-input:focus { border-color: var(--accent); }
+.saved { font-size: 12px; color: var(--text-faint); }
+.hint { color: var(--text-faint); font-size: 14px; }
 .center { margin: auto; }
 </style>

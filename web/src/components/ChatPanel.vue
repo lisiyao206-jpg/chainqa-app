@@ -129,22 +129,45 @@ async function send(text) {
 </template>
 
 <style scoped>
-.chat { display: flex; flex-direction: column; height: 100%; }
-.chat-header { font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+/* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
+.chat { display: flex; flex-direction: column; height: 100%; color: var(--text); }
+.chat-header { font-weight: 500; letter-spacing: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .messages { flex: 1; padding: 12px 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-.empty { color: #9ca3af; }
-.msg { font-size: 14px; line-height: 1.6; }
-.msg.user { align-self: flex-end; background: #2556b6; color: #fff; padding: 6px 12px; border-radius: 12px; max-width: 85%; }
-.msg.bot { background: #f6f7f9; padding: 10px 12px; border-radius: 12px; }
-.msg.bot :deep(pre) { background: #fff; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
-.msg.bot :deep(.cite) { background: #e8eefb; color: #2556b6; font-size: 11px; padding: 0 5px; border-radius: 4px; }
-.thinking { color: #9ca3af; }
-.error { color: #b91c1c; }
+.empty { color: var(--text-faint); }
+.msg { font-size: 14px; line-height: 1.7; }
+/* 我的问题：品红 → 青的渐变气泡 */
+.msg.user {
+  align-self: flex-end; max-width: 85%; padding: 6px 12px; border-radius: 10px 10px 2px 10px;
+  background: linear-gradient(90deg, rgba(255, 43, 214, 0.85), rgba(0, 200, 255, 0.85)); color: #fff;
+}
+/* AI 的回答：深色半透明面板 + 青色细边框 */
+.msg.bot {
+  padding: 10px 12px; border-radius: 2px 10px 10px 10px;
+  background: rgba(10, 8, 30, 0.75); border: 1px solid var(--line); color: var(--text);
+}
+.msg.bot :deep(strong) { color: var(--accent); }
+.msg.bot :deep(pre) {
+  background: rgba(0, 0, 0, 0.5); border: 1px solid var(--line); color: #e5f9ff;
+  padding: 8px; border-radius: 4px; overflow-x: auto; font-size: 12px; font-family: var(--font-code);
+}
+.msg.bot :deep(code) { font-family: var(--font-code); color: var(--gold); }
+.msg.bot :deep(pre code) { color: inherit; }
+.msg.bot :deep(.cite) { background: rgba(0, 240, 255, 0.15); color: var(--accent); font-size: 11px; padding: 0 5px; border-radius: 3px; }
+.thinking { color: var(--text-faint); }
+.error { color: var(--danger); }
 .source { font-size: 12px; margin-top: 6px; }
-.source summary { cursor: pointer; color: #6b7280; }
-.source p { margin: 4px 0; color: #4b5563; white-space: pre-wrap; }
-.input-row { display: flex; gap: 8px; }
-.input-row input { flex: 1; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
-.input-row button { padding: 8px 16px; border: none; border-radius: 8px; background: #1f2329; color: #fff; cursor: pointer; }
+.source summary { cursor: pointer; color: var(--text-dim); }
+.source p { margin: 4px 0; color: var(--text-dim); white-space: pre-wrap; }
+.input-row { display: flex; gap: 8px; padding-top: 8px; }
+.input-row input {
+  flex: 1; padding: 9px 12px; border-radius: 4px; outline: none; font-family: var(--font);
+  border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.4); color: var(--text);
+}
+.input-row input::placeholder { color: var(--text-faint); }
+.input-row input:focus { border-color: var(--accent); }
+.input-row button {
+  padding: 9px 18px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; color: #05020f;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+}
 .input-row button:disabled { opacity: 0.4; cursor: default; }
 </style>
