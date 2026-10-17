@@ -320,7 +320,7 @@ export function deleteComment(uid, commentId) {
 const UPLOAD_DIR = "uploads";
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 const MAX_SIZE = 10 * 1024 * 1024;       // 普通文件最大 10MB
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 视频最大 50MB
+const MAX_VIDEO_SIZE = 20 * 1024 * 1024; // 视频最大 20MB
 const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
 const VIDEO_EXT = [".mp4", ".webm"]; // 浏览器都能直接播放的两种视频格式
 // 只允许这些类型：学习资料常用的格式。不允许 .exe、.html、.svg 这类可能带病毒或脚本的文件

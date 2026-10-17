@@ -2,15 +2,15 @@
 // 文件不能用 userStore.api 发：api 只会发 JSON，而文件是「二进制」，要原样发过去
 import { useUserStore } from '../stores/user.js'
 
-// 和后端一样：普通文件 10MB，视频（mp4 / webm）50MB
+// 和后端一样：普通文件 10MB，视频（mp4 / webm）20MB
 const MAX_SIZE = 10 * 1024 * 1024
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024
+const MAX_VIDEO_SIZE = 20 * 1024 * 1024
 export const isVideoName = (name) => /\.(mp4|webm)$/i.test(name)
 
 // 上传：成功后返回 { id, name, size, isImage }，把 id 放进消息或动态里发出去
 export async function uploadFile(file) {
   if (isVideoName(file.name) ? file.size > MAX_VIDEO_SIZE : file.size > MAX_SIZE)
-    throw new Error(isVideoName(file.name) ? '视频不能超过 50MB' : '文件不能超过 10MB')
+    throw new Error(isVideoName(file.name) ? '视频不能超过 20MB' : '文件不能超过 10MB')
   const res = await fetch('/api/social/files', {
     method: 'POST',
     headers: {

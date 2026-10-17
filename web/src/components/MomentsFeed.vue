@@ -7,6 +7,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
 import { uploadFile, isVideoName } from '../utils/files.js'
+import { copyText, fileFromPaste } from '../utils/clipboard.js'
 import FileChip from './FileChip.vue'
 import UserAvatar from './UserAvatar.vue'
 
@@ -58,7 +59,26 @@ async function act(fn) {
 async function pickFile(e) {
   const file = e.target.files[0]
   e.target.value = ''
+  if (file) attach(file)
+}
+
+// 在发帖框里 Ctrl + V：粘贴文字照常；粘贴截图、图片、文件就自动变成这条帖子的附件
+function onPaste(e) {
+  const file = fileFromPaste(e)
   if (!file) return
+  e.preventDefault()
+  attach(file)
+}
+
+// 复制帖子正文
+const copiedId = ref(null)
+async function copyPost(p) {
+  await copyText((p.title ? p.title + '\n' : '') + p.text)
+  copiedId.value = p.id
+  setTimeout(() => copiedId.value === p.id && (copiedId.value = null), 1500)
+}
+
+async function attach(file) {
   busy.value = true
   error.value = ''
   try {
@@ -113,7 +133,8 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
         v-model="text"
         :rows="props.square ? 4 : 3"
         :maxlength="maxLen"
-        :placeholder="props.square ? '写下你的心得、问题或经验，所有审计员都能看到并参与讨论……' : '分享今天学到的知识、遇到的难题……'"
+        :placeholder="props.square ? '写下你的心得、问题或经验，所有审计员都能看到并参与讨论……（截图后 Ctrl + V 可以直接贴图）' : '分享今天学到的知识、遇到的难题……（截图后 Ctrl + V 可以直接贴图）'"
+        @paste="onPaste"
       ></textarea>
       <div class="bar">
         <button class="btn" :disabled="busy" @click="fileInput.click()">📎 {{ busy ? '上传中…' : '图片 / 视频 / 资料' }}</button>
@@ -122,7 +143,7 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
         <span class="len">{{ text.length }} / {{ maxLen }}</span>
         <button class="btn primary" :disabled="busy || (props.square && !title.trim()) || (!text.trim() && !attached)" @click="publish">发布</button>
       </div>
-      <div class="note">视频支持 mp4 / webm，最大 50MB；其他文件最大 10MB</div>
+      <div class="note">视频支持 mp4 / webm，最大 20MB；其他文件最大 10MB</div>
     </div>
 
     <div v-if="props.square" class="sorts">
@@ -156,6 +177,7 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
           {{ p.favorited ? '★ 已收藏' : '☆ 收藏' }}
         </button>
         <span class="count">💬 {{ p.comments.length }}</span>
+        <button v-if="p.text" class="like" @click="copyPost(p)">{{ copiedId === p.id ? '✓ 已复制' : '⧉ 复制' }}</button>
       </div>
       <div v-if="p.likes.length" class="likes">♥ {{ p.likes.join('、') }}</div>
 
@@ -204,7 +226,7 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
 .add + .del { margin-left: 12px; }
 .del:hover { color: var(--danger); }
 .post-title { margin: 0 0 8px; font-size: 17px; color: #fff; letter-spacing: 1px; }
-.text { white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: 14px; color: var(--text); }
+.text { user-select: text; white-space: pre-wrap; word-break: break-word; line-height: 1.7; font-size: 14px; color: var(--text); }
 .file { margin-top: 10px; }
 .actions { display: flex; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
 .like { border: none; background: none; cursor: pointer; color: var(--text-dim); font-size: 13px; padding: 0; }

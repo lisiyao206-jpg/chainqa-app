@@ -5,6 +5,7 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
 import { uploadFile } from '../utils/files.js'
+import { copyText, fileFromPaste } from '../utils/clipboard.js'
 import FileChip from './FileChip.vue'
 import UserAvatar from './UserAvatar.vue'
 
@@ -95,7 +96,26 @@ function onKey(e) {
 async function pickFile(e) {
   const file = e.target.files[0]
   e.target.value = '' // 清空，下次选同一个文件也能触发
-  if (!file) return
+  if (file) sendFile(file)
+}
+
+// 在输入框里 Ctrl + V：粘贴的是文字就照常粘贴；粘贴的是截图、图片、文件就直接发出去
+function onPaste(e) {
+  const file = fileFromPaste(e)
+  if (!file) return // 文字：交给浏览器自己粘贴
+  e.preventDefault()
+  sendFile(file)
+}
+
+// 复制一条消息的文字，按钮上显示「已复制」1.5 秒
+const copiedId = ref(null)
+async function copyMsg(m) {
+  await copyText(m.text)
+  copiedId.value = m.id
+  setTimeout(() => copiedId.value === m.id && (copiedId.value = null), 1500)
+}
+
+async function sendFile(file) {
   sending.value = true
   try {
     const f = await uploadFile(file)
@@ -161,6 +181,7 @@ function shortTime(t) {
         <div class="meta">
           <span v-if="props.room.type === 'group' && m.from.userId !== me()">{{ m.from.nickname }}</span>
           {{ shortTime(m.time) }}
+          <a v-if="m.text" class="copy" @click="copyMsg(m)">{{ copiedId === m.id ? '已复制' : '复制' }}</a>
         </div>
         <div class="bubble">
           <!-- 文字用 {{ }} 显示：Vue 会自动转义，就算有人发 <script> 也只会显示成文字，不会被执行 -->
@@ -175,7 +196,7 @@ function shortTime(t) {
     <footer>
       <button class="attach" title="发送文件（最大 10MB）" :disabled="sending" @click="fileInput.click()">📎</button>
       <input ref="fileInput" type="file" hidden @change="pickFile" />
-      <textarea v-model="text" rows="2" maxlength="1000" placeholder="输入消息，Enter 发送，Shift + Enter 换行" @keydown="onKey"></textarea>
+      <textarea v-model="text" rows="2" maxlength="1000" placeholder="输入消息，Enter 发送，Shift + Enter 换行；截图后 Ctrl + V 可以直接发图" @keydown="onKey" @paste="onPaste"></textarea>
       <button class="btn primary" :disabled="sending || !text.trim()" @click="sendText">发送</button>
     </footer>
   </section>
@@ -200,7 +221,10 @@ header b { color: #fff; font-size: 15px; letter-spacing: 1px; }
 .meta { font-size: 11px; color: var(--text-faint); margin-bottom: 4px; }
 .bubble { display: flex; flex-direction: column; gap: 6px; padding: 9px 13px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); }
 .msg.mine .bubble { background: rgba(0, 240, 255, 0.12); border-color: var(--line-strong); }
-.text { white-space: pre-wrap; word-break: break-word; line-height: 1.6; font-size: 14px; color: var(--text); }
+.copy { margin-left: 8px; cursor: pointer; color: var(--text-faint); opacity: 0; transition: opacity 0.2s; }
+.msg:hover .copy { opacity: 1; } /* 鼠标移到消息上才出现「复制」，平时不占眼 */
+.copy:hover { color: var(--accent); }
+.text { user-select: text; white-space: pre-wrap; word-break: break-word; line-height: 1.6; font-size: 14px; color: var(--text); }
 
 .error { padding: 6px 18px; color: var(--danger); font-size: 13px; }
 footer { display: flex; gap: 10px; align-items: flex-end; padding: 12px 18px; border-top: 1px solid var(--line); }
