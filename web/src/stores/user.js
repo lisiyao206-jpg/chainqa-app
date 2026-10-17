@@ -15,10 +15,10 @@ export const useUserStore = defineStore('user', {
   },
   actions: {
     // 发请求的小工具：自动带上 token，出错时把后端的提示抛出来
-    // // method 不写时：有 body 就是 POST，没有就是 GET
-    async api(url, body,method) {
+    // method 不写时：有 body 就是 POST，没有就是 GET
+    async api(url, body, method) {
       const res = await fetch(url, {
-        method: method||(body ? 'POST' : 'GET'),
+        method: method || (body ? 'POST' : 'GET'),
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
         body: body ? JSON.stringify(body) : undefined,
       })

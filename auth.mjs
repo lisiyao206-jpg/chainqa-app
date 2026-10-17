@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { db } from "./db.mjs";
 
 const SESSION_DAYS = 7; // 登录一次，7 天内不用重新登录
+
 // 每次启动后端时：把 .env 里 ADMIN_ACCOUNT 写的那个账号设为管理员
 // 这样「先注册、后来才在 .env 里写」也没关系，改完 .env 重启后端就生效
 if (process.env.ADMIN_ACCOUNT) {

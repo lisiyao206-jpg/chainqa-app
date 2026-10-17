@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed ,onMounted} from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { levels } from '../data/levels.js'
 import { useGameStore } from '../stores/game.js'
 import { useMistakesStore } from '../stores/mistakes.js'
@@ -26,6 +26,7 @@ const result = ref('')        // '' 还在找 / 'win' 找对了 / 'lose' 机会�
 const MAX_TRIES = 3
 // 勋章弹窗：答对时设为 { stars, firstTime }，关掉时设回 null
 const medal = ref(null)
+
 function start(lv) {
   if (!unlocked(lv)) return
   level.value = lv
@@ -44,7 +45,6 @@ function submit() {
     const firstTime = !game.cleared[level.value.id]
     game.clear(level.value.id, stars)
     medal.value = { stars, firstTime }
-
   } else {
     wrongTimes.value++
     picked.value = null
@@ -135,7 +135,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
         <button @click="start(level)">🔄 再玩一次</button>
         <button v-if="result === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一关 →</button>
       </div>
-        </div>
+    </div>
 
     <!-- 答对时弹出勋章 -->
     <MedalPopup
@@ -147,7 +147,6 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
     />
   </div>
 </template>
-
 
 <style scoped>
 .select h2 { margin: 0 0 6px; }
@@ -168,7 +167,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
 .play-head { display: flex; align-items: center; gap: 16px; font-weight: bold; }
 .back { border: none; background: none; color: #2556b6; cursor: pointer; font-size: 14px; }
 .tries { margin-left: auto; color: #b45309; }
-.story { padding: 12px 16px; border-radius: 8px; background: #fef3c7; line-height: 1.6; }
+.story { padding: 12px 16px; border-radius: 8px; background: #fef3c7; color: #1f2329; line-height: 1.6; }
 
 .code { background: #1f2329; border-radius: 10px; padding: 10px 0; overflow-x: auto; }
 .line { display: flex; cursor: pointer; }

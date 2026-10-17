@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS users (
   pwd           TEXT NOT NULL,                 -- 加密后的密码（盐:哈希），不存明文
   nickname      TEXT,
   role          TEXT NOT NULL DEFAULT 'user',  -- 'user' 普通 / 'admin' 管理员
+  status        TEXT NOT NULL DEFAULT 'active', -- 'active' 正常 / 'disabled' 被管理员禁用
   register_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 

@@ -1,10 +1,14 @@
 <script setup>
+// 登录 / 注册页：和大厅一样的极简排版，背景用 App.vue 里全站共用的紫色流动色彩
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user.js'
+import { useThemeStore, BACKGROUNDS } from '../stores/theme.js'
 
 const userStore = useUserStore()
 const router = useRouter()
+// 背景主题：登录页也能直接换，和「我的档案」里是同一个设置
+const theme = useThemeStore()
 
 const mode = ref('login')   // 'login' 登录 / 'register' 注册
 const account = ref('')
@@ -25,34 +29,57 @@ async function submit() {
   }
   loading.value = false
 }
+
+function switchMode(m) {
+  mode.value = m
+  error.value = ''
+}
 </script>
 
 <template>
   <div class="login-page">
-    <!-- 左边：产品介绍（以后换成封面插画） -->
+    <!-- 左上角：品牌 -->
+    <div class="brand">链上安全局</div>
+
+    <!-- 左下角：背景主题，点一下马上换 -->
+    <div class="themes">
+      <span class="eyebrow">背景</span>
+      <button
+        v-for="b in BACKGROUNDS"
+        :key="b.id"
+        :class="['theme', { on: theme.bg === b.id }]"
+        :title="b.desc"
+        type="button"
+        @click="theme.setBg(b.id)"
+      >{{ b.name }}</button>
+    </div>
+
+    <!-- 左边：一句话介绍 -->
     <section class="intro">
-      <h1>链上安全局</h1>
-      <p class="slogan">边读、边问、边破案，学会区块链</p>
+      <div class="eyebrow">On-chain Security Bureau</div>
+      <h1>边读、边问、边破案</h1>
+      <p>一个带 AI 导师的智能合约安全学习平台</p>
       <ul>
-        <li>📖 训练营：读教材，选中就能问 AI</li>
-        <li>🧑‍💻 白帽导师：回答都标注教材出处</li>
-        <li>🎯 实战任务：在合约里找出漏洞</li>
+        <li><span>01</span>训练营 · 读教材，选中就能问 AI</li>
+        <li><span>02</span>白帽导师 · 回答都标注教材出处</li>
+        <li><span>03</span>实战任务 · 在合约里找出漏洞</li>
       </ul>
     </section>
 
-    <!-- 右边：登录 / 注册框 -->
-    <form class="box" @submit.prevent="submit">
+    <!-- 右边：登录 / 注册 -->
+    <form class="box glass" @submit.prevent="submit">
+      <div class="eyebrow">{{ mode === 'login' ? 'Sign in' : 'Join us' }}</div>
       <h2>{{ mode === 'login' ? '欢迎回来，审计员' : '加入链上安全局' }}</h2>
-      <input v-model="account" placeholder="账号（字母、数字、下划线）" autocomplete="username" />
-      <input v-model="pwd" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
-      <input v-if="mode === 'register'" v-model="nickname" placeholder="审计员代号（昵称）" />
+      <input v-model="account" class="input" placeholder="账号（字母、数字、下划线）" autocomplete="username" />
+      <input v-model="pwd" class="input" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+      <input v-if="mode === 'register'" v-model="nickname" class="input" placeholder="审计员代号（昵称）" />
       <div v-if="error" class="error">{{ error }}</div>
-      <button class="primary" :disabled="loading">
+      <button class="btn primary submit" :disabled="loading">
         {{ loading ? '请稍候…' : mode === 'login' ? '登 录' : '注 册' }}
       </button>
       <p class="switch">
-        <template v-if="mode === 'login'">还没有账号？<a @click="mode = 'register'; error = ''">去注册</a></template>
-        <template v-else>已有账号？<a @click="mode = 'login'; error = ''">去登录</a></template>
+        <template v-if="mode === 'login'">还没有账号？<a @click="switchMode('register')">去注册</a></template>
+        <template v-else>已有账号？<a @click="switchMode('login')">去登录</a></template>
       </p>
       <p class="privacy">我们会记录你的登录时间，仅用于学习数据统计。</p>
     </form>
@@ -61,31 +88,37 @@ async function submit() {
 
 <style scoped>
 .login-page {
-  height: 100vh; display: flex; align-items: center; justify-content: center; gap: 80px;
-  background: radial-gradient(circle at center, #10203a 0%, #07090f 70%);
-  color: #e5e7eb;
+  position: relative; height: 100vh;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10%;
+  font-weight: 300;
 }
-.intro h1 { font-size: 44px; letter-spacing: 6px; color: #ff5a66; text-shadow: 0 0 14px rgba(255, 59, 74, 0.8); margin: 0; }
-.slogan { font-size: 18px; color: #9ca3af; }
-.intro ul { list-style: none; padding: 0; line-height: 2.2; }
-.box {
-  width: 340px; display: flex; flex-direction: column; gap: 12px;
-  padding: 32px; border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15);
+.brand { position: absolute; top: 22px; left: 36px; font-size: 13px; letter-spacing: 3px; color: #fff; }
+
+/* 左边介绍 */
+.intro h1 { margin: 14px 0 12px; font-size: 40px; font-weight: 200; letter-spacing: 8px; color: #fff; }
+.intro p { margin: 0; font-size: 14px; letter-spacing: 2px; color: var(--text-dim); }
+.intro ul { list-style: none; padding: 0; margin: 40px 0 0; font-size: 13px; line-height: 2.4; color: var(--text-dim); }
+.intro li span { display: inline-block; width: 32px; color: var(--text-faint); }
+
+/* 右边登录框 */
+.box { width: 360px; padding: 36px 34px; display: flex; flex-direction: column; gap: 18px; }
+.box h2 { margin: -8px 0 6px; font-size: 22px; font-weight: 300; letter-spacing: 3px; color: #fff; }
+.submit { margin-top: 8px; padding: 12px; font-size: 14px; letter-spacing: 4px; }
+.error { color: var(--danger); font-size: 13px; }
+.switch { margin: 0; text-align: center; font-size: 13px; color: var(--text-dim); }
+.switch a { color: var(--accent); cursor: pointer; }
+.privacy { margin: 0; text-align: center; font-size: 11px; color: var(--text-faint); }
+
+/* 左下角的背景切换：小字按钮，选中的那个亮起来、下面一个小圆点 */
+.themes { position: absolute; left: 36px; bottom: 28px; display: flex; align-items: center; gap: 18px; font-size: 12px; }
+.theme {
+  position: relative; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: var(--font); font-size: 12px; letter-spacing: 1px; color: var(--text-faint); transition: color 0.3s;
 }
-.box h2 { margin: 0 0 8px; font-size: 20px; }
-.box input {
-  padding: 12px 14px; border-radius: 8px; font-size: 15px; outline: none;
-  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.3); color: #fff;
+.theme:hover, .theme.on { color: #fff; }
+.theme.on::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; width: 4px; height: 4px; margin-left: -2px;
+  border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent);
 }
-.box input:focus { border-color: #3be3ff; }
-.primary {
-  padding: 12px; border: none; border-radius: 8px; cursor: pointer;
-  background: #ff3b4a; color: #fff; font-size: 16px; font-weight: bold;
-}
-.primary:disabled { opacity: 0.5; }
-.error { color: #ff8a93; font-size: 14px; }
-.switch { text-align: center; font-size: 14px; color: #9ca3af; margin: 0; }
-.switch a { color: #3be3ff; cursor: pointer; }
-.privacy { font-size: 12px; color: #6b7280; text-align: center; margin: 0; }
 </style>

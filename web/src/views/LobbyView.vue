@@ -1,187 +1,201 @@
 <script setup>
-import { ref } from 'vue'
-import ImgSlot from '../components/ImgSlot.vue'
+// 大厅：沉浸式排版（参考 Of the Oak）
+// 画面是主角：紫色流动色彩（在 App.vue 里，全站共用）铺满全屏，界面只留最少的文字
+// 四个「发光点」就是四个功能入口：鼠标移上去，右侧淡入介绍；点击进入
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import ProfileModal from '../components/ProfileModal.vue'
 import { useUserStore } from '../stores/user.js'
 
-// 大厅的四个入口：to 对应 router.js 里的 path
-// icon 是图标图片的文件名，放在 web/public/lobby/ 里
-const entries = [
-  { to: '/camp', icon: 'icon-camp.png', emoji: '📖', label: '训练营' },
-  { to: '/mentor', icon: 'icon-mentor.png', emoji: '🧑‍💻', label: '白帽导师' },
-  { to: '/archive', icon: 'icon-archive.png', emoji: '🗂️', label: '案件档案' },
-  { to: '/mission', icon: 'icon-mission.png', emoji: '🎯', label: '实战任务' },
-]
-
-// 玩家信息（现在先写死，以后从登录和进度数据里读）
-// 用 ref 包起来，数据一变，血条就会跟着动
-const player = ref({ title: '新人审计员', level: 1, xp: 30 })
-
-// 点身份卡：打开个人资料弹窗
+const router = useRouter()
 const userStore = useUserStore()
 const showProfile = ref(false)
-// 测试用：每点一次加 10 经验，满 100 升一级
-function gainXp() {
-  player.value.xp += 10
-  if (player.value.xp >= 100) {
-    player.value.xp = 0
-    player.value.level += 1
-  }
+
+// 四个入口：x、y 是发光点在屏幕上的位置（百分比）
+const spots = [
+  { no: '01', to: '/camp', title: '训练营', en: 'Training Camp', x: 30, y: 34,
+    desc: '从入门到合约安全，按章节阅读区块链教材。读到哪里不懂，选中文字就能问 AI；每一章都能一键生成思维导图。' },
+  { no: '02', to: '/mentor', title: '白帽导师', en: 'White-hat Mentor', x: 66, y: 28,
+    desc: '只依据教材回答的 AI 导师。每个结论都标注出处，可以展开核对原文；查不到依据时，它会直接告诉你「不知道」。' },
+  { no: '03', to: '/archive', title: '案件档案', en: 'Case Files', x: 36, y: 70,
+    desc: '你的笔记和错题都存放在这里。笔记打字自动保存；错题可以重做，掌握了就标记出来。' },
+  { no: '04', to: '/mission', title: '实战任务', en: 'Field Mission', x: 70, y: 64,
+    desc: '每一关是一份出了事的合约。像审计员一样逐行阅读，找出藏着漏洞的那一行，赢得勋章。' },
+]
+
+// 当前「点亮」的入口：鼠标移到发光点或左侧目录上时设置，移开时清空
+const active = ref(null)
+const current = computed(() => spots.find((s) => s.no === active.value))
+
+function go(s) {
+  router.push(s.to)
 }
 </script>
 
 <template>
   <div class="lobby">
-    <h1 class="title">链上安全局</h1>
-
-    <!-- 左上角：身份卡 -->
-    <div class="id-card" title="点击查看我的档案" @click="showProfile = true">
-      <div class="avatar"><ImgSlot src="/lobby/avatar.png" fallback="🕵️" label="avatar.png" compact /></div>
-      <div>
-        <div class="id-label">角色身份卡</div>
-        <div class="id-title">{{ player.title }}</div>
-        <div class="id-name">代号：{{ userStore.user?.nickname }}</div>
+    <!-- 顶栏：极简小字 -->
+    <header class="top">
+      <nav class="links">
+        <span class="brand">链上安全局</span>
+        <RouterLink v-for="s in spots" :key="s.no" :to="s.to">{{ s.title }}</RouterLink>
+      </nav>
+      <div class="me">
+        <!-- 只有管理员看得到 -->
+        <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin">管理后台</RouterLink>
+        <button class="avatar" title="我的档案" @click="showProfile = true">
+          {{ userStore.user?.nickname?.slice(0, 1) || '我' }}
+        </button>
       </div>
-    </div>
+    </header>
 
-    <!-- 个人资料弹窗 -->
+    <!-- 左侧：章节目录，和发光点联动 -->
+    <aside class="chapters">
+      <div
+        v-for="s in spots"
+        :key="s.no"
+        :class="['chapter', { on: active === s.no }]"
+        @mouseenter="active = s.no"
+        @mouseleave="active = null"
+        @click="go(s)"
+      >
+        <span class="no">{{ s.no }}</span>{{ s.title }}
+      </div>
+    </aside>
+
+    <!-- 中间：一行细字标题；有入口被点亮时淡出，让位给右侧介绍 -->
+    <Transition name="fade">
+      <div v-if="!current" class="headline">
+        <h1>在链上，每一行代码都是边界</h1>
+        <p>边读、边问、边破案，成为一名智能合约审计员</p>
+      </div>
+    </Transition>
+
+    <!-- 四个发光点 -->
+    <button
+      v-for="s in spots"
+      :key="s.no"
+      :class="['spot', { on: active === s.no }]"
+      :style="{ left: s.x + '%', top: s.y + '%' }"
+      @mouseenter="active = s.no"
+      @mouseleave="active = null"
+      @click="go(s)"
+    >
+      <span class="dot"></span>
+      <span class="ring"></span>
+      <span class="label">{{ s.title }}</span>
+    </button>
+
+    <!-- 右侧：被点亮入口的介绍 -->
+    <Transition name="slide">
+      <section v-if="current" :key="current.no" class="info">
+        <div class="eyebrow">{{ current.no }} / {{ current.en }}</div>
+        <h2>{{ current.title }}</h2>
+        <p>{{ current.desc }}</p>
+        <div class="enter">点击进入 →</div>
+      </section>
+    </Transition>
+
+    <!-- 底部提示 -->
+    <div class="hint">移动鼠标，寻找发光点 · 点击进入</div>
+
     <ProfileModal v-if="showProfile" @close="showProfile = false" />
-    <!-- 管理后台入口：只有管理员才看得到 -->
-    <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin-entry">🛠 管理后台</RouterLink>
-    <!-- 右侧：等级条 -->
-    <div class="level">
-      <div class="level-bar"><div class="level-fill" :style="{ height: player.xp + '%' }"></div></div>
-      <div class="medal"><ImgSlot src="/lobby/medal.png" fallback="🏅" label="medal.png" compact /></div>
-      <div class="level-num">Lv.{{ player.level }}</div>
-      <button class="test-btn" @click="gainXp">+10 经验（测试）</button>
-    </div>
-
-    <!-- 中央：全息屏幕 + 人物，两张图叠在一起 -->
-    <div class="hero-screen"><ImgSlot src="/lobby/hero-screen.png" fallback="🖥️" label="hero-screen.png 1200×700" /></div>
-    <div class="hero-figure"><ImgSlot src="/lobby/hero-figure.png" fallback="🕵️" label="hero-figure.png 高800" /></div>
-
-    <!-- 底部：四个入口 -->
-    <nav class="entries">
-      <RouterLink v-for="e in entries" :key="e.to" :to="e.to" class="entry">
-        <span class="entry-icon"><ImgSlot :src="'/lobby/' + e.icon" :fallback="e.emoji" :label="e.icon" compact /></span>{{ e.label }}
-      </RouterLink>
-    </nav>
   </div>
 </template>
 
 <style scoped>
 .lobby {
-  position: relative;
-  height: 100vh;
-  /* 背景：先铺 bg-frame.png，图片没放进来时显示下面的渐变 */
-  background:
-    url('/lobby/bg-frame.png') center / 100% 100% no-repeat,
-    radial-gradient(circle at center, #10203a 0%, #07090f 70%);
-  color: #e5e7eb;
-  border: 2px solid #ff3b4a;
-  box-shadow: inset 0 0 40px rgba(255, 59, 74, 0.25);
-  overflow: hidden;
+  position: relative; height: 100vh; overflow: hidden;
+  color: #e9e6ff;
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-weight: 300;
 }
-.title {
-  margin: 0;
-  padding-top: 24px;
-  text-align: center;
-  font-size: 32px;
-  letter-spacing: 6px;
-  color: #ff5a66;
-  text-shadow: 0 0 12px rgba(255, 59, 74, 0.8);
+
+/* ===== 顶栏 ===== */
+.top {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 22px 36px;
 }
-.id-card {
-  position: absolute; top: 90px; left: 40px;
-  display: flex; gap: 12px; align-items: center;
-  padding: 10px 16px;
-  border: 1px solid #ff3b4a; border-radius: 8px;
-  background: rgba(255, 59, 74, 0.08);
+.links { display: flex; gap: 26px; align-items: center; font-size: 13px; }
+.links a { color: rgba(233, 230, 255, 0.6); text-decoration: none; transition: color 0.3s; }
+.links a:hover { color: #fff; }
+.brand { color: #fff; letter-spacing: 3px; margin-right: 10px; }
+.me { display: flex; align-items: center; gap: 18px; font-size: 13px; }
+.admin { color: rgba(233, 230, 255, 0.6); text-decoration: none; }
+.admin:hover { color: #fff; }
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+  border: 1px solid rgba(233, 230, 255, 0.4); background: rgba(255, 255, 255, 0.05);
+  color: #fff; font-size: 13px;
 }
-.avatar { width: 56px; height: 56px; font-size: 56px; }
-.id-label { font-size: 12px; color: #9ca3af; }
-.id-title { font-size: 18px; font-weight: bold; }
-.level {
-  position: absolute; top: 120px; right: 50px;
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
+.avatar:hover { border-color: #fff; }
+
+/* ===== 左侧目录 ===== */
+.chapters {
+  position: absolute; left: 36px; top: 50%; transform: translateY(-50%); z-index: 5;
+  display: flex; flex-direction: column; gap: 14px; font-size: 12px;
 }
-.level-bar {
-  width: 14px; height: 220px;
-  border: 1px solid #3ba7ff; border-radius: 7px;
-  display: flex; align-items: flex-end; overflow: hidden;
+.chapter { color: rgba(233, 230, 255, 0.45); cursor: pointer; transition: all 0.3s; letter-spacing: 1px; }
+.chapter .no { display: inline-block; width: 28px; opacity: 0.6; }
+.chapter.on, .chapter:hover { color: #fff; transform: translateX(6px); }
+
+/* ===== 中间标题 ===== */
+.headline {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none; z-index: 3;
 }
-.level-fill {
-  position: relative;
-  width: 100%;
-  background: linear-gradient(#ff3b4a, #3ba7ff);
-  box-shadow: 0 0 12px rgba(255, 59, 74, 0.8);
-  transition: height 0.6s ease-out;      /* 经验变化时，平滑地涨上去 */
-  animation: grow 1.2s ease-out;         /* 进入大厅时，从 0 涨到当前值 */
-  overflow: hidden;
+.headline h1 { margin: 0; font-size: 30px; font-weight: 200; letter-spacing: 6px; color: #fff; }
+.headline p { margin: 14px 0 0; font-size: 13px; letter-spacing: 2px; color: rgba(233, 230, 255, 0.55); }
+
+/* ===== 发光点 ===== */
+.spot {
+  position: absolute; z-index: 4; transform: translate(-50%, -50%);
+  width: 44px; height: 44px; padding: 0; border: none; background: none; cursor: pointer;
 }
-/* 一道白光从下往上不停扫过 */
-.level-fill::after {
-  content: '';
-  position: absolute; left: 0; right: 0; height: 40%;
-  background: linear-gradient(transparent, rgba(255, 255, 255, 0.6), transparent);
-  animation: shine 2s linear infinite;
+.dot {
+  position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 0 10px #fff, 0 0 24px rgba(200, 180, 255, 0.9);
+  transition: transform 0.3s;
 }
-@keyframes grow {
-  from { height: 0; }
+/* 外圈：一直慢慢向外扩散、变淡，像在呼吸 */
+.ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  animation: pulse 2.4s ease-out infinite;
 }
-@keyframes shine {
-  from { top: 100%; }
-  to { top: -40%; }
+@keyframes pulse {
+  from { transform: scale(0.3); opacity: 1; }
+  to { transform: scale(1.4); opacity: 0; }
 }
-.test-btn {
-  background: none; border: 1px dashed #6b7280; color: #9ca3af;
-  font-size: 12px; padding: 4px 8px; border-radius: 4px; cursor: pointer;
+.label {
+  position: absolute; left: 34px; top: 50%; transform: translateY(-50%);
+  white-space: nowrap; font-size: 12px; letter-spacing: 2px;
+  color: rgba(233, 230, 255, 0.5); transition: all 0.3s;
 }
-.level-num { color: #ffd166; font-weight: bold; }
-.medal { width: 64px; height: 64px; font-size: 64px; }
-/* 全息屏幕：在人物后面，宽一些 */
-.hero-screen {
-  position: absolute; top: 46%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 52vw; height: 30vw; font-size: 120px;
+.spot.on .dot { transform: scale(1.6); }
+.spot.on .label { color: #fff; left: 40px; }
+
+/* ===== 右侧介绍 ===== */
+.info {
+  position: absolute; right: 8%; top: 50%; transform: translateY(-50%); z-index: 4;
+  width: 300px; pointer-events: none;
 }
-/* 人物：站在屏幕前面，脚踩在按钮上方 */
-.hero-figure {
-  position: absolute; bottom: 150px; left: 50%;
-  transform: translateX(-50%);
-  height: 55vh; aspect-ratio: 1 / 2; font-size: 160px;
-  filter: drop-shadow(0 0 30px rgba(59, 167, 255, 0.6));
+.eyebrow { font-size: 11px; letter-spacing: 3px; color: rgba(233, 230, 255, 0.5); text-transform: uppercase; }
+.info h2 { margin: 10px 0 14px; font-size: 26px; font-weight: 300; letter-spacing: 4px; color: #fff; }
+.info p { margin: 0; font-size: 13px; line-height: 2; color: rgba(233, 230, 255, 0.7); }
+.enter { margin-top: 20px; font-size: 12px; letter-spacing: 2px; color: #fff; }
+
+/* ===== 底部提示 ===== */
+.hint {
+  position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 5;
+  font-size: 12px; letter-spacing: 2px; color: rgba(233, 230, 255, 0.4);
 }
-.entries {
-  position: absolute; bottom: 60px; left: 0; right: 0;
-  display: flex; justify-content: center; gap: 24px;
-}
-.entry {
-  white-space: nowrap;
-  display: flex; align-items: center; gap: 10px;
-  padding: 18px 36px;
-  border: 1px solid #ff3b4a; border-radius: 8px;
-  background: rgba(255, 59, 74, 0.1);
-  color: #fff; text-decoration: none; font-size: 20px; font-weight: bold;
-  transition: all 0.2s;
-}
-/* 鼠标移上去：发光 + 上浮 */
-.entry:hover {
-  background: rgba(255, 59, 74, 0.25);
-  box-shadow: 0 0 20px rgba(255, 59, 74, 0.6);
-  transform: translateY(-4px);
-}
-.entry-icon { width: 32px; height: 32px; font-size: 32px; }
-.id-name { font-size: 12px; color: #9ca3af; margin-top: 2px; }
-.id-card { cursor: pointer; transition: transform 0.2s; }
-.id-card:hover { transform: translateY(-2px); }
-/* 管理后台入口：放在身份卡正下方 */
-.admin-entry {
-  position: absolute; top: 180px; left: 40px;
-  padding: 6px 14px; border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(255, 255, 255, 0.06);
-  color: #e5e7eb; text-decoration: none; font-size: 13px;
-  transition: all 0.2s;
-}
-.admin-entry:hover { background: rgba(255, 255, 255, 0.15); transform: translateY(-2px); }
+
+/* ===== 过渡动画 ===== */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.slide-enter-active, .slide-leave-active { transition: all 0.5s ease; }
+.slide-enter-from, .slide-leave-to { opacity: 0; transform: translate(20px, -50%); }
 </style>

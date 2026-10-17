@@ -1,25 +1,101 @@
-/* 全局样式：对所有页面生效 */
+/* ===== 全站设计规范 =====
+   所有页面都用这里的变量，不要在页面里写死颜色。想换风格，只改这里，全站一起变 */
+:root {
+  /* 颜色 */
+  --bg: #05020f;                          /* 底色：近黑 */
+  --text: #e8f6ff;                        /* 正文：带一点青的白 */
+  --text-dim: rgba(232, 246, 255, 0.62);  /* 次要文字 */
+  --text-faint: rgba(232, 246, 255, 0.38);/* 很弱的提示文字 */
+  --accent: #00f0ff;                      /* 主色：霓虹青（链接、选中、焦点） */
+  --accent-strong: #ff2bd6;               /* 第二主色：霓虹品红（主按钮） */
+  --gold: #fcee0a;                        /* 点缀：霓虹黄（勋章、星星、成就） */
+  --danger: #ff6b81;                      /* 只用来表示「漏洞、错误、危险」 */
+  --ok: #8ee6c4;                          /* 正确、已掌握 */
 
-/* 去掉浏览器默认的白边 */
-body {
-  margin: 0;
+  /* 面板：深色毛玻璃 */
+  --glass: rgba(6, 4, 20, 0.6);
+  --glass-strong: rgba(6, 4, 20, 0.85);
+  --line: rgba(0, 240, 255, 0.22);        /* 细边框：淡淡的霓虹青 */
+  --line-strong: rgba(0, 240, 255, 0.5);
+  --blur: blur(14px);
+
+  /* 形状 */
+  --radius: 4px;                          /* 赛博朋克：小圆角，更硬朗 */
+  --radius-sm: 2px;
+
+  /* 字体：标题细、正文常规、代码等宽 */
+  --font: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  --font-code: Consolas, Menlo, monospace;
 }
 
-/* 让所有元素的宽高计算方式统一（加了边框和内边距也不会撑大） */
-* {
-  box-sizing: border-box;
+* { box-sizing: border-box; }
+/* 底色只能写在 html 上，不能写在 body 上：
+   动态背景的画布在最底层（z-index: -1），body 如果有背景色，会把它盖住 */
+html { background: var(--bg); }
+body { margin: 0; color: var(--text); font-family: var(--font); }
+a { color: var(--accent); }
+::selection { background: rgba(0, 240, 255, 0.3); }
+
+/* 滚动条：细、淡紫 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.3); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ===== 全站通用的小零件 =====
+   页面里直接写 class="glass"、class="btn" 就能用，保证每一页长得一样 */
+
+/* 深色毛玻璃面板 */
+.glass {
+  background: var(--glass);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
 
-/* 全站字体 */
-body {
-  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+/* 按钮：默认是细边框的透明按钮；加 primary 是实心的主按钮 */
+.btn {
+  padding: 9px 18px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.03);
+  color: var(--text); font-family: var(--font); font-size: 13px; letter-spacing: 1px;
+  transition: all 0.25s;
 }
+.btn:hover { border-color: var(--accent); color: #fff; background: rgba(0, 240, 255, 0.1); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+/* 主按钮：品红 → 青的霓虹渐变，右上、左下切掉两个角（赛博朋克的切角造型） */
+.btn.primary {
+  border: none; border-radius: 0; color: #05020f; font-weight: 600;
+  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.danger:hover { border-color: var(--danger); color: var(--danger); background: rgba(255, 107, 129, 0.08); }
 
-/* 选中文字后弹出的按钮：固定在屏幕上，跟着选中位置走 */
-.ask-btn {
-  position: fixed; transform: translateX(-50%); z-index: 50;
-  padding: 6px 14px; border: none; border-radius: 999px;
-  background: #1f2329; color: #fff; font-size: 13px; cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+/* 输入框：只有底线，聚焦时底线变成主色 */
+.input {
+  width: 100%; padding: 10px 2px; font-size: 14px; font-family: var(--font);
+  color: var(--text); background: transparent; outline: none;
+  border: none; border-bottom: 1px solid var(--line-strong);
+  transition: border-color 0.25s;
 }
-.ask-btn:hover { background: #2556b6; }
+.input::placeholder { color: var(--text-faint); }
+.input:focus { border-bottom-color: var(--accent); }
+
+/* 小标签上方的「眉标」：小号大写字母 + 字距，例如 01 / TRAINING CAMP */
+.eyebrow { font-size: 11px; letter-spacing: 3px; color: var(--text-faint); text-transform: uppercase; }
+
+/* ===== 页面切换动画：旧页面模糊、淡出；新页面从模糊中慢慢变清晰 ===== */
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.45s ease, filter 0.45s ease, transform 0.45s ease;
+}
+.page-enter-from {
+  opacity: 0;
+  filter: blur(10px);
+  transform: scale(1.02);
+}
+.page-leave-to {
+  opacity: 0;
+  filter: blur(10px);
+  transform: scale(0.98);
+}

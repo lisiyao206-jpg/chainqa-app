@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick,watch } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { useAiStore } from '../stores/ai.js'
 
 // 对话记录：每条是 { role: 'user' | 'bot', text, sources, error }
@@ -50,7 +50,6 @@ watch(
 // text 不传时，发送输入框里的内容
 async function send(text) {
   const question = (typeof text === 'string' ? text : input.value).trim()
-
   if (!question || loading.value) return
 
   messages.value.push({ role: 'user', text: question })

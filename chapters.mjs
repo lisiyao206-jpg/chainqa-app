@@ -50,10 +50,9 @@ export function readChapter(id) {
   // 只允许形如 23_Delegatecall 的名字，防止通过 ../ 读到别的文件
   if (!/^(\d{2}|S\d{2})_[\w-]+$/.test(id)) return null;
   const file = path.join(BOOK_DIR, id, "readme.md");
-    if (!fs.existsSync(file)) return null;
+  if (!fs.existsSync(file)) return null;
   // 去掉开头 --- 包起来的元数据（title、tags 等），那是给教材网站用的，不是正文
   return fs.readFileSync(file, "utf-8").replace(/^---[\s\S]*?\n---\s*/, "");
-
 }
 
 // 找到某一章文件夹里的附带文件（插图等），返回完整路径；不安全或不存在就返回 null

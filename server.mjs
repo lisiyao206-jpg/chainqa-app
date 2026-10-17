@@ -12,9 +12,9 @@ import { register, login, logout, userFromToken, getProfile, updateNickname, cha
 import * as data from "./data.mjs";
 import * as admin from "./admin.mjs";
 
-
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = "public";
+// 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
+const PUBLIC_DIR = path.join("web", "dist");
 const TYPES = {
   ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript",
   ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
@@ -157,12 +157,14 @@ function handleMe(req, res) {
   if (!user) return sendJSON(res, 401, { error: "未登录或登录已过期" });
   sendJSON(res, 200, { user });
 }
-// ===== 笔记 / 错题 / 关卡进度（都要先登录）=====
+
+// ===== 笔记 / 错题 / 关卡进度 / 个人资料（都要先登录）=====
 // 统一处理：先认人，没登录就返回 401；出错就返回 400 和错误提示
-async function withUser(req, res, fn,{admin=false}={}) {
+// 第 4 个参数写 { admin: true } 时，还要求是管理员，不是就返回 403
+async function withUser(req, res, fn, { admin = false } = {}) {
   const user = userFromToken(getToken(req));
   if (!user) return sendJSON(res, 401, { error: "请先登录" });
-   if (admin && user.role !== "admin") return sendJSON(res, 403, { error: "只有管理员可以访问" });
+  if (admin && user.role !== "admin") return sendJSON(res, 403, { error: "只有管理员可以访问" });
   try {
     const body = ["POST", "PUT"].includes(req.method) ? await readJSON(req) : {};
     sendJSON(res, 200, (await fn(user.userId, body)) ?? { ok: true });
@@ -190,12 +192,13 @@ function routeData(req, res) {
 
   if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
   if (url === "/api/progress" && method === "POST") return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));
-  
+
   if (url === "/api/profile" && method === "GET") return W((uid) => getProfile(uid));
   if (url === "/api/profile" && method === "PUT") return W((uid, b) => updateNickname(uid, b.nickname));
   if (url === "/api/password" && method === "PUT") return W((uid, b) => changePassword(uid, b.oldPwd, b.newPwd));
   return null;
 }
+
 // ===== 管理员后台（只有管理员能用）=====
 function routeAdmin(req, res) {
   const { method } = req;
@@ -217,15 +220,23 @@ function routeAdmin(req, res) {
   return sendJSON(res, 404, { error: "没有这个接口" });
 }
 
-
-// 其余请求：返回 public/ 下的静态文件
+// 其余请求：返回 web/dist 里打包好的网页文件
 function handleStatic(req, res) {
-  const urlPath = req.url === "/" ? "/index.html" : decodeURIComponent(req.url.split("?")[0]);
-  const file = path.join(PUBLIC_DIR, path.normalize(urlPath));
-  // 防止通过 ../ 读到 public 以外的文件（比如 .env）
-  if (!file.startsWith(PUBLIC_DIR + path.sep) || !fs.existsSync(file)) {
+  const urlPath = decodeURIComponent(req.url.split("?")[0]);
+  let file = path.join(PUBLIC_DIR, path.normalize(urlPath));
+  // 防止通过 ../ 读到 web/dist 以外的文件（比如 .env）
+  if (!file.startsWith(PUBLIC_DIR)) {
     res.writeHead(404);
     return res.end("Not Found");
+  }
+  // 找不到文件、或者是 /camp 这种页面地址时，都返回 index.html，
+  // 由前端路由决定显示哪个页面（否则在 /camp 页面按刷新会 404）
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
+    if (path.extname(urlPath)) {
+      res.writeHead(404);
+      return res.end("Not Found");
+    }
+    file = path.join(PUBLIC_DIR, "index.html");
   }
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
   fs.createReadStream(file).pipe(res);

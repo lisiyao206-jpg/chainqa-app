@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed ,onMounted} from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useNotesStore } from '../stores/notes.js'
 import { useMistakesStore } from '../stores/mistakes.js'
 import MistakesModal from '../components/MistakesModal.vue'

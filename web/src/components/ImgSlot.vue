@@ -23,11 +23,16 @@ const broken = ref(false)
 <style scoped>
 .slot-img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .slot-placeholder {
+  position: relative;
   width: 100%; height: 100%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border: 1px dashed rgba(255, 255, 255, 0.35);
   border-radius: 6px;
 }
 .slot-emoji { font-size: 0.8em; line-height: 1; }
-.slot-label { font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-top: 4px; white-space: nowrap; }
+/* 文件名提示放在占位框左上角，几个框叠在一起时不会互相挡住 */
+.slot-label {
+  position: absolute; top: 6px; left: 8px;
+  font-size: 11px; color: rgba(255, 255, 255, 0.5); white-space: nowrap;
+}
 </style>

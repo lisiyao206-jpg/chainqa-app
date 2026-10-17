@@ -2,9 +2,11 @@
 // 个人资料弹窗：看自己的信息和学习统计，改昵称、改密码
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
+import { useThemeStore, BACKGROUNDS } from '../stores/theme.js'
 
 const emit = defineEmits(['close'])
 const userStore = useUserStore()
+const theme = useThemeStore()
 
 const profile = ref(null)
 const nickname = ref('')
@@ -14,14 +16,9 @@ const newPwd = ref('')
 const msg = ref(null)
 
 onMounted(async () => {
-  try {
-    profile.value = await userStore.api('/api/profile')
-    nickname.value = profile.value.nickname
-  } catch (err) {
-    msg.value = { ok: false, text: '加载失败：' + err.message + '（后端重启了吗？）' }
-  }
+  profile.value = await userStore.api('/api/profile')
+  nickname.value = profile.value.nickname
 })
-
 
 async function saveNickname() {
   try {
@@ -72,6 +69,18 @@ async function savePassword() {
         </div>
 
         <!-- 改昵称 -->
+        <!-- 背景主题：点一下就换，整个网站的背景马上跟着变 -->
+        <h4>背景主题</h4>
+        <div class="themes">
+          <button
+            v-for="b in BACKGROUNDS"
+            :key="b.id"
+            :class="['theme', { on: theme.bg === b.id }]"
+            :title="b.desc"
+            @click="theme.setBg(b.id)"
+          >{{ b.name }}</button>
+        </div>
+
         <h4>修改昵称</h4>
         <form class="row" @submit.prevent="saveNickname">
           <input v-model="nickname" maxlength="12" />
@@ -128,4 +137,12 @@ form button {
 }
 .ok { color: #4ade80; font-size: 14px; }
 .error { color: #ff8a93; font-size: 14px; }
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.theme {
+  padding: 8px 4px; border-radius: 8px; cursor: pointer; font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.04); color: #e5e7eb;
+  transition: all 0.2s;
+}
+.theme:hover { border-color: rgba(0, 240, 255, 0.7); }
+.theme.on { border-color: #00f0ff; background: rgba(0, 240, 255, 0.15); color: #fff; }
 </style>

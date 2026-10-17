@@ -18,7 +18,6 @@ const detail = ref(null)
 function fmt(t) {
   return t ? t.slice(5, 16).replace('T', ' ') : '—'
 }
-
 // 详情面板里某一关的星数：通关了显示 ★★★，没通关显示「未通关」
 function starsOf(levelId) {
   const star = detail.value.progress.find((p) => p.levelId === levelId)?.star
