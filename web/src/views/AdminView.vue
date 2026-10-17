@@ -184,46 +184,63 @@ onMounted(loadUsers)
 </template>
 
 <style scoped>
-.admin { position: relative; }
+/* 赛博朋克深色版：和全站一样用 style.css 里的变量。
+   以前是白底，但全站文字是浅色的，白底上就看不清了，所以面板统一改成深色 */
+.admin { position: relative; color: var(--text); }
 .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .tabs button {
-  padding: 8px 18px; border: 1px solid #e5e7eb; border-radius: 999px;
-  background: #fff; cursor: pointer; font-size: 14px;
+  padding: 8px 18px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04); color: var(--text-dim); cursor: pointer; font-size: 14px;
 }
-.tabs button.active { background: #1f2329; color: #fff; border-color: #1f2329; }
+.tabs button:hover { color: #fff; border-color: var(--accent); }
+.tabs button.active { background: linear-gradient(90deg, var(--accent-strong), var(--accent)); color: #05020f; border-color: transparent; font-weight: 600; }
 .search { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-.search input { width: 240px; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; }
-.search button { padding: 8px 16px; border: none; border-radius: 8px; background: #2556b6; color: #fff; cursor: pointer; }
-.total { margin-left: auto; color: #6b7280; font-size: 13px; }
-
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; text-align: left; white-space: nowrap; }
-th { background: #f6f7f9; color: #6b7280; font-weight: normal; }
-tr.disabled td { color: #9ca3af; }
-.empty { text-align: center; color: #9ca3af; }
-.ops button {
-  margin-right: 6px; padding: 4px 10px; border: 1px solid #e5e7eb; border-radius: 6px;
-  background: #fff; cursor: pointer; font-size: 13px;
+.search input {
+  width: 240px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: rgba(6, 4, 20, 0.7); color: var(--text); outline: none;
 }
-.ops button:hover { border-color: #2556b6; color: #2556b6; }
-.ops .danger:hover { border-color: #b91c1c; color: #b91c1c; }
+.search input:focus { border-color: var(--accent); }
+.search input::placeholder { color: var(--text-faint); }
+.search button { padding: 8px 16px; border: none; border-radius: var(--radius); background: var(--accent); color: #05020f; font-weight: 600; cursor: pointer; }
+.total { margin-left: auto; color: var(--text-dim); font-size: 13px; }
+
+/* 表格：放在深色毛玻璃上 */
+table {
+  width: 100%; border-collapse: collapse; font-size: 14px;
+  background: var(--glass-strong); backdrop-filter: var(--blur); border: 1px solid var(--line);
+}
+th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; color: var(--text); }
+th { background: rgba(0, 240, 255, 0.08); color: var(--accent); font-weight: normal; letter-spacing: 1px; }
+tbody tr:hover td { background: rgba(0, 240, 255, 0.05); }
+tr.disabled td { color: var(--text-faint); }
+.empty { text-align: center; color: var(--text-faint); }
+.ops button {
+  margin-right: 6px; padding: 4px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: transparent; color: var(--text); cursor: pointer; font-size: 13px;
+}
+.ops button:hover { border-color: var(--accent); color: var(--accent); }
+.ops .danger:hover { border-color: var(--danger); color: var(--danger); }
 
 /* 小标签：管理员 / 正常 / 已禁用 / 待温习 / 已掌握 */
 .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
-.tag.admin { background: #e8eefb; color: #2556b6; margin-left: 4px; }
-.tag.active, .tag.mastered { background: #dcfce7; color: #15803d; }
-.tag.disabled, .tag.todo { background: #fee2e2; color: #b91c1c; }
+.tag.admin { background: rgba(0, 240, 255, 0.15); color: var(--accent); margin-left: 4px; }
+.tag.active, .tag.mastered { background: rgba(142, 230, 196, 0.15); color: var(--ok); }
+.tag.disabled, .tag.todo { background: rgba(255, 107, 129, 0.15); color: var(--danger); }
 
+/* 右侧详情面板 */
 .detail {
   position: fixed; top: 56px; right: 0; bottom: 0; width: 340px; z-index: 20;
-  padding: 20px; overflow-y: auto; background: #fff;
-  box-shadow: -8px 0 30px rgba(0, 0, 0, 0.1);
+  padding: 20px; overflow-y: auto; color: var(--text);
+  background: var(--glass-strong); backdrop-filter: var(--blur);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: -8px 0 30px rgba(0, 240, 255, 0.12);
 }
-.detail-head { display: flex; justify-content: space-between; align-items: center; }
-.detail-head button { border: none; background: none; font-size: 18px; cursor: pointer; }
-.detail h4 { margin: 20px 0 8px; }
+.detail-head { display: flex; justify-content: space-between; align-items: center; color: #fff; }
+.detail-head button { border: none; background: none; font-size: 18px; cursor: pointer; color: var(--text); }
+.detail-head button:hover { color: var(--accent); }
+.detail h4 { margin: 20px 0 8px; color: var(--accent); letter-spacing: 1px; }
 .detail ul { list-style: none; padding: 0; margin: 0; font-size: 14px; }
-.detail li { padding: 6px 0; border-bottom: 1px dashed #e5e7eb; }
-.stars { float: right; color: #f59e0b; }
-.error { color: #b91c1c; }
+.detail li { padding: 6px 0; border-bottom: 1px dashed var(--line); color: var(--text); }
+.stars { float: right; color: var(--gold); }
+.error { color: var(--danger); }
 </style>
