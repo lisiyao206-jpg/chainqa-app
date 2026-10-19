@@ -1,14 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LobbyView from './views/LobbyView.vue'
-import TextbookView from './views/TextbookView.vue'
-import MentorView from './views/MentorView.vue'
-import NotebookView from './views/NotebookView.vue'
-import GameView from './views/GameView.vue'
 import LoginView from './views/LoginView.vue'
-import AdminView from './views/AdminView.vue'
-import SocialView from './views/SocialView.vue'
-import AuditView from './views/AuditView.vue'
 import { useUserStore } from './stores/user.js'
+
+// 性能优化：路由懒加载。登录页和大厅一打开就要用，直接打包进首页；
+// 其他页面写成 () => import(...)，等用户真的点进去才下载，首页加载快很多
+// （比如实战任务里的 three.js 3D 引擎很大，不进实战就不用下载它）
+const TextbookView = () => import('./views/TextbookView.vue')
+const MentorView = () => import('./views/MentorView.vue')
+const NotebookView = () => import('./views/NotebookView.vue')
+const GameView = () => import('./views/GameView.vue')
+const AdminView = () => import('./views/AdminView.vue')
+const SocialView = () => import('./views/SocialView.vue')
+const AuditView = () => import('./views/AuditView.vue')
 
 const router = createRouter({
   history: createWebHistory(),
