@@ -20,7 +20,7 @@ const spots = [
     desc: '只依据教材回答的 AI 导师。每个结论都标注出处，可以展开核对原文；查不到依据时，它会直接告诉你「不知道」。' },
   { no: '03', to: '/archive', title: '案件档案', en: 'Case Files', x: 36, y: 70,
     desc: '你的笔记和错题都存放在这里。笔记打字自动保存；错题可以重做，掌握了就标记出来。' },
-  { no: '04', to: '/mission', title: '实战任务', en: 'Field Mission', x: 70, y: 64,
+  { no: '04', to: '/mission', title: '实战任务', en: 'Field Mission', x: 60, y: 70,
     desc: '每一关是一份出了事的合约。像审计员一样逐行阅读，找出藏着漏洞的那一行，赢得勋章。' },
   { no: '05', to: '/social', title: '情报站', en: 'Intel Hub', x: 52, y: 84,
     desc: '审计员之间交流的地方。在广场发帖、发视频分享心得，和所有人讨论；加好友私聊、建讨论组一起研究题目，互相传资料。' },
@@ -75,6 +75,7 @@ function go(s) {
     >
       <span class="dot"></span>
       <span class="ring"></span>
+      <span class="ring r2"></span>
       <span class="label">{{ s.title }}</span>
     </button>
 
@@ -109,12 +110,12 @@ function go(s) {
   display: flex; justify-content: space-between; align-items: center;
   padding: 22px 36px;
 }
-.links { display: flex; gap: 26px; align-items: center; font-size: 13px; }
-.links a { color: rgba(233, 230, 255, 0.6); text-decoration: none; transition: color 0.3s; }
+.links { display: flex; gap: 32px; align-items: center; font-size: 16px; }
+.links a { color: rgba(233, 230, 255, 0.7); text-decoration: none; transition: color 0.3s; }
 .links a:hover { color: #fff; }
-.brand { color: #fff; letter-spacing: 3px; margin-right: 10px; }
-.me { display: flex; align-items: center; gap: 18px; font-size: 13px; }
-.admin { color: rgba(233, 230, 255, 0.6); text-decoration: none; }
+.brand { color: #fff; font-size: 19px; letter-spacing: 4px; margin-right: 12px; }
+.me { display: flex; align-items: center; gap: 20px; font-size: 16px; }
+.admin { color: rgba(233, 230, 255, 0.7); text-decoration: none; }
 .admin:hover { color: #fff; }
 .me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }
 .me-btn:hover { box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
@@ -122,54 +123,60 @@ function go(s) {
 /* ===== 中间标题 ===== */
 .headline {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  text-align: center; pointer-events: none; z-index: 3;
+  text-align: center; pointer-events: none; z-index: 3; white-space: nowrap;
 }
-.headline h1 { margin: 0; font-size: 30px; font-weight: 200; letter-spacing: 6px; color: #fff; }
-.headline p { margin: 14px 0 0; font-size: 13px; letter-spacing: 2px; color: rgba(233, 230, 255, 0.55); }
+.headline h1 { margin: 0; font-size: 46px; font-weight: 200; letter-spacing: 10px; color: #fff; text-shadow: 0 0 24px rgba(0, 240, 255, 0.35); }
+.headline p { margin: 18px 0 0; font-size: 18px; letter-spacing: 4px; color: rgba(233, 230, 255, 0.7); }
 
-/* ===== 发光点 ===== */
+/* ===== 发光点：更大、更亮，一眼就能看到 ===== */
 .spot {
   position: absolute; z-index: 4; transform: translate(-50%, -50%);
-  width: 44px; height: 44px; padding: 0; border: none; background: none; cursor: pointer;
+  width: 84px; height: 84px; padding: 0; border: none; background: none; cursor: pointer;
 }
+/* 中心的光球：白色内核 + 青色和品红两层光晕 */
 .dot {
-  position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px;
+  position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px;
   border-radius: 50%; background: #fff;
-  box-shadow: 0 0 10px #fff, 0 0 24px rgba(200, 180, 255, 0.9);
+  box-shadow: 0 0 10px #fff, 0 0 26px var(--accent), 0 0 52px rgba(255, 43, 214, 0.7);
+  animation: glow 2.4s ease-in-out infinite;
   transition: transform 0.3s;
 }
-/* 外圈：一直慢慢向外扩散、变淡，像在呼吸 */
+@keyframes glow { 50% { box-shadow: 0 0 14px #fff, 0 0 36px var(--accent), 0 0 70px rgba(255, 43, 214, 0.9); } }
+/* 两圈光环：一直向外扩散、变淡，像雷达在扫，第二圈晚一半时间出发 */
 .ring {
   position: absolute; inset: 0; border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 2px solid rgba(0, 240, 255, 0.85);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.5);
   animation: pulse 2.4s ease-out infinite;
 }
+.ring.r2 { animation-delay: 1.2s; border-color: rgba(255, 43, 214, 0.8); box-shadow: 0 0 12px rgba(255, 43, 214, 0.5); }
 @keyframes pulse {
-  from { transform: scale(0.3); opacity: 1; }
-  to { transform: scale(1.4); opacity: 0; }
+  from { transform: scale(0.25); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
 }
 .label {
-  position: absolute; left: 34px; top: 50%; transform: translateY(-50%);
-  white-space: nowrap; font-size: 12px; letter-spacing: 2px;
-  color: rgba(233, 230, 255, 0.5); transition: all 0.3s;
+  position: absolute; left: 66px; top: 50%; transform: translateY(-50%);
+  white-space: nowrap; font-size: 19px; font-weight: 400; letter-spacing: 4px;
+  color: rgba(255, 255, 255, 0.88); text-shadow: 0 0 10px rgba(0, 240, 255, 0.6), 0 2px 4px #000;
+  transition: all 0.3s;
 }
-.spot.on .dot { transform: scale(1.6); }
-.spot.on .label { color: #fff; left: 40px; }
+.spot.on .dot { transform: scale(1.5); }
+.spot.on .label { color: #fff; left: 74px; font-size: 21px; text-shadow: 0 0 16px var(--accent), 0 2px 4px #000; }
 
 /* ===== 右侧介绍 ===== */
 .info {
-  position: absolute; right: 8%; top: 50%; transform: translateY(-50%); z-index: 4;
-  width: 300px; pointer-events: none;
+  position: absolute; right: 7%; top: 50%; transform: translateY(-50%); z-index: 4;
+  width: 380px; pointer-events: none;
 }
-.eyebrow { font-size: 11px; letter-spacing: 3px; color: rgba(233, 230, 255, 0.5); text-transform: uppercase; }
-.info h2 { margin: 10px 0 14px; font-size: 26px; font-weight: 300; letter-spacing: 4px; color: #fff; }
-.info p { margin: 0; font-size: 13px; line-height: 2; color: rgba(233, 230, 255, 0.7); }
-.enter { margin-top: 20px; font-size: 12px; letter-spacing: 2px; color: #fff; }
+.eyebrow { font-size: 13px; letter-spacing: 3px; color: rgba(233, 230, 255, 0.6); text-transform: uppercase; }
+.info h2 { margin: 12px 0 16px; font-size: 34px; font-weight: 300; letter-spacing: 6px; color: #fff; }
+.info p { margin: 0; font-size: 16px; line-height: 2; color: rgba(233, 230, 255, 0.8); }
+.enter { margin-top: 22px; font-size: 15px; letter-spacing: 2px; color: var(--accent); }
 
 /* ===== 底部提示 ===== */
 .hint {
   position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); z-index: 5;
-  font-size: 12px; letter-spacing: 2px; color: rgba(233, 230, 255, 0.4);
+  font-size: 15px; letter-spacing: 3px; color: rgba(233, 230, 255, 0.55);
 }
 
 /* ===== 过渡动画 ===== */

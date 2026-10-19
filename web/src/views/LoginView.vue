@@ -62,10 +62,7 @@ function switchMode(m) {
       <ul>
         <li><span>01</span>训练营 · 读教材，选中就能问 AI</li>
         <li><span>02</span>白帽导师 · 回答都标注教材出处</li>
-        <li><span>03</span>案件分析 · 训练中教材的笔记，实战中易错题的收集</li>
-        <li><span>04</span>实战任务 · 在合约里找出漏洞</li>
-        <li><span>05</span>情报站 · 从外圈和好友处获取知识</li>
-        <li><span>06</span>学习站台 · 收集情报站中的帖子</li>
+        <li><span>03</span>实战任务 · 在合约里找出漏洞</li>
       </ul>
     </section>
 
@@ -96,28 +93,30 @@ function switchMode(m) {
   padding: 0 10%;
   font-weight: 300;
 }
-.brand { position: absolute; top: 22px; left: 36px; font-size: 13px; letter-spacing: 3px; color: #fff; }
+.brand { position: absolute; top: 24px; left: 40px; font-size: 18px; letter-spacing: 3px; color: #fff; }
 
 /* 左边介绍 */
-.intro h1 { margin: 14px 0 12px; font-size: 40px; font-weight: 200; letter-spacing: 8px; color: #fff; }
-.intro p { margin: 0; font-size: 14px; letter-spacing: 2px; color: var(--text-dim); }
-.intro ul { list-style: none; padding: 0; margin: 40px 0 0; font-size: 13px; line-height: 2.4; color: var(--text-dim); }
-.intro li span { display: inline-block; width: 32px; color: var(--text-faint); }
+.intro h1 { margin: 16px 0 14px; font-size: 56px; font-weight: 200; letter-spacing: 8px; color: #fff; }
+.intro p { margin: 0; font-size: 18px; letter-spacing: 2px; color: var(--text-dim); }
+.intro ul { list-style: none; padding: 0; margin: 44px 0 0; font-size: 17px; line-height: 2.4; color: var(--text-dim); }
+.intro li span { display: inline-block; width: 40px; color: var(--text-faint); }
 
 /* 右边登录框 */
-.box { width: 360px; padding: 36px 34px; display: flex; flex-direction: column; gap: 18px; }
-.box h2 { margin: -8px 0 6px; font-size: 22px; font-weight: 300; letter-spacing: 3px; color: #fff; }
-.submit { margin-top: 8px; padding: 12px; font-size: 14px; letter-spacing: 4px; }
-.error { color: var(--danger); font-size: 13px; }
-.switch { margin: 0; text-align: center; font-size: 13px; color: var(--text-dim); }
+.box { width: 420px; padding: 40px 38px; display: flex; flex-direction: column; gap: 20px; }
+.box :deep(.input), .box .input { font-size: 16px; padding: 12px 2px; }
+.intro .eyebrow, .box .eyebrow { font-size: 13px; }
+.box h2 { margin: -8px 0 6px; font-size: 28px; font-weight: 300; letter-spacing: 3px; color: #fff; }
+.submit { margin-top: 8px; padding: 14px; font-size: 17px; letter-spacing: 4px; }
+.error { color: var(--danger); font-size: 15px; }
+.switch { margin: 0; text-align: center; font-size: 15px; color: var(--text-dim); }
 .switch a { color: var(--accent); cursor: pointer; }
-.privacy { margin: 0; text-align: center; font-size: 11px; color: var(--text-faint); }
+.privacy { margin: 0; text-align: center; font-size: 13px; color: var(--text-faint); }
 
 /* 左下角的背景切换：小字按钮，选中的那个亮起来、下面一个小圆点 */
-.themes { position: absolute; left: 36px; bottom: 28px; display: flex; align-items: center; gap: 18px; font-size: 12px; }
+.themes { position: absolute; left: 40px; bottom: 30px; display: flex; align-items: center; gap: 22px; font-size: 15px; }
 .theme {
   position: relative; padding: 0; border: none; background: none; cursor: pointer;
-  font-family: var(--font); font-size: 12px; letter-spacing: 1px; color: var(--text-faint); transition: color 0.3s;
+  font-family: var(--font); font-size: 15px; letter-spacing: 1px; color: var(--text-dim); transition: color 0.3s;
 }
 .theme:hover, .theme.on { color: #fff; }
 .theme.on::after {
