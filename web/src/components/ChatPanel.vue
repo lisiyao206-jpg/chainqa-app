@@ -1,8 +1,12 @@
 <script setup>
 import { ref, nextTick, watch } from 'vue'
 import { useAiStore } from '../stores/ai.js'
+import { useUserStore } from '../stores/user.js'
+import { renderMarkdown } from '../utils/markdown.js'
 
-// 对话记录：每条是 { role: 'user' | 'bot', text, sources, error }
+// 对话记录：每条是 { role: 'user' | 'bot', text, sources, error, logId, rating }
+// logId 是后端问答日志的编号，有了它才能给这条回答点「有帮助 / 没帮助」
+const userStore = useUserStore()
 const messages = ref([])
 // 输入框里的内容
 const input = ref('')
@@ -17,23 +21,7 @@ function scrollToBottom() {
   })
 }
 
-// 把 AI 回答里的 Markdown 转成 HTML（代码块、行内代码、粗体、引用编号）
-function escapeHtml(s) {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-}
-function renderMarkdown(md) {
-  return md
-    .split('```')
-    .map((part, i) => {
-      if (i % 2 === 1) return `<pre><code>${escapeHtml(part.replace(/^[\w-]*\n/, ''))}</code></pre>`
-      return escapeHtml(part)
-        .replace(/`([^`]+)`/g, '<code>$1</code>')
-        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-        .replace(/\[(\d+)\]/g, '<span class="cite">$1</span>')
-        .replace(/\n/g, '<br>')
-    })
-    .join('')
-}
+// 把 AI 回答里的 Markdown 转成 HTML：和 AI 审计报告共用一份（utils/markdown.js）
 
 // 别的页面（比如训练营选中文字）通过公告板塞进来的问题，自动发出去
 const ai = useAiStore()
@@ -54,7 +42,7 @@ async function send(text) {
 
   messages.value.push({ role: 'user', text: question })
   // 先放一条空的 AI 消息，后面一个字一个字往里填
-  messages.value.push({ role: 'bot', text: '', sources: [], error: '' })
+  messages.value.push({ role: 'bot', text: '', sources: [], error: '', logId: null, rating: null, reason: '', askReason: false, thanks: false })
   const bot = messages.value[messages.value.length - 1]
   if (typeof text !== 'string') input.value = ''
   loading.value = true
@@ -64,7 +52,8 @@ async function send(text) {
     // 发给后端（Vite 会把 /api 转到 3000 端口的 server.mjs）
     const res = await fetch('/api/ask', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // 带上登录凭证：后端才知道是谁问的（写进问答日志），也才能评价这条回答
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userStore.token}` },
       body: JSON.stringify({ question }),
     })
     if (!res.ok) throw new Error('请求失败，后端开着吗？')
@@ -86,6 +75,7 @@ async function send(text) {
         else if (event === 'sources') bot.sources = data
         else if (event === 'refused') bot.text = '⚠️ 知识库中没找到相关依据，换个说法试试？'
         else if (event === 'error') bot.error = data
+        else if (event === 'log') bot.logId = data
         scrollToBottom()
       }
     }
@@ -93,6 +83,23 @@ async function send(text) {
     bot.error = err.message
   }
   loading.value = false
+}
+
+// ===== 评价这条回答（进入管理员后台的「反馈处理」）=====
+async function rate(msg, rating) {
+  msg.rating = rating
+  msg.thanks = false
+  msg.askReason = rating === 'down' // 没帮助：请用户说说哪里不好
+  if (rating === 'up') await submitRating(msg)
+}
+async function submitRating(msg) {
+  try {
+    await userStore.api('/api/feedback', { type: 'answer', logId: msg.logId, rating: msg.rating, content: msg.reason })
+    msg.askReason = false
+    msg.thanks = true
+  } catch (err) {
+    msg.error = err.message
+  }
 }
 </script>
 
@@ -117,6 +124,16 @@ async function send(text) {
             <p>{{ s.file }}</p>
             <p>{{ s.text }}…</p>
           </details>
+          <!-- 评价：这条回答有没有帮到你 -->
+          <div v-if="msg.logId" class="rate">
+            <button :class="{ on: msg.rating === 'up' }" @click="rate(msg, 'up')">👍 有帮助</button>
+            <button :class="{ on: msg.rating === 'down' }" @click="rate(msg, 'down')">👎 没帮助</button>
+            <span v-if="msg.thanks" class="thanks">谢谢反馈！</span>
+          </div>
+          <form v-if="msg.askReason" class="reason" @submit.prevent="submitRating(msg)">
+            <input v-model="msg.reason" maxlength="300" placeholder="哪里不对？比如答错了、没答到点上……" />
+            <button>提交</button>
+          </form>
         </template>
       </div>
     </div>
@@ -156,6 +173,20 @@ async function send(text) {
 .thinking { color: var(--text-faint); }
 .error { color: var(--danger); }
 .source { font-size: 12px; margin-top: 6px; }
+.rate { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.rate button {
+  padding: 2px 10px; font-size: 12px; cursor: pointer; border-radius: 999px;
+  color: var(--text-dim); background: none; border: 1px solid var(--line);
+}
+.rate button:hover { color: #fff; border-color: var(--accent); }
+.rate button.on { color: #05020f; background: var(--accent); border-color: var(--accent); }
+.thanks { font-size: 12px; color: var(--ok); }
+.reason { display: flex; gap: 6px; margin-top: 6px; }
+.reason input {
+  flex: 1; padding: 5px 8px; font-size: 12px; color: var(--text); outline: none;
+  background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line-strong);
+}
+.reason button { padding: 4px 10px; font-size: 12px; cursor: pointer; color: #05020f; background: var(--accent); border: none; }
 .source summary { cursor: pointer; color: var(--text-dim); }
 .source p { margin: 4px 0; color: var(--text-dim); white-space: pre-wrap; }
 .input-row { display: flex; gap: 8px; padding-top: 8px; }

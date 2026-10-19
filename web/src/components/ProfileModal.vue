@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
 import { useThemeStore, BACKGROUNDS } from '../stores/theme.js'
 import MedalWall from './MedalWall.vue'
+import FeedbackModal from './FeedbackModal.vue'
 import UserAvatar from './UserAvatar.vue'
 import { PRESET_AVATARS } from '../data/avatars.js'
 import { uploadFile } from '../utils/files.js'
@@ -19,9 +20,12 @@ const newPwd = ref('')
 // 操作结果提示：{ ok: true/false, text }
 const msg = ref(null)
 const showWall = ref(false) // 勋章墙开关
+const showFeedback = ref(false) // 意见反馈开关
+const unread = ref(0)           // 管理员回复了、我还没看的反馈数
 
 onMounted(async () => {
   profile.value = await userStore.api('/api/profile')
+  userStore.api('/api/feedback/unread').then((d) => (unread.value = d.n)).catch(() => {})
   nickname.value = profile.value.nickname
 })
 
@@ -147,6 +151,10 @@ async function savePassword() {
         </div>
         <button class="wall-btn" @click="showWall = true">🏅 查看我的勋章墙</button>
         <MedalWall v-if="showWall" @close="showWall = false" />
+        <button class="fb-btn" @click="showFeedback = true; unread = 0">
+          💬 意见反馈 <i v-if="unread" class="dot">{{ unread }} 条新回复</i>
+        </button>
+        <FeedbackModal v-if="showFeedback" @close="showFeedback = false" />
 
         <!-- 改昵称 -->
         <!-- 背景主题：点一下就换，整个网站的背景马上跟着变 -->
@@ -226,6 +234,9 @@ header { display: flex; justify-content: space-between; align-items: center; fon
 .stats div { padding: 10px 0; border-radius: 8px; background: rgba(255, 255, 255, 0.05); }
 .wall-btn { width: 100%; margin-top: 10px; padding: 8px; cursor: pointer; font-size: 13px; color: var(--gold); background: rgba(252, 238, 10, 0.06); border: 1px solid rgba(252, 238, 10, 0.4); }
 .wall-btn:hover { background: rgba(252, 238, 10, 0.14); }
+.fb-btn { width: 100%; margin-top: 8px; padding: 8px; cursor: pointer; font-size: 13px; color: var(--accent); background: rgba(0, 240, 255, 0.06); border: 1px solid var(--line-strong); }
+.fb-btn:hover { background: rgba(0, 240, 255, 0.14); }
+.fb-btn .dot { font-style: normal; margin-left: 6px; padding: 0 8px; border-radius: 9px; color: #fff; background: var(--accent-strong); font-size: 11px; }
 .stats b { display: block; font-size: 20px; color: #fff; }
 h4 { margin: 20px 0 8px; font-size: 14px; }
 .row { display: flex; gap: 8px; }

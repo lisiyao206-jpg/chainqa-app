@@ -5,7 +5,7 @@ import { levels } from '../data/levels.js'
 
 const userStore = useUserStore()
 
-// 当前标签页：'users' 用户管理 / 'logins' 登录记录
+// 当前标签页：'users' 用户管理 / 'logins' 登录记录 / 'qa' 问答日志 / 'feedback' 反馈处理
 const tab = ref('users')
 const users = ref([])
 const logins = ref([])
@@ -45,7 +45,73 @@ async function loadLogins() {
 
 function switchTab(name) {
   tab.value = name
-  name === 'users' ? loadUsers() : loadLogins()
+  ;({ users: loadUsers, logins: loadLogins, qa: loadQa, feedback: loadFeedback })[name]()
+}
+
+// ===== 新增 / 编辑用户 =====
+// form 为 null 时不显示表单；mode = 'create' 新增 / 'edit' 编辑
+const form = ref(null)
+function openCreate() {
+  form.value = { mode: 'create', account: '', pwd: '', nickname: '', role: 'user' }
+}
+function openEdit(u) {
+  form.value = { mode: 'edit', userId: u.userId, account: u.account, nickname: u.nickname, role: u.role, pwd: '' }
+}
+async function saveForm() {
+  const f = form.value
+  try {
+    if (f.mode === 'create') {
+      await userStore.api('/api/admin/users', { account: f.account, pwd: f.pwd, nickname: f.nickname, role: f.role })
+    } else {
+      // 密码不填就不改
+      await userStore.api(`/api/admin/users/${f.userId}`, { nickname: f.nickname, role: f.role, pwd: f.pwd || undefined }, 'PUT')
+    }
+    form.value = null
+    loadUsers()
+  } catch (err) {
+    alert(err.message)
+  }
+}
+
+// ===== 问答日志 =====
+const qa = ref([])
+const qaKeyword = ref('')
+const refusedOnly = ref(false) // 只看「拒答」的：拒答多的问题，说明知识库该补资料了
+const openQa = ref(null)       // 展开看完整回答的那一条
+async function loadQa() {
+  error.value = ''
+  try {
+    qa.value = await userStore.api(`/api/admin/qa?q=${encodeURIComponent(qaKeyword.value)}&refused=${refusedOnly.value ? 1 : 0}`)
+  } catch (err) {
+    error.value = err.message
+  }
+}
+
+// ===== 反馈处理 =====
+const feedbacks = ref([])
+const fbStatus = ref('')    // '' 全部 / pending 待处理 / replied 已回复
+const replies = ref({})     // 每条反馈正在写的回复：{ 反馈id: 文字 }
+async function loadFeedback() {
+  error.value = ''
+  try {
+    feedbacks.value = await userStore.api('/api/admin/feedback?status=' + fbStatus.value)
+  } catch (err) {
+    error.value = err.message
+  }
+}
+async function reply(f) {
+  try {
+    await userStore.api(`/api/admin/feedback/${f.id}`, { reply: replies.value[f.id] }, 'PUT')
+    replies.value[f.id] = ''
+    loadFeedback()
+  } catch (err) {
+    alert(err.message)
+  }
+}
+async function removeFeedback(f) {
+  if (!confirm('删除这条反馈？')) return
+  await userStore.api(`/api/admin/feedback/${f.id}`, null, 'DELETE')
+  loadFeedback()
 }
 
 // 打开某个用户的详情：通关情况 + 错题
@@ -86,6 +152,8 @@ onMounted(loadUsers)
     <div class="tabs">
       <button :class="{ active: tab === 'users' }" @click="switchTab('users')">👥 用户管理</button>
       <button :class="{ active: tab === 'logins' }" @click="switchTab('logins')">🕒 登录记录</button>
+      <button :class="{ active: tab === 'qa' }" @click="switchTab('qa')">🤖 问答日志</button>
+      <button :class="{ active: tab === 'feedback' }" @click="switchTab('feedback')">💬 反馈处理</button>
     </div>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -95,7 +163,22 @@ onMounted(loadUsers)
       <form class="search" @submit.prevent="loadUsers">
         <input v-model="keyword" placeholder="按账号或昵称搜索" />
         <button>搜索</button>
+        <button type="button" class="ghost" @click="openCreate">＋ 新增用户</button>
         <span class="total">共 {{ users.length }} 人</span>
+      </form>
+
+      <!-- 新增 / 编辑用户 -->
+      <form v-if="form" class="user-form" @submit.prevent="saveForm">
+        <b>{{ form.mode === 'create' ? '新增用户' : `编辑「${form.account}」` }}</b>
+        <input v-if="form.mode === 'create'" v-model="form.account" placeholder="账号（3~20 位字母、数字、下划线）" />
+        <input v-model="form.nickname" maxlength="12" placeholder="昵称" />
+        <input v-model="form.pwd" type="password" :placeholder="form.mode === 'create' ? '密码（至少 6 位）' : '重置密码（不填就不改）'" />
+        <select v-model="form.role" :disabled="form.userId === userStore.user.userId">
+          <option value="user">审计员</option>
+          <option value="admin">管理员</option>
+        </select>
+        <button>保存</button>
+        <button type="button" class="ghost" @click="form = null">取消</button>
       </form>
 
       <table>
@@ -123,6 +206,7 @@ onMounted(loadUsers)
             </td>
             <td class="ops">
               <button @click="openDetail(u)">详情</button>
+              <button @click="openEdit(u)">编辑</button>
               <!-- 不能对自己操作，所以自己那一行不显示这两个按钮 -->
               <template v-if="u.userId !== userStore.user.userId">
                 <button @click="toggleStatus(u)">{{ u.status === 'active' ? '禁用' : '恢复' }}</button>
@@ -138,7 +222,7 @@ onMounted(loadUsers)
     </template>
 
     <!-- ===== 登录记录 ===== -->
-    <template v-else>
+    <template v-else-if="tab === 'logins'">
       <table>
         <thead>
           <tr><th>时间</th><th>账号</th><th>昵称</th></tr>
@@ -154,6 +238,74 @@ onMounted(loadUsers)
           </tr>
         </tbody>
       </table>
+    </template>
+
+    <!-- ===== 问答日志 ===== -->
+    <template v-else-if="tab === 'qa'">
+      <form class="search" @submit.prevent="loadQa">
+        <input v-model="qaKeyword" placeholder="搜索问题或回答" />
+        <button>搜索</button>
+        <label class="check"><input v-model="refusedOnly" type="checkbox" @change="loadQa" /> 只看拒答</label>
+        <span class="total">最近 {{ qa.length }} 条</span>
+      </form>
+      <table>
+        <thead>
+          <tr><th>时间</th><th>提问人</th><th>问题</th><th>结果</th><th>用户评价</th><th>引用资料</th></tr>
+        </thead>
+        <tbody>
+          <template v-for="l in qa" :key="l.id">
+            <tr class="clickable" @click="openQa = openQa === l.id ? null : l.id">
+              <td>{{ fmt(l.time) }}</td>
+              <td>{{ l.user ? l.user.nickname : '未登录' }}</td>
+              <td class="wrap">{{ l.question }}</td>
+              <td>
+                <span v-if="l.error" class="tag disabled">出错</span>
+                <span v-else-if="l.refused" class="tag todo">拒答</span>
+                <span v-else class="tag active">已回答</span>
+              </td>
+              <td>{{ l.rating === 'up' ? '👍' : l.rating === 'down' ? '👎' : '—' }}</td>
+              <td>{{ l.sources.length }}</td>
+            </tr>
+            <!-- 展开：完整回答 + 引用了哪些资料 -->
+            <tr v-if="openQa === l.id" class="expand">
+              <td colspan="6">
+                <div class="answer">{{ l.error || l.answer || '（没有生成回答）' }}</div>
+                <div v-for="(s, i) in l.sources" :key="i" class="src">[{{ i + 1 }}] {{ s.file }} › {{ s.heading }}（相似度 {{ s.score }}）</div>
+              </td>
+            </tr>
+          </template>
+          <tr v-if="!qa.length"><td colspan="6" class="empty">还没有问答记录</td></tr>
+        </tbody>
+      </table>
+    </template>
+
+    <!-- ===== 反馈处理 ===== -->
+    <template v-else>
+      <div class="search">
+        <select v-model="fbStatus" @change="loadFeedback">
+          <option value="">全部</option>
+          <option value="pending">待处理</option>
+          <option value="replied">已回复</option>
+        </select>
+        <span class="total">共 {{ feedbacks.length }} 条</span>
+      </div>
+      <div v-if="!feedbacks.length" class="empty">没有反馈</div>
+      <div v-for="f in feedbacks" :key="f.id" class="fb">
+        <div class="fb-meta">
+          <b>{{ f.user.nickname }}</b><small>（{{ f.user.account }}）</small>
+          <span>{{ f.type === 'answer' ? (f.rating === 'up' ? '👍 觉得回答有帮助' : '👎 觉得回答没帮助') : '💬 留言' }}</span>
+          <span>{{ fmt(f.time) }}</span>
+          <span :class="['tag', f.status === 'replied' ? 'active' : 'todo']">{{ f.status === 'replied' ? '已回复' : '待处理' }}</span>
+          <button class="del" @click="removeFeedback(f)">删除</button>
+        </div>
+        <div v-if="f.question" class="fb-q">问题：{{ f.question }}</div>
+        <div v-if="f.content" class="fb-content">{{ f.content }}</div>
+        <div v-if="f.reply" class="fb-reply">已回复：{{ f.reply }}</div>
+        <form class="fb-form" @submit.prevent="reply(f)">
+          <input v-model="replies[f.id]" maxlength="1000" :placeholder="f.reply ? '再次回复（会覆盖上一条）' : '写回复，用户在「意见反馈」里能看到'" />
+          <button :disabled="!replies[f.id]?.trim()">回复</button>
+        </form>
+      </div>
     </template>
 
     <!-- ===== 右侧详情面板 ===== -->
@@ -220,6 +372,37 @@ tr.disabled td { color: var(--text-faint); }
 }
 .ops button:hover { border-color: var(--accent); color: var(--accent); }
 .ops .danger:hover { border-color: var(--danger); color: var(--danger); }
+
+.search .ghost, .user-form .ghost { background: transparent; color: var(--accent); border: 1px solid var(--line-strong); }
+.check { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+select {
+  padding: 8px 10px; font-size: 13px; color: var(--text); background: rgba(6, 4, 20, 0.85);
+  border: 1px solid var(--line-strong); border-radius: var(--radius); outline: none;
+}
+.user-form {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; padding: 12px;
+  border: 1px dashed var(--line-strong); background: rgba(0, 240, 255, 0.04);
+}
+.user-form b { color: var(--accent); font-weight: normal; margin-right: 6px; }
+.user-form input { padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(6, 4, 20, 0.7); color: var(--text); outline: none; }
+.user-form button { padding: 8px 16px; border: none; border-radius: var(--radius); background: var(--accent); color: #05020f; font-weight: 600; cursor: pointer; }
+td.wrap { white-space: normal; max-width: 420px; }
+tr.clickable { cursor: pointer; }
+tr.expand td { white-space: normal; background: rgba(0, 240, 255, 0.04); }
+.answer { white-space: pre-wrap; line-height: 1.7; color: var(--text); max-height: 260px; overflow-y: auto; }
+.src { margin-top: 4px; font-size: 12px; color: var(--text-dim); }
+.fb { padding: 14px 16px; margin-bottom: 10px; background: var(--glass-strong); border: 1px solid var(--line); }
+.fb-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--text-dim); }
+.fb-meta b { color: #fff; }
+.fb-meta .del { margin-left: auto; border: none; background: none; color: var(--text-faint); cursor: pointer; }
+.fb-meta .del:hover { color: var(--danger); }
+.fb-q { margin-top: 6px; font-size: 13px; color: var(--text-dim); }
+.fb-content { margin-top: 6px; white-space: pre-wrap; line-height: 1.7; }
+.fb-reply { margin-top: 6px; padding: 6px 10px; font-size: 13px; background: rgba(142, 230, 196, 0.08); border-left: 3px solid var(--ok); }
+.fb-form { display: flex; gap: 8px; margin-top: 10px; }
+.fb-form input { flex: 1; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: rgba(6, 4, 20, 0.7); color: var(--text); outline: none; }
+.fb-form button { padding: 8px 16px; border: none; border-radius: var(--radius); background: var(--accent); color: #05020f; font-weight: 600; cursor: pointer; }
+.fb-form button:disabled { opacity: 0.4; cursor: default; }
 
 /* 小标签：管理员 / 正常 / 已禁用 / 待温习 / 已掌握 */
 .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; }

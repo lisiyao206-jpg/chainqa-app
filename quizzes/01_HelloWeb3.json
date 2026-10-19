@@ -1,0 +1,50 @@
+[
+  {
+    "type": "text",
+    "question": "Solidity的主要特点是什么？",
+    "options": [
+      "A. 基于对象，适合区块链领域工作",
+      "B. 高级，不懂会被认为是低级",
+      "C. 适合编程大佬学习，不适合小白",
+      "D. 以上都不是"
+    ],
+    "answer": 0,
+    "explain": "Solidity的两个特点是基于对象和高级，适合区块链领域工作。"
+  },
+  {
+    "type": "text",
+    "question": "在Solidity中，以下哪项不是代码源文件的结构组成部分？",
+    "options": [
+      "A. 注释",
+      "B. Solidity版本声明",
+      "C. 合约定义",
+      "D. 合约方法"
+    ],
+    "answer": 3,
+    "explain": "合约方法不是源文件的结构组成部分，而是合约内部的一部分。"
+  },
+  {
+    "type": "text",
+    "question": "以下Solidity代码的运行结果是什么？\n\n```solidity\npragma solidity ^0.8.21;\ncontract Test {\n    function test() public pure returns (uint) {\n        return 1 + 2;\n    }\n}\n```",
+    "options": [
+      "A. 3",
+      "B. 4",
+      "C. 1 + 2",
+      "D. 错误：无法计算"
+    ],
+    "answer": 0,
+    "explain": "由于函数是纯函数，返回值是1 + 2，即3。"
+  },
+  {
+    "type": "text",
+    "question": "以下Solidity代码存在什么漏洞？\n\n```solidity\npragma solidity ^0.8.21;\ncontract Vulnerable {\n    address public owner;\n    constructor() { owner = msg.sender; }\n    function transfer(address _to) public { owner.send(msg.value); }\n}\n```",
+    "options": [
+      "A. 漏洞：owner变量可以被修改",
+      "B. 漏洞：transfer函数没有检查接收者的地址是否有效",
+      "C. 漏洞：构造函数没有使用payable关键字",
+      "D. 漏洞：send函数已弃用，应使用sendTransaction函数"
+    ],
+    "answer": 3,
+    "explain": "send函数已弃用，应使用sendTransaction函数。"
+  }
+]

@@ -38,6 +38,7 @@ const nav = [
   { to: '/mentor', title: '白帽导师' },
   { to: '/archive', title: '案件档案' },
   { to: '/mission', title: '实战任务' },
+  { to: '/audit', title: 'AI 审计' },
   { to: '/social', title: '情报站' },
   { to: '/study', title: '学习站' },
 ]

@@ -15,7 +15,7 @@ if (process.env.ADMIN_ACCOUNT) {
 // ===== 密码加密 =====
 // 「盐」是一段随机字符串：同样的密码，加不同的盐，算出来的哈希也不同，
 // 这样就算两个人密码一样，数据库里存的也不一样，更难被破解
-function hashPassword(pwd) {
+export function hashPassword(pwd) {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync(pwd, salt, 64).toString("hex");
   return `${salt}:${hash}`;

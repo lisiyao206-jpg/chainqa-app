@@ -13,6 +13,8 @@ import { register, login, logout, userFromToken, getProfile, updateNickname, cha
 import * as data from "./data.mjs";
 import * as admin from "./admin.mjs";
 import * as social from "./social.mjs";
+import * as feedback from "./feedback.mjs";
+import { runAudit } from "./agent.mjs";
 
 const PORT = process.env.PORT || 3000;
 // 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
@@ -50,9 +52,17 @@ async function handleAsk(req, res) {
     Connection: "keep-alive",
   });
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  // 记问答日志：边推给网页边把回答攒起来，答完存进 qa_logs
+  const user = userFromToken(getToken(req));
+  let full = "", sources = [], wasRefused = false, errMsg = null;
 
   try {
-    const { good, refused } = await answer(question, (delta) => send("delta", delta));
+    const { good, refused } = await answer(question, (delta) => {
+      full += delta;
+      send("delta", delta);
+    });
+    sources = good.map((h) => ({ file: h.file, heading: h.heading, score: Number(h.score.toFixed(3)) }));
+    wasRefused = refused;
     // 回答里的 [1][2] 对应这里的引用来源
     send("sources", good.map((h) => ({
       file: h.file,
@@ -62,8 +72,48 @@ async function handleAsk(req, res) {
     })));
     if (refused) send("refused", "知识库中未找到相关依据");
   } catch (err) {
+    errMsg = err.message;
     send("error", err.message);
   }
+  try {
+    const logId = feedback.logAsk({ userId: user?.userId, question, answer: full, sources, refused: wasRefused, error: errMsg });
+    if (user) send("log", logId); // 登录了才能评价，所以只给登录的人发日志编号
+  } catch {}
+  res.end();
+}
+
+// POST /api/agent/audit：AI 审计 Agent。每一步（思考 / 调用工具 / 工具结果 / 最终报告）都用 SSE 实时推给网页
+const auditing = new Set(); // 正在审计的用户：同一个人同时只能跑一个，防止狂点浪费额度
+async function handleAudit(req, res) {
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "请先登录" });
+  if (auditing.has(user.userId)) return sendJSON(res, 429, { error: "上一次审计还没结束，请稍等" });
+  let code = "";
+  try {
+    code = String(JSON.parse(await readBody(req)).code || "");
+  } catch {}
+
+  res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  auditing.add(user.userId);
+  let report = "", errMsg = null, result = { sources: [] };
+  try {
+    result = await runAudit(code, (event, data) => {
+      if (event === "report") report = data;
+      send(event, data);
+    });
+  } catch (err) {
+    errMsg = err.message;
+    send("error", err.message);
+  } finally {
+    auditing.delete(user.userId);
+  }
+  // 也记进问答日志，管理员能在后台看到大家都审计了什么
+  try {
+    const logId = feedback.logAsk({ userId: user.userId, question: "[AI 审计] " + code.slice(0, 1500), answer: report, sources: result.sources, refused: false, error: errMsg });
+    send("log", logId);
+  } catch {}
+  send("done", true);
   res.end();
 }
 
@@ -207,6 +257,11 @@ function routeData(req, res) {
   if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
   if (url === "/api/progress" && method === "POST") return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));
 
+  // 意见反馈：提交、看我的反馈（带管理员回复）、有几条新回复
+  if (url === "/api/feedback" && method === "POST") return W((uid, b) => feedback.addFeedback(uid, b));
+  if (url === "/api/feedback" && method === "GET") return W((uid) => feedback.myFeedback(uid));
+  if (url === "/api/feedback/unread" && method === "GET") return W((uid) => ({ n: feedback.unreadReplies(uid) }));
+
   // 训练营防御战：哪些章节守住了 / 记一次成绩
   if (url === "/api/camp" && method === "GET") return W((uid) => getCampProgress(uid));
   if (url === "/api/camp" && method === "POST") return W((uid, b) => saveCampResult(uid, b.chapterId, b.wall));
@@ -233,8 +288,18 @@ function routeAdmin(req, res) {
     return A(() => admin.listUsers(q));
   }
   if (pathname === "/api/admin/logins" && method === "GET") return A(() => admin.listLogins());
+  if (pathname === "/api/admin/users" && method === "POST") return A((uid, b) => admin.createUser(b));
+  // 问答日志 / 反馈处理
+  const qs = new URLSearchParams(query);
+  if (pathname === "/api/admin/qa" && method === "GET") return A(() => feedback.listQaLogs({ q: qs.get("q") || "", refusedOnly: qs.get("refused") === "1" }));
+  if (pathname === "/api/admin/feedback" && method === "GET") return A(() => feedback.listFeedback(qs.get("status") || ""));
+  const fm = pathname.match(/^\/api\/admin\/feedback\/(\d+)$/);
+  if (fm && method === "PUT") return A((uid, b) => feedback.replyFeedback(Number(fm[1]), b.reply));
+  if (fm && method === "DELETE") return A(() => feedback.deleteFeedback(Number(fm[1])));
   if (m && method === "GET") return A(() => admin.userDetail(id));
-  if (m && method === "PUT") return A((uid, b) => admin.setUserStatus(uid, id, b.status));
+  // PUT 可以改状态（禁用 / 恢复），也可以改昵称、身份、重置密码
+  if (m && method === "PUT")
+    return A((uid, b) => (b.status !== undefined ? admin.setUserStatus(uid, id, b.status) : admin.updateUser(uid, id, b)));
   if (m && method === "DELETE") return A((uid) => admin.deleteUser(uid, id));
   return sendJSON(res, 404, { error: "没有这个接口" });
 }
@@ -341,6 +406,7 @@ http
     if (routeAdmin(req, res) !== null) return; // 管理员后台
     if (routeSocial(req, res) !== null) return; // 情报站
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
+    else if (req.method === "POST" && req.url === "/api/agent/audit") handleAudit(req, res);
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);
     else if (req.method === "POST" && req.url === "/api/logout") handleLogout(req, res);

@@ -22,7 +22,14 @@ export const useUserStore = defineStore('user', {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.token}` },
         body: body ? JSON.stringify(body) : undefined,
       })
-      const data = await res.json()
+      // 后端返回的不是 JSON（常见于：后端还是旧代码、没有这个接口，于是回了一个网页）
+      // 这时给一句看得懂的提示，而不是「Unexpected token '<'」
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        throw new Error('后端没有这个接口：请确认后端文件已经更新，并且重启了后端（node server.mjs）')
+      }
       if (!res.ok) throw new Error(data.error || '请求失败')
       return data
     },
