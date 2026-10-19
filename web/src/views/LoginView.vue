@@ -62,7 +62,10 @@ function switchMode(m) {
       <ul>
         <li><span>01</span>训练营 · 读教材，选中就能问 AI</li>
         <li><span>02</span>白帽导师 · 回答都标注教材出处</li>
-        <li><span>03</span>实战任务 · 在合约里找出漏洞</li>
+        <li><span>03</span>案件分析 · 训练中教材的笔记，实战中易错题的收集</li>
+        <li><span>04</span>实战任务 · 在合约里找出漏洞</li>
+        <li><span>05</span>情报站 · 从外圈和好友处获取知识</li>
+        <li><span>06</span>学习站台 · 收集情报站中的帖子</li>
       </ul>
     </section>
 

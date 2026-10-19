@@ -13,11 +13,9 @@ import { useThemeStore } from './stores/theme.js'
 // 所有可选的动态背景。用 defineAsyncComponent「按需加载」：
 // 用户选了哪个才下载哪个，没选 3D 背景就不会下载 three.js，打开网页更快
 const BG_COMPONENTS = {
-  silk: defineAsyncComponent(() => import('./components/PurpleFlow.vue')),
   galaxy: defineAsyncComponent(() => import('./components/GalaxyBg.vue')),
   chain: defineAsyncComponent(() => import('./components/ChainSpace.vue')),
   butterfly: defineAsyncComponent(() => import('./components/ButterflySand.vue')),
-  sand: defineAsyncComponent(() => import('./components/SandFlow.vue')),
 }
 const theme = useThemeStore()
 

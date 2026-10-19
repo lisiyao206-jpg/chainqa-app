@@ -4,6 +4,8 @@ import { marked } from 'marked'
 import { useAiStore } from '../stores/ai.js'
 import { useNotesStore } from '../stores/notes.js'
 import MindmapModal from '../components/MindmapModal.vue'
+import DefenseModal from '../components/DefenseModal.vue'
+import { useUserStore } from '../stores/user.js'
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
 const groups = ref([])
@@ -20,8 +22,34 @@ const readerEl = ref(null)
 const loading = ref(true)
 const error = ref('')
 
+// ===== 防御战：读完一章，漏洞小怪来攻击防御墙 =====
+const userStore = useUserStore()
+const defended = ref({})    // 守住过的章节：{ 章节id: 防御墙最好成绩 }
+const alarm = ref(false)    // 底部的红色警报条
+const showDefense = ref(false)
+const alarmed = new Set()   // 这次打开网页后已经响过警报的章节，同一章不重复响
+
+// 在正文里往下滚：滚到这一章的末尾（还没守住过），就拉响警报
+function onReaderScroll(e) {
+  selBtn.value = null
+  const el = e.target
+  if (!current.value || contentLoading.value || alarmed.has(current.value.id) || defended.value[current.value.id] > 0) return
+  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60) {
+    alarmed.add(current.value.id)
+    alarm.value = true
+  }
+}
+function startDefense() {
+  alarm.value = false
+  showDefense.value = true
+}
+function onDefenseDone(wall) {
+  defended.value[current.value.id] = Math.max(defended.value[current.value.id] || 0, wall)
+}
+
 // 页面一打开，就向后端要章节目录
 onMounted(async () => {
+  userStore.api('/api/camp').then((d) => (defended.value = d)).catch(() => {})
   try {
     const res = await fetch('/api/chapters')
     const data = await res.json()
@@ -53,6 +81,7 @@ function fixImages(html, id) {
 // 点击某一章：向后端要这一章的原文，再把 Markdown 转成 HTML 显示
 async function openChapter(c) {
   current.value = c
+  alarm.value = false
   content.value = ''
   contentLoading.value = true
   try {
@@ -146,19 +175,21 @@ function toggle(name) {
           >
             <span class="no">{{ c.no }}</span>
             <span class="name">{{ shortTitle(c.title) }}</span>
+            <span v-if="defended[c.id] > 0" class="shield" title="防御墙守住了">🛡</span>
           </li>
         </ul>
       </div>
     </aside>
 
     <!-- 右侧：阅读区 -->
-    <section class="reader glass" ref="readerEl" @scroll="selBtn = null">
+    <section class="reader glass" ref="readerEl" @scroll="onReaderScroll">
       <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
       <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
       <template v-else>
         <!-- 本章工具栏 -->
         <div class="tools">
           <button @click="showMindmap = true">🧠 本章思维导图</button>
+          <button class="defense-btn" @click="startDefense">🛡 防御战{{ defended[current.id] > 0 ? ` · 最好 ${defended[current.id]}%` : '' }}</button>
         </div>
         <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
       </template>
@@ -166,6 +197,14 @@ function toggle(name) {
 
     <!-- 思维导图弹窗：换一章时 :key 变化，弹窗会重新生成 -->
     <MindmapModal v-if="showMindmap" :key="current.id" :chapter="current" @close="showMindmap = false" />
+
+    <!-- 读到章末时的警报：漏洞小怪来了 -->
+    <div v-if="alarm" class="alarm" @click="startDefense">
+      ⚠️ 警报！漏洞小怪正在攻击「第 {{ current.no }} 讲」的防御墙，请尽快修复！
+      <b>立即迎战 →</b>
+      <a class="later" @click.stop="alarm = false">稍后</a>
+    </div>
+    <DefenseModal v-if="showDefense" :key="'d' + current.id" :chapter="current" @close="showDefense = false" @done="onDefenseDone" />
 
     <!-- 放大查看插图：点黑色背景任意位置关闭 -->
     <div v-if="zoomSrc" class="zoom" @click="zoomSrc = ''">
@@ -263,7 +302,20 @@ function toggle(name) {
 .error { color: #b91c1c; }
 
 /* 本章工具栏 */
-.tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.tools { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
+.tools .defense-btn { border-color: #ff6b81; color: #c0264a; }
+.shield { margin-left: auto; flex-shrink: 0; font-size: 12px; }
+
+/* 章末警报：底部一条红色横幅，一闪一闪 */
+.alarm {
+  position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); z-index: 70; cursor: pointer;
+  display: flex; align-items: center; gap: 16px; padding: 14px 22px; white-space: nowrap;
+  font-size: 15px; color: #fff; background: rgba(60, 4, 20, 0.95); border: 1px solid #ff6b81;
+  box-shadow: 0 0 30px rgba(255, 107, 129, 0.6); animation: siren 1s ease-in-out infinite;
+}
+.alarm b { color: #fcee0a; }
+.alarm .later { color: rgba(255, 255, 255, 0.5); font-size: 13px; }
+@keyframes siren { 50% { box-shadow: 0 0 60px rgba(255, 107, 129, 0.95); border-color: #fcee0a; } }
 .tools button {
   padding: 6px 14px; border: 1px solid #e5e7eb; border-radius: 999px;
   background: rgba(255, 255, 255, 0.8); font-size: 13px; cursor: pointer;

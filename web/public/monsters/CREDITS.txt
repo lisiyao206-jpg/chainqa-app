@@ -1,0 +1,9 @@
+3D 怪兽模型来源（全部为 CC0 公共领域协议，可免费用于任何用途，无需署名；这里注明出处是为了诚实）
+作者：Quaternius（https://quaternius.com）
+下载：Poly Pizza · Monsters Bundle（https://poly.pizza/bundle/Monsters-Bundle-5oyGWAmOB6）
+
+level-1.glb  权限窃贼  ← Ninja
+level-2.glb  溢出刺球  ← Green Spiky Blob
+level-3.glb  重入幽灵  ← Ghost
+level-4.glb  钓鱼魅影  ← Fish
+level-5.glb  预言巫师  ← Wizard

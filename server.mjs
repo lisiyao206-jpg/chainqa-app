@@ -8,6 +8,7 @@ import path from "node:path";
 import { answer } from "./rag.mjs";
 import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
 import { getMindmap } from "./mindmap.mjs";
+import { getQuiz, getCampProgress, saveCampResult } from "./quiz.mjs";
 import { register, login, logout, userFromToken, getProfile, updateNickname, changePassword, setAvatar } from "./auth.mjs";
 import * as data from "./data.mjs";
 import * as admin from "./admin.mjs";
@@ -94,6 +95,18 @@ async function handleMindmap(req, res, id) {
     const markdown = await getMindmap(decodeURIComponent(id));
     if (markdown === null) return sendJSON(res, 404, { error: "没有这一章" });
     sendJSON(res, 200, { id, markdown });
+  } catch (err) {
+    sendJSON(res, 500, { error: err.message });
+  }
+}
+
+// GET /api/chapters/23_Delegatecall/quiz：训练营防御战的题目（AI 出题，存过就直接用）
+async function handleQuiz(req, res, id) {
+  if (!userFromToken(getToken(req))) return sendJSON(res, 401, { error: "请先登录" }); // 出题要花 AI 额度，只给登录的人用
+  try {
+    const quiz = await getQuiz(decodeURIComponent(id));
+    if (quiz === null) return sendJSON(res, 404, { error: "没有这一章" });
+    sendJSON(res, 200, quiz);
   } catch (err) {
     sendJSON(res, 500, { error: err.message });
   }
@@ -193,6 +206,10 @@ function routeData(req, res) {
 
   if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
   if (url === "/api/progress" && method === "POST") return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));
+
+  // 训练营防御战：哪些章节守住了 / 记一次成绩
+  if (url === "/api/camp" && method === "GET") return W((uid) => getCampProgress(uid));
+  if (url === "/api/camp" && method === "POST") return W((uid, b) => saveCampResult(uid, b.chapterId, b.wall));
 
   if (url === "/api/profile" && method === "GET") return W((uid) => getProfile(uid));
   if (url === "/api/profile" && method === "PUT") return W((uid, b) => updateNickname(uid, b.nickname));
@@ -319,6 +336,7 @@ http
     const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
     const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
     const mindmapMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/mindmap$/);
+    const quizMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/quiz$/);
     if (routeData(req, res) !== null) return; // 笔记、错题、关卡进度
     if (routeAdmin(req, res) !== null) return; // 管理员后台
     if (routeSocial(req, res) !== null) return; // 情报站
@@ -330,6 +348,7 @@ http
     else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
     else if (req.method === "GET" && mindmapMatch) handleMindmap(req, res, mindmapMatch[1]);
+    else if (req.method === "GET" && quizMatch) handleQuiz(req, res, quizMatch[1]);
     else if (req.method === "GET" && fileMatch) handleChapterFile(req, res, fileMatch[1], fileMatch[2]);
     else if (req.method === "GET") handleStatic(req, res);
     else {
