@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "./db.mjs";
+import { moderate } from "./safety.mjs";
 
 const toISO = (t) => (t ? t.replace(" ", "T") : t);
 const one = (sql, ...args) => db.prepare(sql).get(...args);
@@ -123,7 +124,7 @@ export function openDM(uid, fid) {
 
 // 建讨论组：只能拉自己的好友
 export function createGroup(uid, name, memberIds = []) {
-  name = cleanText(name, 20, "讨论组名");
+  name = moderate(cleanText(name, 20, "讨论组名"));
   if (!name) throw new Error("给讨论组起个名字吧");
   const ids = [...new Set(memberIds.map(Number))].filter((id) => id !== uid);
   if (ids.some((id) => !isFriend(uid, id))) throw new Error("只能拉好友进讨论组");
@@ -205,7 +206,7 @@ export function sendMessage(uid, roomId, { text, fileId }) {
     const other = one("SELECT user_id FROM room_members WHERE room_id = ? AND user_id != ?", roomId, uid);
     if (!other || !isFriend(uid, other.user_id)) throw new Error("你们已经不是好友了，不能再发消息");
   }
-  text = cleanText(text, 1000, "一条消息");
+  text = moderate(cleanText(text, 1000, "一条消息"));
   if (fileId && !one("SELECT 1 FROM files WHERE file_id = ? AND user_id = ?", fileId, uid)) throw new Error("文件不存在");
   if (!text && !fileId) throw new Error("消息不能为空");
   rateLimit(uid);
@@ -254,7 +255,8 @@ export function listSquare(uid, sort = "new") {
 export function createPost(uid, { text, fileId, title, visibility }) {
   const isPublic = visibility === "public";
   text = cleanText(text, isPublic ? 2000 : 500, isPublic ? "帖子正文" : "一条动态");
-  title = isPublic ? cleanText(title, 40, "标题") : null;
+  text = moderate(text);
+  title = isPublic ? moderate(cleanText(title, 40, "标题")) : null;
   if (isPublic && !title) throw new Error("给帖子起个标题吧");
   if (fileId && !one("SELECT 1 FROM files WHERE file_id = ? AND user_id = ?", fileId, uid)) throw new Error("文件不存在");
   if (!text && !fileId) throw new Error("写点什么再发吧");
@@ -304,7 +306,7 @@ export function removeFromStudy(uid, postId) {
 
 export function addComment(uid, postId, text) {
   if (!canSeePost(uid, one("SELECT * FROM posts WHERE post_id = ?", postId))) throw new Error("这条动态不存在");
-  text = cleanText(text, 200, "一条评论");
+  text = moderate(cleanText(text, 200, "一条评论"));
   if (!text) throw new Error("评论不能为空");
   rateLimit(uid);
   run("INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)", postId, uid, text);

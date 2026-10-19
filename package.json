@@ -10,9 +10,5 @@
   "engines": {
     "node": ">=22.5"
   },
-  "license": "MIT",
-  "dependencies": {
-    "markmap-lib": "^0.18.12",
-    "markmap-view": "^0.18.12"
-  }
+  "license": "MIT"
 }

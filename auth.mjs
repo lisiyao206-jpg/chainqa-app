@@ -3,6 +3,7 @@
 
 import crypto from "node:crypto";
 import { db } from "./db.mjs";
+import { moderate } from "./safety.mjs";
 
 const SESSION_DAYS = 7; // 登录一次，7 天内不用重新登录
 
@@ -89,7 +90,7 @@ export function getProfile(userId) {
 
 // ===== 修改昵称 =====
 export function updateNickname(userId, nickname) {
-  nickname = String(nickname || "").trim();
+  nickname = moderate(String(nickname || "").trim()); // 昵称也会公开显示，同样要过内容过滤
   if (!nickname || nickname.length > 12) throw new Error("昵称要 1~12 个字");
   db.prepare("UPDATE users SET nickname = ? WHERE user_id = ?").run(nickname, userId);
   return { nickname };

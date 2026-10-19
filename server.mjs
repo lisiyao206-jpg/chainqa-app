@@ -16,6 +16,7 @@ import * as social from "./social.mjs";
 import * as feedback from "./feedback.mjs";
 import { runAudit } from "./agent.mjs";
 import { extractCode } from "./vision.mjs";
+import { checkInjection } from "./safety.mjs";
 
 const PORT = process.env.PORT || 3000;
 // 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
@@ -55,6 +56,16 @@ async function handleAsk(req, res) {
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   // 记问答日志：边推给网页边把回答攒起来，答完存进 qa_logs
   const user = userFromToken(getToken(req));
+
+  // AI 安全：疑似提示词注入（让 AI 忽略规则、泄露系统提示词……）直接拦下，不交给大模型；拦截记录管理员在后台能看到
+  const inj = checkInjection(question);
+  if (inj.blocked) {
+    send("blocked", inj.reason);
+    try {
+      feedback.logAsk({ userId: user?.userId, question, answer: "", sources: [], refused: true, error: "已拦截：" + inj.reason });
+    } catch {}
+    return res.end();
+  }
   let full = "", sources = [], wasRefused = false, errMsg = null;
 
   try {

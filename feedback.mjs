@@ -4,6 +4,7 @@
 //             管理员在后台查看、回复，用户在「意见反馈」里能看到回复
 
 import { db } from "./db.mjs";
+import { moderate } from "./safety.mjs";
 
 const toISO = (t) => (t ? t.replace(" ", "T") : t);
 
@@ -64,7 +65,7 @@ export function listQaLogs({ q = "", refusedOnly = false } = {}) {
 // ===== 用户：提交反馈 =====
 export function addFeedback(uid, { type, logId, rating, content }) {
   type = type === "answer" ? "answer" : "message";
-  content = String(content || "").trim();
+  content = moderate(String(content || "").trim());
   if (content.length > 1000) throw new Error("反馈最多 1000 字");
   if (type === "message" && !content) throw new Error("写点什么再提交吧");
   if (type === "answer") {

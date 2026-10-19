@@ -259,7 +259,8 @@ onMounted(loadUsers)
               <td>{{ l.user ? l.user.nickname : '未登录' }}</td>
               <td class="wrap">{{ l.question }}</td>
               <td>
-                <span v-if="l.error" class="tag disabled">出错</span>
+                <span v-if="l.error?.startsWith('已拦截')" class="tag admin">🛡 拦截</span>
+                <span v-else-if="l.error" class="tag disabled">出错</span>
                 <span v-else-if="l.refused" class="tag todo">拒答</span>
                 <span v-else class="tag active">已回答</span>
               </td>

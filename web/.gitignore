@@ -23,3 +23,9 @@ dist-ssr
 *.sln
 *.sw?
 quizzes/
+.env
+chainqa.db
+uploads/
+quizzes/
+mindmaps/
+node_modules/

@@ -76,6 +76,7 @@ async function send(text) {
         else if (event === 'refused') bot.text = '⚠️ 知识库中没找到相关依据，换个说法试试？'
         else if (event === 'error') bot.error = data
         else if (event === 'log') bot.logId = data
+        else if (event === 'blocked') bot.text = `🛡️ 已拦截：${data}。我只会依据教材回答智能合约安全的问题，换个问法试试吧。`
         scrollToBottom()
       }
     }
