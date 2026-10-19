@@ -40,7 +40,6 @@ const nav = [
   { to: '/mission', title: '实战任务' },
   { to: '/audit', title: 'AI 审计' },
   { to: '/social', title: '情报站' },
-  { to: '/study', title: '学习站' },
 ]
 
 const userStore = useUserStore()

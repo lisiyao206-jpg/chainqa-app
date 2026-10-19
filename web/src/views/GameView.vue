@@ -8,6 +8,7 @@
 // 3 点信誉用完就失败，这道题进错题本；赢的时候剩几点信誉就拿几颗星
 // 提示不会自动出现：要自己点「求助情报」，每用一条，这关最多能拿的星星就少一颗——不能光靠提示过关
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { levels } from '../data/levels.js'
 import { useGameStore } from '../stores/game.js'
 import { useMistakesStore } from '../stores/mistakes.js'
@@ -24,7 +25,19 @@ const mistakes = useMistakesStore()
 const ai = useAiStore()
 
 // 打开页面时，从数据库读取我的通关记录
-onMounted(() => game.load())
+// 从 AI 审计的「去打这只怪练手」跳过来时，网址带着 ?level=3：读完进度后直接进入那一关（没解锁就停在选关页）
+const route = useRoute()
+const router = useRouter()
+onMounted(async () => {
+  await game.load()
+  const lv = levels.find((l) => l.id === Number(route.query.level))
+  if (lv) start(lv)
+})
+
+// 打完一关：把这一关的合约交给 AI 审计 Agent 复盘，看看 AI 找到的和自己找到的是不是一样
+function reviewWithAI() {
+  router.push({ path: '/audit', query: { level: level.value.id } })
+}
 
 
 // 第 1 关一开始就能玩；之后每关要先通过上一关才解锁
@@ -419,6 +432,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
         <div class="result-actions">
           <button @click="askMentor">🧑‍💻 请白帽导师结合教材再讲讲</button>
           <button @click="start(level)">🔄 再战一次</button>
+          <button @click="reviewWithAI">🤖 让 AI 审计复盘这份合约</button>
           <button v-if="phase === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一只怪兽 →</button>
         </div>
       </div>

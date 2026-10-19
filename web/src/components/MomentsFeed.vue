@@ -103,7 +103,7 @@ function publish() {
   })
 }
 const like = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/like`, {}))
-// 收藏：收藏和点赞过的帖子都会进「学习站」
+// 收藏：收藏和点赞过的帖子都会进「情报收集文件夹」
 const favorite = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/favorite`, {}))
 const remove = (p) => confirm('删除这条帖子？') && act(() => userStore.api(`/api/social/posts/${p.id}`, null, 'DELETE'))
 const removeComment = (c) => act(() => userStore.api(`/api/social/comments/${c.id}`, null, 'DELETE'))
@@ -173,7 +173,7 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
 
       <div class="actions">
         <button :class="['like', { on: p.liked }]" @click="like(p)">{{ p.liked ? '♥' : '♡' }} {{ p.likes.length || '赞' }}</button>
-        <button :class="['like', 'fav', { on: p.favorited }]" title="收藏后可以在「学习站」里随时复习" @click="favorite(p)">
+        <button :class="['like', 'fav', { on: p.favorited }]" title="收藏后可以在「情报收集文件夹」里随时复习" @click="favorite(p)">
           {{ p.favorited ? '★ 已收藏' : '☆ 收藏' }}
         </button>
         <span class="count">💬 {{ p.comments.length }}</span>

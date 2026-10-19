@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { useAiStore } from '../stores/ai.js'
 import { useNotesStore } from '../stores/notes.js'
@@ -8,6 +9,7 @@ import DefenseModal from '../components/DefenseModal.vue'
 import { useUserStore } from '../stores/user.js'
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
+const route = useRoute() // 网址信息：从 AI 审计跳过来时会带上 ?chapter=
 const groups = ref([])
 // 哪些分组是展开的，例如 { '入门篇': true }
 const openGroups = ref({})
@@ -57,6 +59,18 @@ onMounted(async () => {
     groups.value = data
     // 默认展开第一组
     if (data.length) openGroups.value[data[0].name] = true
+    // 从 AI 审计的「去训练营学这一章」跳过来：网址带着 ?chapter=S01，打开以它开头的那一章
+    const want = String(route.query.chapter || '')
+    if (want) {
+      for (const g of data) {
+        const c = g.chapters.find((c) => c.id === want || c.id.startsWith(want + '_'))
+        if (c) {
+          openGroups.value[g.name] = true
+          openChapter(c)
+          break
+        }
+      }
+    }
   } catch (err) {
     error.value = err.message + '（后端开着吗？）'
   }

@@ -1,17 +1,23 @@
 <script setup>
-// 情报站：审计员之间交流的地方，分四栏
+// 情报站：审计员之间交流的地方，分五栏
 //   广场：外圈，所有人都能看、都能讨论，可以发帖、发视频分享心得（MomentsFeed.vue，square 模式）
 //   聊天：和好友私聊、建讨论组一起讨论题目，可以互相传文件（ChatRoom.vue）
 //   好友圈：发动态、点赞、评论（MomentsFeed.vue）
 //   好友：按账号加好友、处理好友申请、好友列表
+//   情报收集文件夹：我点赞、收藏过的帖子，分「视频」和「笔记 / 文本」，随时复习（StudyStation.vue，原来的「学习站」）
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from '../stores/user.js'
 import ChatRoom from '../components/ChatRoom.vue'
 import MomentsFeed from '../components/MomentsFeed.vue'
+import StudyStation from '../components/StudyStation.vue'
+import { useRoute } from 'vue-router'
 import UserAvatar from '../components/UserAvatar.vue'
 
 const userStore = useUserStore()
-const tab = ref('square')
+// 网址带 ?tab=folder 时直接打开那一栏（旧的 /study 地址会自动跳到这里）
+const TABS = ['square', 'chat', 'moments', 'friends', 'folder']
+const route = useRoute()
+const tab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'square')
 const rooms = ref([])
 const friends = ref([])
 const requests = ref([])
@@ -128,12 +134,16 @@ async function onLeft() {
         <button :class="{ on: tab === 'friends' }" @click="tab = 'friends'">
           好友 <i v-if="requests.length" class="dot">{{ requests.length }}</i>
         </button>
+        <button :class="{ on: tab === 'folder' }" title="我点赞、收藏过的帖子都在这里" @click="tab = 'folder'">📁 情报收集文件夹</button>
       </nav>
     </div>
     <div v-if="error" class="error">{{ error }}</div>
 
+    <!-- 情报收集文件夹：点赞、收藏过的帖子 -->
+    <StudyStation v-if="tab === 'folder'" />
+
     <!-- 广场：外圈，不认识的人也能一起讨论 -->
-    <MomentsFeed v-if="tab === 'square'" key="square" square />
+    <MomentsFeed v-else-if="tab === 'square'" key="square" square />
 
     <!-- 聊天：左边聊天列表，右边聊天窗口 -->
     <div v-else-if="tab === 'chat'" class="chat glass">

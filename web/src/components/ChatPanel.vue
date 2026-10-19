@@ -1,5 +1,5 @@
 <script setup>
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onUnmounted } from 'vue'
 import { useAiStore } from '../stores/ai.js'
 import { useUserStore } from '../stores/user.js'
 import { renderMarkdown } from '../utils/markdown.js'
@@ -85,6 +85,47 @@ async function send(text) {
   loading.value = false
 }
 
+// ===== 语音（多模态）：🎤 说话提问、🔊 朗读回答 =====
+// 用的是浏览器自带的语音识别和语音合成，不花 AI 额度。Chrome / Edge 支持；不支持的浏览器不显示麦克风按钮
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
+const canListen = !!Recognition
+const listening = ref(false)
+let recognizer = null
+function toggleMic() {
+  if (listening.value) return recognizer?.stop()
+  recognizer = new Recognition()
+  recognizer.lang = 'zh-CN'
+  recognizer.interimResults = true // 边说边出字
+  const before = input.value
+  recognizer.onresult = (e) => {
+    input.value = before + [...e.results].map((r) => r[0].transcript).join('')
+  }
+  recognizer.onerror = (e) => {
+    if (e.error !== 'aborted') alert(e.error === 'not-allowed' ? '请允许浏览器使用麦克风' : '语音识别出错了：' + e.error + '（语音识别需要联网）')
+  }
+  recognizer.onend = () => (listening.value = false)
+  recognizer.start()
+  listening.value = true
+}
+
+// 朗读：去掉代码块和 Markdown 符号再读，代码读出来没意义
+const speakingIdx = ref(-1)
+function speak(msg, i) {
+  speechSynthesis.cancel()
+  if (speakingIdx.value === i) return (speakingIdx.value = -1) // 再点一次就停止
+  const text = msg.text.replace(/```[\s\S]*?```/g, '（代码略）').replace(/[`*#>]|\[\d+\]/g, '')
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'zh-CN'
+  u.rate = 1.1
+  u.onend = () => (speakingIdx.value = -1)
+  speakingIdx.value = i
+  speechSynthesis.speak(u)
+}
+onUnmounted(() => {
+  speechSynthesis.cancel()
+  recognizer?.abort()
+})
+
 // ===== 评价这条回答（进入管理员后台的「反馈处理」）=====
 async function rate(msg, rating) {
   msg.rating = rating
@@ -128,6 +169,7 @@ async function submitRating(msg) {
           <div v-if="msg.logId" class="rate">
             <button :class="{ on: msg.rating === 'up' }" @click="rate(msg, 'up')">👍 有帮助</button>
             <button :class="{ on: msg.rating === 'down' }" @click="rate(msg, 'down')">👎 没帮助</button>
+            <button :class="{ on: speakingIdx === i }" title="朗读这条回答" @click="speak(msg, i)">{{ speakingIdx === i ? '⏹ 停止' : '🔊 朗读' }}</button>
             <span v-if="msg.thanks" class="thanks">谢谢反馈！</span>
           </div>
           <form v-if="msg.askReason" class="reason" @submit.prevent="submitRating(msg)">
@@ -139,7 +181,8 @@ async function submitRating(msg) {
     </div>
 
     <form class="input-row" @submit.prevent="send">
-      <input v-model="input" placeholder="输入你的问题" />
+      <input v-model="input" :placeholder="listening ? '正在听……说完点一下麦克风' : '输入你的问题，或点 🎤 说出来'" />
+      <button v-if="canListen" type="button" :class="['mic', { on: listening }]" :title="listening ? '停止' : '语音提问'" @click="toggleMic">🎤</button>
       <button :disabled="loading">{{ loading ? '回答中' : '发送' }}</button>
     </form>
   </div>
@@ -201,4 +244,7 @@ async function submitRating(msg) {
   background: linear-gradient(90deg, var(--accent-strong), var(--accent));
 }
 .input-row button:disabled { opacity: 0.4; cursor: default; }
+.mic { flex-shrink: 0; width: 40px; cursor: pointer; font-size: 16px; background: none !important; border: 1px solid var(--line-strong) !important; }
+.mic.on { border-color: var(--danger) !important; box-shadow: 0 0 14px rgba(255, 107, 129, 0.6); animation: rec 1s ease-in-out infinite; }
+@keyframes rec { 50% { box-shadow: 0 0 4px rgba(255, 107, 129, 0.3); } }
 </style>

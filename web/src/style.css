@@ -24,9 +24,8 @@
   --radius-sm: 2px;
 
   /* 字体：标题细、正文常规、代码等宽 */
---font: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
---font-title: "SimSun", serif; /* 宋体*/
---font-code: Consolas, Menlo, monospace;
+  --font: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  --font-code: Consolas, Menlo, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -94,7 +93,4 @@ select, option { background: #0b0820; color: var(--text); }
 @keyframes page-in {
   from { transform: translateY(14px); }
   to { transform: none; }
-}
-h1, h2, h3, .poem-text {
-  font-family: var(--font-title);
 }

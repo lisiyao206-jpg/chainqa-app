@@ -1,5 +1,5 @@
 <script setup>
-// 学习站：我点赞过、收藏过的帖子都收在这里，方便随时复习
+// 情报收集文件夹（放在情报站里，原来叫「学习站」）：我点赞过、收藏过的帖子都收在这里，方便随时复习
 // 分两栏：视频（带视频的帖子，排成网格）/ 笔记·文本（其余的帖子，排成列表，可以展开看全文）
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useUserStore } from '../stores/user.js'
@@ -85,7 +85,7 @@ async function jump(p) {
 }
 
 async function remove(p) {
-  if (!confirm('移出学习站？（会同时取消点赞和收藏）')) return
+  if (!confirm('移出情报收集文件夹？（会同时取消点赞和收藏）')) return
   await userStore.api(`/api/social/study/${p.id}`, null, 'DELETE')
   // 搜索结果里移出时，不一定是当前栏目，所以两栏都删一下
   lists.value = { video: lists.value.video.filter((x) => x.id !== p.id), text: lists.value.text.filter((x) => x.id !== p.id) }
@@ -106,7 +106,7 @@ const shortTime = (t) => t.slice(0, 10)
       </div>
       <input v-model="keyword" class="input search" placeholder="🔍 记得几个字就行，视频和笔记一起搜" />
     </div>
-    <p class="intro">在广场或好友圈里点 ♡ 赞 或 ☆ 收藏 的帖子，都会自动收进这里。</p>
+    <p class="intro">📁 在广场或好友圈里点 ♡ 赞 或 ☆ 收藏 的帖子，都会自动收进这个文件夹。</p>
     <div v-if="error" class="error">{{ error }}</div>
 
     <div v-if="loading" class="empty">加载中…</div>

@@ -15,6 +15,7 @@ import * as admin from "./admin.mjs";
 import * as social from "./social.mjs";
 import * as feedback from "./feedback.mjs";
 import { runAudit } from "./agent.mjs";
+import { extractCode } from "./vision.mjs";
 
 const PORT = process.env.PORT || 3000;
 // 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
@@ -115,6 +116,21 @@ async function handleAudit(req, res) {
   } catch {}
   send("done", true);
   res.end();
+}
+
+// POST /api/vision/code：看图识代码（多模态）。上传一张代码截图，返回识别出的 Solidity 代码
+async function handleVision(req, res) {
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "请先登录" });
+  if (auditing.has(user.userId)) return sendJSON(res, 429, { error: "上一个任务还没结束，请稍等" });
+  auditing.add(user.userId);
+  try {
+    sendJSON(res, 200, await extractCode((await readJSON(req)).image));
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+  } finally {
+    auditing.delete(user.userId);
+  }
 }
 
 // 返回 JSON 的小工具
@@ -407,6 +423,7 @@ http
     if (routeSocial(req, res) !== null) return; // 情报站
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "POST" && req.url === "/api/agent/audit") handleAudit(req, res);
+    else if (req.method === "POST" && req.url === "/api/vision/code") handleVision(req, res);
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);
     else if (req.method === "POST" && req.url === "/api/logout") handleLogout(req, res);

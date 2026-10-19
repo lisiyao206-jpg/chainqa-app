@@ -1,8 +1,12 @@
 <script setup>
+// 多模态：也可以上传 / 粘贴一张代码截图，视觉模型先把图里的代码读出来，再交给 Agent 审计
 // AI 审计：粘贴一份合约，AI 审计 Agent 自己规划步骤、调用工具（规则扫描 / 查漏洞库 / 检索教材），最后写出审计报告
 // 右边实时显示 Agent 的每一步：🧠 它在想什么、🔧 调用了哪个工具、📦 工具返回了什么——AI 的「思考过程」看得见
 // 左边的代码会标出扫描到的问题行
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { SWC_LINKS } from '../data/swcLinks.js'
+import { fileFromPaste } from '../utils/clipboard.js'
 import { useUserStore } from '../stores/user.js'
 import { renderMarkdown } from '../utils/markdown.js'
 import { levels } from '../data/levels.js'
@@ -21,6 +25,58 @@ const viewerEl = ref(null)
 
 // 工具的中文名：时间线上显示得更清楚
 const TOOL_NAMES = { scan_contract: '规则扫描', lookup_swc: '查询 SWC 漏洞库', search_knowledge: '检索教材知识库' }
+
+// ===== 截图识别代码（多模态）=====
+const imageInput = ref(null)
+const reading = ref(false)   // 正在识别截图
+const visionTip = ref('')
+
+// 图片太大时先在浏览器里缩小（最长边 1800 像素），上传更快，也不会超过 5MB 的限制
+function toDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, 1800 / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(img.src)
+      resolve(canvas.toDataURL('image/png'))
+    }
+    img.onerror = () => reject(new Error('这张图片打不开'))
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+async function readImage(file) {
+  if (!file?.type.startsWith('image/')) return
+  reading.value = true
+  visionTip.value = ''
+  error.value = ''
+  try {
+    const { code: got } = await userStore.api('/api/vision/code', { image: await toDataURL(file) })
+    code.value = got
+    editing.value = true
+    visionTip.value = '✅ 已从截图识别出代码。识别可能有个别错字，检查一下再点「开始审计」'
+  } catch (err) {
+    visionTip.value = '⚠️ ' + err.message
+  } finally {
+    reading.value = false
+  }
+}
+function pickImage(e) {
+  readImage(e.target.files[0])
+  e.target.value = ''
+}
+// 在代码框里 Ctrl + V：粘贴的是截图就识别；是文字就照常粘贴
+function onPaste(e) {
+  const file = fileFromPaste(e)
+  if (file?.type.startsWith('image/')) {
+    e.preventDefault()
+    readImage(file)
+  }
+}
 
 // 示例合约：直接用实战任务里的 5 份
 function loadSample(e) {
@@ -86,6 +142,26 @@ const counts = computed(() => {
 })
 const SEV = { 高危: 'high', 中危: 'mid', 低危: 'low', 提示: 'info' }
 
+// 从实战任务的「让 AI 审计复盘」跳过来：网址带着 ?level=3，自动填入那一关的合约并开始审计
+const route = useRoute()
+onMounted(() => {
+  const lv = levels.find((l) => l.id === Number(route.query.level))
+  if (lv) {
+    code.value = lv.code.join('\n')
+    audit()
+  }
+})
+
+// 延伸学习：报告里出现过的每种漏洞，对应的训练营章节和实战关卡
+const related = computed(() => {
+  const ids = [...new Set(findings.value.filter((f) => f.severity !== '提示').map((f) => f.swc))]
+  // 扫描器没扫到、但 AI 在报告里写到的 SWC 编号也算上
+  for (const m of report.value.matchAll(/SWC-(\d{3})/g)) if (!ids.includes('SWC-' + m[1])) ids.push('SWC-' + m[1])
+  return ids
+    .filter((id) => SWC_LINKS[id])
+    .map((id) => ({ id, title: findings.value.find((f) => f.swc === id)?.title || '', ...SWC_LINKS[id], monster: levels.find((l) => l.id === SWC_LINKS[id].level)?.monster }))
+})
+
 async function rate(r) {
   rating.value = r
   try {
@@ -110,12 +186,18 @@ async function rate(r) {
             <option value="">📂 载入示例合约…</option>
             <option v-for="lv in levels" :key="lv.id" :value="lv.id">{{ lv.title }}（{{ lv.type }}）</option>
           </select>
+          <button class="btn" :disabled="reading || running" title="上传一张代码截图，AI 识别出代码（也可以直接在代码框里 Ctrl + V 粘贴截图）" @click="imageInput.click()">
+            {{ reading ? '识别中…' : '📷 截图识别' }}
+          </button>
+          <input ref="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="pickImage" />
           <button v-if="!editing" class="btn" @click="editing = true">✏️ 编辑代码</button>
           <span class="len">{{ code.length }} / 12000</span>
           <button class="btn primary" :disabled="running || !code.trim()" @click="audit">{{ running ? '审计中…' : '🔍 开始审计' }}</button>
         </div>
-        <textarea v-if="editing" v-model="code" class="editor" spellcheck="false" maxlength="12000"
-          placeholder="// 把要审计的合约粘贴到这里，或者从上面载入示例合约&#10;pragma solidity ^0.8.21;&#10;&#10;contract MyContract { ... }"></textarea>
+        <div v-if="reading" class="reading">🔍 视觉模型正在读截图里的代码……</div>
+        <div v-else-if="visionTip" class="vision-tip">{{ visionTip }}</div>
+        <textarea v-if="editing" v-model="code" class="editor" @paste="onPaste" spellcheck="false" maxlength="12000"
+          placeholder="// 把要审计的合约粘贴到这里，或者从上面载入示例合约；&#10;// 也可以直接 Ctrl + V 粘贴一张代码截图，AI 会帮你识别出代码&#10;pragma solidity ^0.8.21;&#10;&#10;contract MyContract { ... }"></textarea>
         <!-- 查看模式：标出扫描到的问题行 -->
         <div v-else ref="viewerEl" class="viewer">
           <div v-for="l in lines" :key="l.no" :class="['ln-row', l.hits[0] && SEV[l.hits[0].severity]]">
@@ -165,6 +247,15 @@ async function rate(r) {
         <article v-if="report" class="report">
           <div class="r-title">📝 审计报告</div>
           <div class="md" v-html="renderMarkdown(report)"></div>
+          <!-- 延伸学习：学 → 练 → 用，三个板块连起来 -->
+          <div v-if="related.length" class="related">
+            <div class="rel-title">📚 延伸学习</div>
+            <div v-for="r in related" :key="r.id" class="rel-row">
+              <span class="rel-id">{{ r.id }} {{ r.title }}</span>
+              <RouterLink :to="{ path: '/camp', query: { chapter: r.chapter } }">📖 去训练营学这一章</RouterLink>
+              <RouterLink v-if="r.level" :to="{ path: '/mission', query: { level: r.level } }">🎮 去打{{ r.monster?.name }}练手</RouterLink>
+            </div>
+          </div>
           <p class="disclaimer">⚠️ AI 审计结果仅供学习参考，可能存在误报或漏报。真实项目上线前，请由专业审计团队复核。</p>
           <div v-if="logId" class="rate">
             这份报告有帮助吗？
@@ -188,6 +279,10 @@ async function rate(r) {
 /* 代码 */
 .bar { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .sample { padding: 7px 10px; font-size: 13px; color: var(--text); background: rgba(6, 4, 20, 0.85); border: 1px solid var(--line-strong); outline: none; cursor: pointer; }
+.reading, .vision-tip { padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--line); }
+.reading { color: var(--accent); animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: 0.5; } }
+.vision-tip { color: var(--text-dim); }
 .len { margin-left: auto; font-size: 12px; color: var(--text-faint); }
 .editor {
   flex: 1; resize: none; padding: 14px 16px; border: none; outline: none; background: transparent; color: #dff6ff;
@@ -236,6 +331,12 @@ async function rate(r) {
 .md :deep(code) { font-family: var(--font-code); color: var(--gold); }
 .md :deep(pre) { padding: 10px 12px; overflow-x: auto; background: rgba(0, 0, 0, 0.5); border: 1px solid var(--line); font-size: 12px; }
 .md :deep(pre code) { color: #e5f9ff; }
+.related { margin-top: 16px; padding: 12px 14px; border: 1px dashed var(--line-strong); background: rgba(252, 238, 10, 0.03); }
+.rel-title { margin-bottom: 6px; color: var(--gold); letter-spacing: 2px; font-size: 14px; }
+.rel-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; padding: 4px 0; font-size: 13px; }
+.rel-id { min-width: 150px; color: var(--text); }
+.rel-row a { color: var(--accent); text-decoration: none; }
+.rel-row a:hover { text-shadow: 0 0 8px var(--accent); }
 .disclaimer { margin: 14px 0 0; font-size: 12px; color: var(--text-faint); }
 .rate { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
 .rate button { padding: 2px 10px; cursor: pointer; background: none; border: 1px solid var(--line); border-radius: 999px; }
