@@ -10,7 +10,7 @@
 // 兜底机制：如果大模型这次没有调用任何工具（或者调用失败），就按固定流程（扫描 → 查资料 → 写报告）走完，保证一定有结果
 
 import { scanContract, lookupSwc } from "./scanner.mjs";
-import { search } from "./rag.mjs";
+import { search, THRESHOLD } from "./rag.mjs";
 import { checkInjection } from "./safety.mjs";
 
 const BASE = process.env.ZHIPU_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
@@ -104,7 +104,7 @@ async function runTool(name, args, ctx) {
     return { result: r, summary: r.error ? r.error : `${r.id} ${r.title}` };
   }
   if (name === "search_knowledge") {
-    const hits = (await search(String(args.query || "").slice(0, 200), 3)).filter((h) => h.score >= 0.35);
+    const hits = (await search(String(args.query || "").slice(0, 200), 3)).filter((h) => h.score >= THRESHOLD);
     return {
       result: hits.length ? hits.map((h) => ({ 出处: `${h.file} › ${h.heading}`, 内容: h.text.slice(0, 600) })) : "教材里没有找到相关内容",
       summary: hits.length ? `找到 ${hits.length} 段资料：${hits.map((h) => h.heading).join("、")}` : "教材里没有找到相关内容",

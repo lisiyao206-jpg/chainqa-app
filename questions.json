@@ -1,0 +1,37 @@
+{
+  "说明": "RAG 评测题：in 是教材里有答案的题（keywords 是答对必须提到的要点，每组用 | 分隔同义词）；out 是教材范围外的题，正确做法是拒答",
+  "in": [
+    { "q": "Solidity 中 external 和 public 函数可见性有什么区别？", "keywords": ["external|外部", "public", "internal|内部|合约内"] },
+    { "q": "view 和 pure 函数有什么区别？", "keywords": ["view", "pure", "读取|读|状态"] },
+    { "q": "什么是函数修饰器 modifier？怎么用？", "keywords": ["modifier|修饰器", "_;|下划线|占位"] },
+    { "q": "mapping 映射能不能遍历？为什么？", "keywords": ["mapping|映射", "不能|无法|不支持"] },
+    { "q": "Solidity 的事件 event 有什么作用？", "keywords": ["event|事件", "emit", "日志|log"] },
+    { "q": "require、assert 和 revert 有什么区别？", "keywords": ["require", "assert", "revert"] },
+    { "q": "合约怎么接收 ETH？receive 和 fallback 有什么区别？", "keywords": ["receive", "fallback", "msg.data|calldata|数据"] },
+    { "q": "用 call、transfer、send 发送 ETH 有什么区别？", "keywords": ["call", "transfer", "send", "2300|gas"] },
+    { "q": "delegatecall 和 call 有什么区别？", "keywords": ["delegatecall", "存储|storage|状态变量|上下文"] },
+    { "q": "abi.encode 和 abi.encodePacked 有什么区别？", "keywords": ["abi.encode", "encodePacked", "压缩|填充|补|0"] },
+    { "q": "selfdestruct 有什么作用和风险？", "keywords": ["selfdestruct", "删除|销毁|转"] },
+    { "q": "什么是代理合约？为什么能升级？", "keywords": ["代理|proxy", "delegatecall", "逻辑合约|实现合约|升级"] },
+    { "q": "重入攻击的原理是什么？怎么防御？", "keywords": ["重入", "fallback|回调|receive", "检查|nonReentrant|重入锁|状态"] },
+    { "q": "为什么不能用 tx.origin 做身份验证？", "keywords": ["tx.origin", "msg.sender", "钓鱼|调用链|发起"] },
+    { "q": "为什么链上随机数不安全？应该怎么生成随机数？", "keywords": ["随机", "block|区块|timestamp", "预言机|VRF|Chainlink"] },
+    { "q": "0.8 版本之前的整数溢出应该怎么防？", "keywords": ["溢出", "SafeMath|0.8|检查"] },
+    { "q": "什么是签名重放攻击？怎么防御？", "keywords": ["重放", "nonce|随机数|已使用|chainid|链"] },
+    { "q": "什么是抢跑交易（front-running）？", "keywords": ["抢跑|抢先|front", "mempool|内存池|交易池|gas"] },
+    { "q": "智能合约里的拒绝服务（DoS）攻击是怎么发生的？", "keywords": ["DoS|拒绝服务", "回滚|revert|失败|gas"] },
+    { "q": "访问控制漏洞是什么？如何避免？", "keywords": ["权限|访问控制", "onlyOwner|owner|修饰器|modifier"] }
+  ],
+  "out": [
+    "今天北京的天气怎么样？",
+    "Python 的装饰器怎么用？",
+    "推荐几部好看的科幻电影",
+    "比特币现在的价格是多少？",
+    "红烧肉怎么做才好吃？",
+    "帮我写一首关于春天的诗",
+    "Java 的垃圾回收机制是怎样的？",
+    "2026 年世界杯冠军是谁？",
+    "怎样减肥最快？",
+    "英伟达的股价明年会涨吗？"
+  ]
+}
