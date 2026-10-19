@@ -32,6 +32,13 @@ const spots = [
 const active = ref(null)
 const current = computed(() => spots.find((s) => s.no === active.value))
 
+// 退出登录：和其他页面顶栏的「退出」一样，先确认，再回到登录页
+async function logout() {
+  if (!confirm(`要退出「${userStore.user?.nickname}」吗？`)) return
+  await userStore.logout()
+  router.push('/login')
+}
+
 function go(s) {
   router.push(s.to)
 }
@@ -48,6 +55,7 @@ function go(s) {
       <div class="me">
         <!-- 只有管理员看得到 -->
         <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin">管理后台</RouterLink>
+        <a class="admin" @click="logout">退出</a>
         <button class="me-btn" title="我的档案" @click="showProfile = true">
           <UserAvatar :user="userStore.user" :size="34" />
         </button>
@@ -115,7 +123,7 @@ function go(s) {
 .links a:hover { color: #fff; }
 .brand { color: #fff; font-size: 19px; letter-spacing: 4px; margin-right: 12px; }
 .me { display: flex; align-items: center; gap: 20px; font-size: 16px; }
-.admin { color: rgba(233, 230, 255, 0.7); text-decoration: none; }
+.admin { color: rgba(233, 230, 255, 0.7); text-decoration: none; cursor: pointer; }
 .admin:hover { color: #fff; }
 .me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }
 .me-btn:hover { box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
