@@ -1,16 +1,17 @@
-<script setup>
+<script setup lang="ts">
 // 勋章弹窗：漏洞猎人答对时弹出，勋章落下 + 光芒旋转 + 星星依次亮起
 import ImgSlot from './ImgSlot.vue'
+import type { Level } from '../types'
 
-const props = defineProps({
-  level: Object,     // 刚通过的关卡（来自 data/levels.js）
-  stars: Number,     // 这次拿到几颗星：1~3
-  firstTime: Boolean // 是不是第一次通过这一关
-})
+const props = defineProps<{
+  level?: Level       // 刚通过的关卡（来自 data/levels.js）
+  stars?: number      // 这次拿到几颗星：1~3
+  firstTime?: boolean // 是不是第一次通过这一关
+}>()
 const emit = defineEmits(['close'])
 
 // 不同星数，评语不同
-const comments = { 3: '一眼看穿，完美审计！', 2: '稍作排查，成功定位！', 1: '险中求胜，漏洞到手！' }
+const comments: Record<number, string> = { 3: '一眼看穿，完美审计！', 2: '稍作排查，成功定位！', 1: '险中求胜，漏洞到手！' }
 </script>
 
 <template>
@@ -22,23 +23,23 @@ const comments = { 3: '一眼看穿，完美审计！', 2: '稍作排查，成�
       <div class="medal-wrap">
         <div class="rays"></div>
         <div class="medal">
-          <ImgSlot :src="`/medals/level-${props.level.id}.png`" fallback="🏅" :label="`level-${props.level.id}.png`" compact />
+          <ImgSlot :src="`/medals/level-${props.level!.id}.png`" fallback="🏅" :label="`level-${props.level!.id}.png`" compact />
         </div>
       </div>
 
-      <div class="name">「{{ props.level.type }}猎手」勋章</div>
-      <div class="sub">第 {{ props.level.id }} 关 · {{ props.level.title }}</div>
+      <div class="name">「{{ props.level!.type }}猎手」勋章</div>
+      <div class="sub">第 {{ props.level!.id }} 关 · {{ props.level!.title }}</div>
 
       <!-- 三颗星：拿到的亮起，每颗晚一点出现（animation-delay） -->
       <div class="stars">
         <span
           v-for="i in 3"
           :key="i"
-          :class="['star', { on: i <= props.stars }]"
+          :class="['star', { on: i <= props.stars! }]"
           :style="{ animationDelay: 0.6 + i * 0.2 + 's' }"
         >★</span>
       </div>
-      <div class="comment">{{ comments[props.stars] }}</div>
+      <div class="comment">{{ comments[props.stars!] }}</div>
 
       <button class="ok" @click="emit('close')">收下勋章</button>
     </div>
@@ -102,5 +103,9 @@ const comments = { 3: '一眼看穿，完美审计！', 2: '稍作排查，成�
   from { transform: scale(0); }
   70% { transform: scale(1.4); }
   to { transform: scale(1); }
+}
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  .popup { width: min(320px, 90vw); }
 }
 </style>

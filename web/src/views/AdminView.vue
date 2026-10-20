@@ -1,26 +1,82 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useUserStore } from '../stores/user.js'
-import { levels } from '../data/levels.js'
+import { useUserStore } from '../stores/user'
+import { levels } from '../data/levels'
+import type { Role, Mistake, Source } from '../types'
+
+// 后台用到的几种数据形状（只在这个页面用，所以写在这里）
+interface AdminUser {
+  userId: number
+  account: string
+  nickname: string
+  role: Role
+  status: 'active' | 'disabled' | string
+  registerTime?: string | null
+  lastLogin?: string | null
+  loginCount?: number
+  noteCount?: number
+  mistakeCount?: number
+  clearedCount?: number
+}
+interface LoginRecord {
+  id: number
+  time: string
+  account: string
+  nickname: string
+}
+interface UserDetail extends AdminUser {
+  progress: { levelId: number; star: number }[]
+  mistakes: Mistake[]
+}
+interface UserForm {
+  mode: 'create' | 'edit'
+  userId?: number
+  account: string
+  pwd: string
+  nickname: string
+  role: Role
+}
+interface QaLog {
+  id: number
+  time: string
+  user?: { nickname: string } | null
+  question: string
+  answer?: string | null
+  error?: string | null
+  refused?: boolean
+  rating?: 'up' | 'down' | null
+  sources: Source[]
+}
+interface Feedback {
+  id: number
+  user: { nickname: string; account: string }
+  type: string
+  rating?: 'up' | 'down' | null
+  time: string
+  status: 'pending' | 'replied' | string
+  question?: string | null
+  content?: string | null
+  reply?: string | null
+}
 
 const userStore = useUserStore()
 
 // 当前标签页：'users' 用户管理 / 'logins' 登录记录 / 'qa' 问答日志 / 'feedback' 反馈处理
 const tab = ref('users')
-const users = ref([])
-const logins = ref([])
+const users = ref<AdminUser[]>([])
+const logins = ref<LoginRecord[]>([])
 const keyword = ref('')
 const error = ref('')
 // 右侧详情面板里显示的用户，没打开时为 null
-const detail = ref(null)
+const detail = ref<UserDetail | null>(null)
 
 // 把「2026-10-15T16:20:00」显示成「10-15 16:20」
-function fmt(t) {
+function fmt(t?: string | null) {
   return t ? t.slice(5, 16).replace('T', ' ') : '—'
 }
 // 详情面板里某一关的星数：通关了显示 ★★★，没通关显示「未通关」
-function starsOf(levelId) {
-  const star = detail.value.progress.find((p) => p.levelId === levelId)?.star
+function starsOf(levelId: number) {
+  const star = detail.value!.progress.find((p) => p.levelId === levelId)?.star
   return star ? '★'.repeat(star) : '未通关'
 }
 
@@ -30,7 +86,7 @@ async function loadUsers() {
   try {
     users.value = await userStore.api('/api/admin/users?q=' + encodeURIComponent(keyword.value))
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   }
 }
 
@@ -39,26 +95,26 @@ async function loadLogins() {
   try {
     logins.value = await userStore.api('/api/admin/logins')
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   }
 }
 
-function switchTab(name) {
+function switchTab(name: 'users' | 'logins' | 'qa' | 'feedback') {
   tab.value = name
   ;({ users: loadUsers, logins: loadLogins, qa: loadQa, feedback: loadFeedback })[name]()
 }
 
 // ===== 新增 / 编辑用户 =====
 // form 为 null 时不显示表单；mode = 'create' 新增 / 'edit' 编辑
-const form = ref(null)
+const form = ref<UserForm | null>(null)
 function openCreate() {
   form.value = { mode: 'create', account: '', pwd: '', nickname: '', role: 'user' }
 }
-function openEdit(u) {
+function openEdit(u: AdminUser) {
   form.value = { mode: 'edit', userId: u.userId, account: u.account, nickname: u.nickname, role: u.role, pwd: '' }
 }
 async function saveForm() {
-  const f = form.value
+  const f = form.value!
   try {
     if (f.mode === 'create') {
       await userStore.api('/api/admin/users', { account: f.account, pwd: f.pwd, nickname: f.nickname, role: f.role })
@@ -69,77 +125,77 @@ async function saveForm() {
     form.value = null
     loadUsers()
   } catch (err) {
-    alert(err.message)
+    alert((err as Error).message)
   }
 }
 
 // ===== 问答日志 =====
-const qa = ref([])
+const qa = ref<QaLog[]>([])
 const qaKeyword = ref('')
 const refusedOnly = ref(false) // 只看「拒答」的：拒答多的问题，说明知识库该补资料了
-const openQa = ref(null)       // 展开看完整回答的那一条
+const openQa = ref<number | null>(null)       // 展开看完整回答的那一条
 async function loadQa() {
   error.value = ''
   try {
     qa.value = await userStore.api(`/api/admin/qa?q=${encodeURIComponent(qaKeyword.value)}&refused=${refusedOnly.value ? 1 : 0}`)
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   }
 }
 
 // ===== 反馈处理 =====
-const feedbacks = ref([])
+const feedbacks = ref<Feedback[]>([])
 const fbStatus = ref('')    // '' 全部 / pending 待处理 / replied 已回复
-const replies = ref({})     // 每条反馈正在写的回复：{ 反馈id: 文字 }
+const replies = ref<Record<number, string>>({})     // 每条反馈正在写的回复：{ 反馈id: 文字 }
 async function loadFeedback() {
   error.value = ''
   try {
     feedbacks.value = await userStore.api('/api/admin/feedback?status=' + fbStatus.value)
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   }
 }
-async function reply(f) {
+async function reply(f: Feedback) {
   try {
     await userStore.api(`/api/admin/feedback/${f.id}`, { reply: replies.value[f.id] }, 'PUT')
     replies.value[f.id] = ''
     loadFeedback()
   } catch (err) {
-    alert(err.message)
+    alert((err as Error).message)
   }
 }
-async function removeFeedback(f) {
+async function removeFeedback(f: Feedback) {
   if (!confirm('删除这条反馈？')) return
   await userStore.api(`/api/admin/feedback/${f.id}`, null, 'DELETE')
   loadFeedback()
 }
 
 // 打开某个用户的详情：通关情况 + 错题
-async function openDetail(u) {
+async function openDetail(u: AdminUser) {
   detail.value = await userStore.api(`/api/admin/users/${u.userId}`)
 }
 
 // 禁用 ↔ 恢复
-async function toggleStatus(u) {
+async function toggleStatus(u: AdminUser) {
   const next = u.status === 'active' ? 'disabled' : 'active'
   if (next === 'disabled' && !confirm(`禁用「${u.nickname}」后，他会被立刻踢下线，也无法再登录。确定吗？`)) return
   try {
     await userStore.api(`/api/admin/users/${u.userId}`, { status: next }, 'PUT')
     u.status = next
   } catch (err) {
-    alert(err.message)
+    alert((err as Error).message)
   }
 }
 
 // 删除账号：他的笔记、错题、进度、登录记录会一起被删掉（数据库的级联删除）
-async function removeUser(u) {
+async function removeUser(u: AdminUser) {
   if (!confirm(`删除「${u.nickname}」后，他的笔记、错题、进度会全部清空，无法恢复。确定吗？`)) return
   try {
     await userStore.api(`/api/admin/users/${u.userId}`, null, 'DELETE')
     users.value = users.value.filter((x) => x.userId !== u.userId)
     if (detail.value?.userId === u.userId) detail.value = null
   } catch (err) {
-    alert(err.message)
+    alert((err as Error).message)
   }
 }
 
@@ -173,7 +229,7 @@ onMounted(loadUsers)
         <input v-if="form.mode === 'create'" v-model="form.account" placeholder="账号（3~20 位字母、数字、下划线）" />
         <input v-model="form.nickname" maxlength="12" placeholder="昵称" />
         <input v-model="form.pwd" type="password" :placeholder="form.mode === 'create' ? '密码（至少 6 位）' : '重置密码（不填就不改）'" />
-        <select v-model="form.role" :disabled="form.userId === userStore.user.userId">
+        <select v-model="form.role" :disabled="form.userId === userStore.user!.userId">
           <option value="user">审计员</option>
           <option value="admin">管理员</option>
         </select>
@@ -208,7 +264,7 @@ onMounted(loadUsers)
               <button @click="openDetail(u)">详情</button>
               <button @click="openEdit(u)">编辑</button>
               <!-- 不能对自己操作，所以自己那一行不显示这两个按钮 -->
-              <template v-if="u.userId !== userStore.user.userId">
+              <template v-if="u.userId !== userStore.user!.userId">
                 <button @click="toggleStatus(u)">{{ u.status === 'active' ? '禁用' : '恢复' }}</button>
                 <button class="danger" @click="removeUser(u)">删除</button>
               </template>
@@ -427,4 +483,16 @@ tr.expand td { white-space: normal; background: rgba(0, 240, 255, 0.04); }
 .detail li { padding: 6px 0; border-bottom: 1px dashed var(--line); color: var(--text); }
 .stars { float: right; color: var(--gold); }
 .error { color: var(--danger); }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  .tabs { overflow-x: auto; scrollbar-width: none; }
+  .tabs button { flex-shrink: 0; }
+  /* 表格太宽：表格自己左右滑动，不撑破整页 */
+  table { display: block; overflow-x: auto; }
+  td.wrap { max-width: 260px; }
+  .search { flex-wrap: wrap; }
+  .search input { width: 100%; }
+  /* 右侧详情抽屉：手机上铺满整个宽度 */
+  .detail { width: 100%; }
+}
 </style>

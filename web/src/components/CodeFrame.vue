@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // 代码边框：一串代码沿着边框一直绕圈流动
 // 用法：父元素加 position: relative，里面放 <CodeFrame :text="..." />，它会自动铺满父元素
 //   shape="rect"   方框（右上角切角，和卡片的造型一致）
@@ -6,20 +6,28 @@
 // 原理：SVG 的 <textPath> 能让文字沿着一条路径排列；不断改变文字的起点（startOffset），文字就沿着边框流动
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
-const props = defineProps({
-  text: { type: String, default: 'require(msg.sender == owner); ' },
-  shape: { type: String, default: 'rect' },
-  color: { type: String, default: 'var(--accent)' },
-  duration: { type: Number, default: 24 }, // 绕一圈要几秒，越大越慢
-  size: { type: Number, default: 9 },      // 字号
-  inset: { type: Number, default: 7 },     // 文字离边缘多远
-  chamfer: { type: Number, default: 18 },  // 右上角切角的大小，要和卡片的 clip-path 一样
+const props = withDefaults(defineProps<{
+  text?: string
+  shape?: string
+  color?: string
+  duration?: number // 绕一圈要几秒，越大越慢
+  size?: number     // 字号
+  inset?: number    // 文字离边缘多远
+  chamfer?: number  // 右上角切角的大小，要和卡片的 clip-path 一样
+}>(), {
+  text: 'require(msg.sender == owner); ',
+  shape: 'rect',
+  color: 'var(--accent)',
+  duration: 24,
+  size: 9,
+  inset: 7,
+  chamfer: 18,
 })
 
-const root = ref(null)
+const root = ref<SVGSVGElement | null>(null)
 const w = ref(0)
 const h = ref(0)
-let ro
+let ro: ResizeObserver | undefined
 // 每个边框要有自己的路径 id，不然几个边框会抢同一条路径
 const id = 'cf' + Math.random().toString(36).slice(2, 8)
 
@@ -29,7 +37,7 @@ onMounted(() => {
     w.value = e.contentRect.width
     h.value = e.contentRect.height
   })
-  ro.observe(root.value)
+  ro.observe(root.value!)
 })
 onUnmounted(() => ro?.disconnect())
 

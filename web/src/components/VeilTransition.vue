@@ -7,12 +7,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 
 const on = ref(false)
 const n = ref(0) // 每次播放都换一个 key，让动画从头再播
-let timer
+let timer: ReturnType<typeof setTimeout> | undefined
 
 function play() {
   n.value++

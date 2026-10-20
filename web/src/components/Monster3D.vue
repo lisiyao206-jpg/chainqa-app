@@ -10,34 +10,40 @@
   <div ref="box" class="monster3d" @pointerdown="dragStart"></div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 
-const props = defineProps({
-  src: String,                                 // 模型地址，例如 /monsters/level-1.glb
-  color: { type: String, default: '#00f0ff' }, // 怪兽的主题色：背后那圈轮廓光用它
-  action: Object,                              // { name: 'hit' | 'attack' | 'death', id }，id 每次不同，连续两次同样的动作也会重新播放
+interface MonsterAction {
+  name: string
+  id: number | string
+}
+const props = withDefaults(defineProps<{
+  src?: string            // 模型地址，例如 /monsters/level-1.glb
+  color?: string          // 怪兽的主题色：背后那圈轮廓光用它
+  action?: MonsterAction | null  // { name: 'hit' | 'attack' | 'death', id }，id 每次不同，连续两次同样的动作也会重新播放
+}>(), {
+  color: '#00f0ff',
 })
 const emit = defineEmits(['error'])
 
 // 每种动作可能叫的名字（不同模型包的命名不一样）
-const CLIPS = {
+const CLIPS: Record<string, RegExp[]> = {
   idle: [/(^|\|)Idle$/i, /Flying_Idle/i, /Idle/i],
   hit: [/HitReact/i, /HitRecieve/i, /Hit/i],
   attack: [/Punch/i, /Headbutt/i, /Bite/i, /Weapon/i, /Attack/i],
   death: [/Death/i, /Die/i],
 }
 
-const box = ref(null)
-let renderer, scene, camera, model, mixer, timer, raf
-const actions = {} // 找到的动作：{ idle, hit, attack, death }
-let current = null
+const box = ref<HTMLDivElement | null>(null)
+let renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, model: THREE.Group, mixer: THREE.AnimationMixer, timer: THREE.Timer, raf: number
+const actions: Record<string, THREE.AnimationAction> = {} // 找到的动作：{ idle, hit, attack, death }
+let current: THREE.AnimationAction | null = null
 let yaw = 0, dragging = false, lastX = 0
-let ro // 盯着舞台大小：窗口变大变小时，画面跟着调整
+let ro: ResizeObserver // 盯着舞台大小：窗口变大变小时，画面跟着调整
 
-function findClip(clips, patterns) {
+function findClip(clips: THREE.AnimationClip[], patterns: RegExp[]) {
   for (const p of patterns) {
     const c = clips.find((clip) => p.test(clip.name))
     if (c) return c
@@ -46,7 +52,7 @@ function findClip(clips, patterns) {
 }
 
 // 切换动作：淡入新的、淡出旧的；hit / attack 播一次就回到待机，death 播完停在最后一帧
-function play(name) {
+function play(name: string) {
   const next = actions[name] || actions.idle
   if (!next) return
   const once = name !== 'idle'
@@ -59,7 +65,7 @@ function play(name) {
 }
 
 onMounted(() => {
-  const el = box.value
+  const el = box.value!
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }) // alpha：背景透明，下面的面板颜色能透出来
   } catch {
@@ -96,7 +102,7 @@ onMounted(() => {
 
   timer = new THREE.Timer() // 计时器：算出每一帧过了多久，动作才能按真实时间播放（新版 three.js 用 Timer 代替了 Clock）
   new GLTFLoader().load(
-    props.src,
+    props.src as string,
     (gltf) => {
       model = gltf.scene
       // 不同模型大小不一样：统一缩放到差不多高（约 2），并且脚踩在地面中间
@@ -141,10 +147,10 @@ onMounted(() => {
 watch(() => props.action?.id, () => props.action && play(props.action.name))
 
 // 按住左右拖动：转着看怪兽
-function dragStart(e) {
+function dragStart(e: PointerEvent) {
   dragging = true
   lastX = e.clientX
-  const move = (ev) => {
+  const move = (ev: PointerEvent) => {
     yaw += (ev.clientX - lastX) * 0.01
     lastX = ev.clientX
   }
@@ -162,9 +168,10 @@ onUnmounted(() => {
   cancelAnimationFrame(raf)
   ro?.disconnect()
   scene?.traverse((o) => {
-    o.geometry?.dispose()
-    ;[].concat(o.material || []).forEach((m) => {
-      Object.values(m).forEach((v) => v?.isTexture && v.dispose())
+    const mesh = o as THREE.Mesh
+    mesh.geometry?.dispose()
+    ;([] as THREE.Material[]).concat(mesh.material || []).forEach((m) => {
+      Object.values(m).forEach((v: any) => v?.isTexture && v.dispose())
       m.dispose()
     })
   })

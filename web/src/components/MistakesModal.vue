@@ -1,6 +1,7 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useMistakesStore } from '../stores/mistakes.js'
+import { useMistakesStore } from '../stores/mistakes'
+import type { MistakeStatus } from '../types'
 
 const emit = defineEmits(['close'])
 const mistakes = useMistakesStore()
@@ -17,8 +18,8 @@ const revealed = ref(false)   // 是否已经揭晓答案
 const currentQ = computed(() => mistakes.list.find((m) => m.id === queue.value[index.value]))
 
 // 标记这道题，然后进入下一题
-function mark(status) {
-  mistakes.setStatus(currentQ.value.id, status)
+function mark(status: MistakeStatus) {
+  mistakes.setStatus(currentQ.value!.id, status)
   index.value++
   myAnswer.value = ''
   revealed.value = false

@@ -12,3 +12,9 @@ node_modules/
 
 # 数据库：存着用户账号和加密密码，不能上传
 chainqa.db
+# 用户上传的文件：私人内容，不能公开
+uploads/
+
+# AI 生成的缓存：运行时会自动生成
+quizzes/
+mindmaps/

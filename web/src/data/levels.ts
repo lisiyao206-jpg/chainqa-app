@@ -1,4 +1,4 @@
-// data/levels.js —— 漏洞猎人的关卡（手写的「保底题」）
+// data/levels.ts —— 漏洞猎人的关卡（手写的「保底题」）
 // 以后 AI 可以按这个格式自动出新题；AI 出题失败时，就用这里的题顶上
 // 每关：title 关卡名、story 剧情、chapter 对应的教材章节、code 合约代码（每行一个字符串）
 //       difficulty 难度 1~5：越往后合约越长，还会混进「看起来可疑、其实没问题」的干扰代码
@@ -12,7 +12,9 @@
 //       fix     修补：lines 要替换的行（从第几行到第几行）、options 修补方案（code 换上去的代码，correct 对不对，why 为什么）
 //               错误的方案都是「看起来像修好了」的写法，要真的懂原理才分得清
 
-export const levels = [
+import type { Level } from '../types'
+
+export const levels: Level[] = [
   {
     id: 1,
     title: '没上锁的金库',

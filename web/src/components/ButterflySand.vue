@@ -10,24 +10,35 @@
   <canvas ref="canvasRef" class="butterfly"></canvas>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 
-const canvasRef = ref(null)
-let ctx, w, h, dpr, animId, lastTime
-let stars = []
-let dust = []    // 漂浮的霓虹尘埃：填满蝴蝶周围的空间
-let streams = [] // 数据流：从屏幕两边流向蝴蝶的细光线
-let rings = []   // 环绕蝴蝶的几圈轨道
-let grains = []
-let scale, cx, cy
+type RGB = number[]
+interface Grain {
+  bx: number; by: number; part: string; edge: boolean
+  color: RGB; glowing: boolean; size: number; alpha: number; twinkle: number
+  sx: number; sy: number; push: number
+}
+interface Dust { x: number; y: number; z: number; vx: number; vy: number; size: number; color: RGB; phase: number }
+interface Stream { side: number; y0: number; bend: number; t: number; speed: number; color: RGB }
+interface Ring { rx: number; ry: number; tilt: number; speed: number; phase: number }
+interface Star { x: number; y: number; r: number; a: number; speed: number; phase: number }
+
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+let ctx: CanvasRenderingContext2D, w: number, h: number, dpr: number, animId: number, lastTime: number
+let stars: Star[] = []
+let dust: Dust[] = []    // 漂浮的霓虹尘埃：填满蝴蝶周围的空间
+let streams: Stream[] = [] // 数据流：从屏幕两边流向蝴蝶的细光线
+let rings: Ring[] = []   // 环绕蝴蝶的几圈轨道
+let grains: Grain[] = []
+let scale: number, cx: number, cy: number
 const mouse = { x: -9999, y: -9999 }
 let dissolveAt = 0 // 登录成功的时刻；0 表示还没登录
 
-const rand = (a, b) => a + Math.random() * (b - a)
-const smooth = (t) => t * t * (3 - 2 * t)
-const lerp = (a, b, t) => a + (b - a) * t
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
+const rand = (a: number, b: number) => a + Math.random() * (b - a)
+const smooth = (t: number) => t * t * (3 - 2 * t)
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+const pick = <T>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
 
 // ===== 蝴蝶的形状：右半边的翅膀用多边形描出来，左半边镜像 =====
 // 坐标单位大约 -4 ~ 4，x 向右，y 向下
@@ -35,7 +46,7 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const UPPER = [[0.05, -0.2], [1.3, -2.3], [3.9, -3.5], [3.4, -2.0], [3.8, -1.3], [2.6, -0.5], [2.9, -0.1], [0.05, 0.15]] // 上翅：尖角向外上方，外缘有锯齿缺口
 const LOWER = [[0.05, 0.25], [2.5, 0.35], [3.1, 1.5], [2.3, 2.0], [2.8, 3.5], [1.3, 2.4], [0.9, 2.9], [0.1, 1.1]]         // 下翅：尖刺一样的「尾巴」
 // 点在不在多边形里面（射线法：从点往右画一条线，穿过边的次数是奇数就在里面）
-function inside(poly, x, y) {
+function inside(poly: number[][], x: number, y: number) {
   let hit = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i], [xj, yj] = poly[j]
@@ -44,13 +55,13 @@ function inside(poly, x, y) {
   return hit
 }
 // 在多边形的边上随机取一个点（用来画亮晶晶的翅膀边缘）
-function edgePoint(poly) {
+function edgePoint(poly: number[][]) {
   const i = Math.floor(Math.random() * (poly.length - 1))
   const [x1, y1] = poly[i], [x2, y2] = poly[i + 1]
   const k = Math.random()
   return [x1 + (x2 - x1) * k + rand(-0.06, 0.06), y1 + (y2 - y1) * k + rand(-0.06, 0.06)]
 }
-function randomWingPoint() {
+function randomWingPoint(): { bx: number; by: number; part: string; edge: boolean } {
   const side = Math.random() < 0.5 ? 1 : -1 // 一半放到左边：左右对称
   // 20% 的点放在翅膀边缘上，形成亮晶晶的轮廓
   if (Math.random() < 0.2) {
@@ -68,7 +79,7 @@ function randomWingPoint() {
 
 // ===== 颜色：赛博朋克霓虹 =====
 // 轮廓：霓虹青；电路线（从翅根连到每个尖角的直线）：霓虹粉；内部：暗紫蓝，零星青色像屏幕像素；翅根：品红发光
-function onCircuit(x, y, poly) {
+function onCircuit(x: number, y: number, poly: number[][]) {
   // 点离「翅根 → 某个尖角」这条直线足够近，就算在电路线上
   for (const [px, py] of poly) {
     const len = Math.hypot(px, py)
@@ -79,7 +90,7 @@ function onCircuit(x, y, poly) {
   }
   return false
 }
-function wingColor(bx, by, part, edge) {
+function wingColor(bx: number, by: number, part: string, edge: boolean): [RGB, boolean] {
   const x = Math.abs(bx)
   if (edge) return [[0, 240, 255], true]                                   // 轮廓：霓虹青
   if (onCircuit(x, by, part === 'upper' ? UPPER : LOWER)) return [[255, 43, 214], true] // 电路线：霓虹粉
@@ -90,7 +101,7 @@ function wingColor(bx, by, part, edge) {
   return [part === 'lower' ? c.map((v) => v * 0.8) : c, false]
 }
 
-function newGrain() {
+function newGrain(): Grain {
   const p = randomWingPoint()
   const [color, glowing] = wingColor(p.bx, p.by, p.part, p.edge)
   const ang = rand(0, Math.PI * 2)
@@ -135,7 +146,7 @@ function build() {
   }))
 }
 
-function newStream(fresh) {
+function newStream(fresh: boolean): Stream {
   const side = Math.random() < 0.5 ? -1 : 1
   return {
     side,
@@ -147,7 +158,7 @@ function newStream(fresh) {
   }
 }
 // 数据流在进度 k 时的位置：一条二次贝塞尔曲线，从屏幕边缘弯到蝴蝶中心
-function streamPos(s, k) {
+function streamPos(s: Stream, k: number) {
   const x0 = s.side < 0 ? -20 : w + 20
   const mx = (x0 + cx) / 2, my = (s.y0 + cy) / 2 + s.bend
   const a = (1 - k) * (1 - k), b = 2 * k * (1 - k), c = k * k
@@ -158,15 +169,15 @@ function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2)
   w = window.innerWidth
   h = window.innerHeight
-  canvasRef.value.width = w * dpr
-  canvasRef.value.height = h * dpr
+  canvasRef.value!.width = w * dpr
+  canvasRef.value!.height = h * dpr
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   build()
 }
 
 // 「散开程度」随时间变化：0 = 完全聚拢，1 = 完全散开
 // 一轮 12 秒：聚拢停留 5 秒 → 3.5 秒慢慢散开 → 3.5 秒慢慢聚回来
-function scatterAt(t) {
+function scatterAt(t: number) {
   const p = (t % 12) / 12
   if (p < 0.42) return 0
   if (p < 0.71) return smooth((p - 0.42) / 0.29)
@@ -174,7 +185,7 @@ function scatterAt(t) {
 }
 
 // ===== 每一帧 =====
-function animate(now) {
+function animate(now: number) {
   const dt = Math.min(0.05, (now - (lastTime || now)) / 1000)
   lastTime = now
   const t = now / 1000
@@ -296,17 +307,17 @@ function animate(now) {
 // 登录成功时调用：蝴蝶散成星尘消失（1.2 秒），再跳转
 function engulf() {
   dissolveAt = performance.now()
-  return new Promise((resolve) => setTimeout(resolve, 1200))
+  return new Promise<void>((resolve) => setTimeout(resolve, 1200))
 }
 defineExpose({ engulf })
 
-function onMove(e) {
+function onMove(e: MouseEvent) {
   mouse.x = e.clientX
   mouse.y = e.clientY
 }
 
 onMounted(() => {
-  ctx = canvasRef.value.getContext('2d')
+  ctx = canvasRef.value!.getContext('2d')!
   resize()
   animId = requestAnimationFrame(animate)
   window.addEventListener('resize', resize)

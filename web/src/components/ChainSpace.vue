@@ -11,7 +11,7 @@
   <div ref="host" class="chain-space"></div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -19,9 +19,10 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
-const host = ref(null)
-let renderer, composer, scene, camera, animId
-let blocks = [], nebulas = [], stars, fireflies, fireflyBase
+const host = ref<HTMLDivElement | null>(null)
+let renderer: THREE.WebGLRenderer, composer: EffectComposer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, animId: number
+let blocks: THREE.Group[] = [], nebulas: THREE.Sprite[] = []
+let stars: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>, fireflies: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>, fireflyBase: ArrayLike<number>
 const mouse = { x: 0, y: 0 }  // 鼠标位置：-1 ~ 1
 const look = { x: 0, y: 0 }   // 镜头实际的偏转，慢慢追上鼠标
 const LENGTH = 420            // 整条链有多长，镜头飞完一遍就从头开始
@@ -32,7 +33,7 @@ const HUES = [0.88, 0.5, 0.8, 0.52, 0.15] // 赛博朋克霓虹：品红、青�
 const pickHue = () => HUES[Math.floor(Math.random() * HUES.length)]
 
 // 链的中心线：一条在空间里蜿蜒的曲线。z 是往远处的方向
-function chainPath(z) {
+function chainPath(z: number) {
   return new THREE.Vector3(Math.sin(z * 0.02) * 14, Math.cos(z * 0.015) * 6 - 2, -z)
 }
 
@@ -40,7 +41,7 @@ function chainPath(z) {
 function softTexture(inner = 0.2) {
   const c = document.createElement('canvas')
   c.width = c.height = 128
-  const g = c.getContext('2d')
+  const g = c.getContext('2d')!
   const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64)
   grad.addColorStop(0, 'rgba(255,255,255,1)')
   grad.addColorStop(inner, 'rgba(255,255,255,0.55)')
@@ -80,7 +81,7 @@ function build() {
   // ===== 2. 区块链：半透明的发光水晶方块 =====
   const boxGeo = new THREE.BoxGeometry(3, 3, 3)
   const edges = new THREE.EdgesGeometry(boxGeo)
-  const linkPoints = []
+  const linkPoints: THREE.Vector3[] = []
   for (let i = 0; i < 60; i++) {
     const p = chainPath(i * (LENGTH / 60))
     const color = new THREE.Color().setHSL(HUES[i % HUES.length], 0.75, 0.7)
@@ -121,7 +122,7 @@ function build() {
 }
 
 // 生成一团光点：沿着链的周围随机散布
-function makePoints(count, spreadX, spreadY, size, map, opacity) {
+function makePoints(count: number, spreadX: number, spreadY: number, size: number, map: THREE.Texture, opacity: number) {
   const pos = new Float32Array(count * 3)
   const col = new Float32Array(count * 3)
   const c = new THREE.Color()
@@ -140,7 +141,7 @@ function makePoints(count, spreadX, spreadY, size, map, opacity) {
   }))
 }
 
-function animate(now) {
+function animate(now: number) {
   const t = now / 1000
   // 镜头沿着链往前飞：每秒 5 个单位
   const z = (t * 5) % (LENGTH - 60)
@@ -181,7 +182,7 @@ function resize() {
   composer.setSize(window.innerWidth, window.innerHeight)
 }
 
-function onMove(e) {
+function onMove(e: MouseEvent) {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1
   mouse.y = (e.clientY / window.innerHeight) * 2 - 1
 }
@@ -190,7 +191,7 @@ onMounted(() => {
   renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(window.innerWidth, window.innerHeight)
-  host.value.appendChild(renderer.domElement)
+  host.value!.appendChild(renderer.domElement)
   build()
   // 后期处理：先正常渲染一遍，再加「辉光」效果，最后输出到屏幕
   composer = new EffectComposer(renderer)

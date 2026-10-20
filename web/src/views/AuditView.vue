@@ -1,46 +1,55 @@
-<script setup>
+<script setup lang="ts">
 // 多模态：也可以上传 / 粘贴一张代码截图，视觉模型先把图里的代码读出来，再交给 Agent 审计
 // AI 审计：粘贴一份合约，AI 审计 Agent 自己规划步骤、调用工具（规则扫描 / 查漏洞库 / 检索教材），最后写出审计报告
 // 右边实时显示 Agent 的每一步：🧠 它在想什么、🔧 调用了哪个工具、📦 工具返回了什么——AI 的「思考过程」看得见
 // 左边的代码会标出扫描到的问题行
 import { ref, computed, nextTick, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { SWC_LINKS } from '../data/swcLinks.js'
-import { fileFromPaste } from '../utils/clipboard.js'
-import { useUserStore } from '../stores/user.js'
-import { renderMarkdown } from '../utils/markdown.js'
-import { levels } from '../data/levels.js'
+import { SWC_LINKS } from '../data/swcLinks'
+import { fileFromPaste } from '../utils/clipboard'
+import { useUserStore } from '../stores/user'
+import { renderMarkdown } from '../utils/markdown'
+import { levels } from '../data/levels'
+import type { Finding } from '../types'
+
+// Agent 的一步：think 想法 / tool 调用工具 / result 工具返回
+interface AgentStep {
+  type: 'think' | 'tool' | 'result'
+  text?: string
+  name?: string
+  args?: Record<string, unknown>
+}
 
 const userStore = useUserStore()
 const code = ref('')
 const editing = ref(true)   // true 编辑代码 / false 查看审计结果（标出问题行）
 const running = ref(false)
-const steps = ref([])       // Agent 的每一步：{ type: 'think' | 'tool' | 'result', text, name, args }
-const findings = ref([])    // 规则扫描找到的疑似问题
+const steps = ref<AgentStep[]>([])       // Agent 的每一步：{ type: 'think' | 'tool' | 'result', text, name, args }
+const findings = ref<Finding[]>([])    // 规则扫描找到的疑似问题
 const report = ref('')
 const error = ref('')
-const logId = ref(null)
-const rating = ref(null)
-const viewerEl = ref(null)
+const logId = ref<number | null>(null)
+const rating = ref<'up' | 'down' | null>(null)
+const viewerEl = ref<HTMLDivElement | null>(null)
 
 // 工具的中文名：时间线上显示得更清楚
 const TOOL_NAMES = { scan_contract: '规则扫描', lookup_swc: '查询 SWC 漏洞库', search_knowledge: '检索教材知识库' }
 
 // ===== 截图识别代码（多模态）=====
-const imageInput = ref(null)
+const imageInput = ref<HTMLInputElement | null>(null)
 const reading = ref(false)   // 正在识别截图
 const visionTip = ref('')
 
 // 图片太大时先在浏览器里缩小（最长边 1800 像素），上传更快，也不会超过 5MB 的限制
-function toDataURL(file) {
-  return new Promise((resolve, reject) => {
+function toDataURL(file: File) {
+  return new Promise<string>((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
       const scale = Math.min(1, 1800 / Math.max(img.width, img.height))
       const canvas = document.createElement('canvas')
       canvas.width = Math.round(img.width * scale)
       canvas.height = Math.round(img.height * scale)
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
       URL.revokeObjectURL(img.src)
       resolve(canvas.toDataURL('image/png'))
     }
@@ -49,28 +58,29 @@ function toDataURL(file) {
   })
 }
 
-async function readImage(file) {
+async function readImage(file: File | null | undefined) {
   if (!file?.type.startsWith('image/')) return
   reading.value = true
   visionTip.value = ''
   error.value = ''
   try {
-    const { code: got } = await userStore.api('/api/vision/code', { image: await toDataURL(file) })
+    const { code: got } = await userStore.api<{ code: string }>('/api/vision/code', { image: await toDataURL(file) })
     code.value = got
     editing.value = true
     visionTip.value = '✅ 已从截图识别出代码。识别可能有个别错字，检查一下再点「开始审计」'
   } catch (err) {
-    visionTip.value = '⚠️ ' + err.message
+    visionTip.value = '⚠️ ' + (err as Error).message
   } finally {
     reading.value = false
   }
 }
-function pickImage(e) {
-  readImage(e.target.files[0])
-  e.target.value = ''
+function pickImage(e: Event) {
+  const input = e.target as HTMLInputElement
+  readImage(input.files![0])
+  input.value = ''
 }
 // 在代码框里 Ctrl + V：粘贴的是截图就识别；是文字就照常粘贴
-function onPaste(e) {
+function onPaste(e: ClipboardEvent) {
   const file = fileFromPaste(e)
   if (file?.type.startsWith('image/')) {
     e.preventDefault()
@@ -79,10 +89,11 @@ function onPaste(e) {
 }
 
 // 示例合约：直接用实战任务里的 5 份
-function loadSample(e) {
-  const lv = levels.find((l) => l.id === Number(e.target.value))
+function loadSample(e: Event) {
+  const select = e.target as HTMLSelectElement
+  const lv = levels.find((l) => l.id === Number(select.value))
   if (lv) code.value = lv.code.join('\n')
-  e.target.value = ''
+  select.value = ''
   editing.value = true
 }
 
@@ -102,7 +113,7 @@ async function audit() {
     })
     if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || '请求失败，后端开着吗？')
     // 和 AI 小助手一样用 SSE：后端每走一步就推一条
-    const reader = res.body.getReader()
+    const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     while (true) {
@@ -110,7 +121,7 @@ async function audit() {
       if (done) break
       buffer += decoder.decode(value, { stream: true })
       const events = buffer.split('\n\n')
-      buffer = events.pop()
+      buffer = events.pop() as string
       for (const raw of events) {
         const event = raw.match(/^event: (.+)$/m)?.[1]
         const data = JSON.parse(raw.match(/^data: (.+)$/m)?.[1] || 'null')
@@ -126,7 +137,7 @@ async function audit() {
       }
     }
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   }
   running.value = false
 }
@@ -162,7 +173,7 @@ const related = computed(() => {
     .map((id) => ({ id, title: findings.value.find((f) => f.swc === id)?.title || '', ...SWC_LINKS[id], monster: levels.find((l) => l.id === SWC_LINKS[id].level)?.monster }))
 })
 
-async function rate(r) {
+async function rate(r: 'up' | 'down') {
   rating.value = r
   try {
     await userStore.api('/api/feedback', { type: 'answer', logId: logId.value, rating: r, content: '' })
@@ -186,7 +197,7 @@ async function rate(r) {
             <option value="">📂 载入示例合约…</option>
             <option v-for="lv in levels" :key="lv.id" :value="lv.id">{{ lv.title }}（{{ lv.type }}）</option>
           </select>
-          <button class="btn" :disabled="reading || running" title="上传一张代码截图，AI 识别出代码（也可以直接在代码框里 Ctrl + V 粘贴截图）" @click="imageInput.click()">
+          <button class="btn" :disabled="reading || running" title="上传一张代码截图，AI 识别出代码（也可以直接在代码框里 Ctrl + V 粘贴截图）" @click="imageInput!.click()">
             {{ reading ? '识别中…' : '📷 截图识别' }}
           </button>
           <input ref="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="pickImage" />
@@ -228,8 +239,8 @@ async function rate(r) {
             <div class="body">
               <template v-if="s.type === 'think'">{{ s.text }}</template>
               <template v-else-if="s.type === 'tool'">
-                调用 <b>{{ TOOL_NAMES[s.name] || s.name }}</b>
-                <code v-if="Object.keys(s.args || {}).length">{{ Object.values(s.args).join('，') }}</code>
+                调用 <b>{{ TOOL_NAMES[s.name!] || s.name }}</b>
+                <code v-if="Object.keys(s.args || {}).length">{{ Object.values(s.args!).join('，') }}</code>
               </template>
               <template v-else>{{ s.text }}</template>
             </div>
@@ -341,4 +352,11 @@ async function rate(r) {
 .rate { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
 .rate button { padding: 2px 10px; cursor: pointer; background: none; border: 1px solid var(--line); border-radius: 999px; }
 .rate button.on { background: var(--accent); border-color: var(--accent); }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  /* 代码和报告上下排，各自能滚动 */
+  .grid { grid-template-columns: 1fr; height: auto; }
+  .grid > * { min-height: 360px; }
+  .rel-id { min-width: 0; }
+}
 </style>

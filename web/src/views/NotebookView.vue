@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useNotesStore } from '../stores/notes.js'
-import { useMistakesStore } from '../stores/mistakes.js'
+import { useNotesStore } from '../stores/notes'
+import { useMistakesStore } from '../stores/mistakes'
 import MistakesModal from '../components/MistakesModal.vue'
-import { useUserStore } from '../stores/user.js'
+import { useUserStore } from '../stores/user'
 
 const notes = useNotesStore()
 
@@ -12,7 +12,7 @@ const mistakes = useMistakesStore()
 const showMistakes = ref(false)
 
 // 当前正在编辑的笔记 id
-const currentId = ref(null)
+const currentId = ref<number | null>(null)
 const current = computed(() => notes.list.find((n) => n.id === currentId.value))
 
 // 打开页面时，从数据库读取我的笔记和错题
@@ -26,8 +26,8 @@ async function newNote() {
 }
 
 async function removeNote() {
-  if (!confirm(`确定删除「${current.value.title || '无标题笔记'}」吗？`)) return
-  await notes.remove(currentId.value)
+  if (!confirm(`确定删除「${current.value!.title || '无标题笔记'}」吗？`)) return
+  await notes.remove(currentId.value!)
   currentId.value = notes.list[0]?.id ?? null
 }
 
@@ -35,10 +35,10 @@ async function removeNote() {
 const userStore = useUserStore()
 const target = ref('public') // public 广场（所有人能看）/ friends 好友圈（只有好友能看）
 const publishing = ref(false)
-const published = ref(null)  // 发布结果提示：{ ok, text }
+const published = ref<{ ok: boolean; text: string } | null>(null)  // 发布结果提示：{ ok, text }
 
 async function publishNote() {
-  const n = current.value
+  const n = current.value!
   if (!n.content.trim()) return (published.value = { ok: false, text: '笔记还是空的，写点内容再发布吧' })
   const where = target.value === 'public' ? '广场（所有人都能看到）' : '好友圈（只有好友能看到）'
   if (!confirm(`把「${n.title || '无标题笔记'}」发布到${where}？`)) return
@@ -52,16 +52,16 @@ async function publishNote() {
     })
     published.value = { ok: true, text: '已发布！' }
   } catch (err) {
-    published.value = { ok: false, text: err.message }
+    published.value = { ok: false, text: (err as Error).message }
   } finally {
     publishing.value = false
   }
 }
 
 // 把时间戳显示成「10月14日 21:30」
-function formatTime(t) {
+function formatTime(t: string) {
   const d = new Date(t)
-  const pad = (n) => String(n).padStart(2, '0')
+  const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 </script>
@@ -96,7 +96,7 @@ function formatTime(t) {
             class="title-input"
             :value="current.title"
             placeholder="笔记标题"
-            @input="notes.update(current.id, { title: $event.target.value })"
+            @input="notes.update(current.id, { title: ($event.target as HTMLInputElement).value })"
           />
           <button class="del-btn" @click="removeNote">🗑 删除</button>
         </div>
@@ -104,7 +104,7 @@ function formatTime(t) {
           class="content-input"
           :value="current.content"
           placeholder="在这里记下你的理解、疑问、代码片段……"
-          @input="notes.update(current.id, { content: $event.target.value })"
+          @input="notes.update(current.id, { content: ($event.target as HTMLTextAreaElement).value })"
         ></textarea>
         <!-- 笔记下方：左边是自动保存提示，右边是「发布讨论」 -->
         <div class="foot">
@@ -188,4 +188,12 @@ function formatTime(t) {
 .target:focus { border-color: var(--accent); }
 .hint { color: var(--text-faint); font-size: 14px; }
 .center { margin: auto; }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  /* 笔记列表放上面，编辑区在下面 */
+  .archive { flex-direction: column; gap: 12px; }
+  .list { width: auto; max-height: 30vh; }
+  .publish { margin-right: 56px; }
+  .foot { flex-wrap: wrap; }
+}
 </style>

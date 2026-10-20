@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ChatPanel from './components/ChatPanel.vue'
@@ -6,9 +6,9 @@ import VeilTransition from './components/VeilTransition.vue'
 import CyberOverlay from './components/CyberOverlay.vue'
 import ProfileModal from './components/ProfileModal.vue'
 import UserAvatar from './components/UserAvatar.vue'
-import { useAiStore } from './stores/ai.js'
-import { useUserStore } from './stores/user.js'
-import { useThemeStore } from './stores/theme.js'
+import { useAiStore } from './stores/ai'
+import { useUserStore } from './stores/user'
+import { useThemeStore } from './stores/theme'
 
 // 所有可选的动态背景。用 defineAsyncComponent「按需加载」：
 // 用户选了哪个才下载哪个，没选 3D 背景就不会下载 three.js，打开网页更快
@@ -29,7 +29,7 @@ const inLobby = computed(() => route.path === '/' || route.path === '/login')
 const ai = useAiStore()
 
 // 每次换页面，播放一次「光幕」转场
-const rain = ref(null)
+const rain = ref<InstanceType<typeof VeilTransition> | null>(null)
 watch(() => route.path, () => rain.value?.play())
 
 // 顶栏的导航，和大厅保持一致
@@ -148,5 +148,22 @@ async function logout() {
   position: fixed; right: 28px; bottom: 94px; z-index: 30;
   width: 380px; height: min(540px, calc(100vh - 130px));
   padding: 18px; background: var(--glass-strong);
+}
+
+/* ===== 手机（屏幕窄于 760px） =====
+   顶栏分两行：第一行是站名和头像，第二行是导航，导航太多时可以左右滑动 */
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; padding: 12px 14px 4px; row-gap: 10px; }
+  .links { order: 3; width: 100%; gap: 20px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+  .links::-webkit-scrollbar { display: none; }
+  .links a { white-space: nowrap; flex-shrink: 0; }
+  /* 站名单独放在第一行左边，不跟着导航一起滑走 */
+  .brand { position: absolute; top: 18px; left: 14px; }
+  .topbar { position: relative; justify-content: flex-end; min-height: 54px; }
+  .me { gap: 16px; }
+  .me a { white-space: nowrap; }
+  .content { padding: 6px 12px 80px; }
+  .ai-fab { right: 16px; bottom: 16px; width: 46px; height: 46px; }
+  .ai-panel { left: 8px; right: 8px; bottom: 72px; width: auto; height: calc(100vh - 150px); }
 }
 </style>

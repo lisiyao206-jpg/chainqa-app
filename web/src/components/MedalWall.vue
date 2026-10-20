@@ -1,10 +1,10 @@
-<script setup>
+<script setup lang="ts">
 // 勋章墙：漏洞猎人每一关对应一枚勋章
 // 通关了 → 勋章点亮，显示拿到的星星；没通关 → 勋章是暗的剪影
 // 数据来自 game 公告板（stores/game.js），不需要新的后端接口
 import { computed, onMounted } from 'vue'
-import { levels } from '../data/levels.js'
-import { useGameStore } from '../stores/game.js'
+import { levels } from '../data/levels'
+import { useGameStore } from '../stores/game'
 import ImgSlot from './ImgSlot.vue'
 import CodeFrame from './CodeFrame.vue'
 

@@ -1,14 +1,27 @@
-<script setup>
+<script setup lang="ts">
 // 意见反馈：给我们留言（功能建议、发现的问题、题目出错……），并查看管理员的回复
 // 对 AI 回答点过的「有帮助 / 没帮助」也会出现在这里
 import { ref, onMounted } from 'vue'
-import { useUserStore } from '../stores/user.js'
+import { useUserStore } from '../stores/user'
 
 const emit = defineEmits(['close'])
+interface FeedbackItem {
+  id: number
+  type: 'answer' | 'message' | string
+  rating?: 'up' | 'down' | null
+  time: string
+  status: 'pending' | 'replied' | string
+  unread?: boolean | number
+  question?: string | null
+  content?: string | null
+  reply?: string | null
+  replyTime?: string | null
+}
+
 const userStore = useUserStore()
-const list = ref([])
+const list = ref<FeedbackItem[]>([])
 const content = ref('')
-const msg = ref(null) // { ok, text }
+const msg = ref<{ ok: boolean; text: string } | null>(null) // { ok, text }
 const sending = ref(false)
 
 async function load() {
@@ -25,13 +38,13 @@ async function submit() {
     msg.value = { ok: true, text: '已提交，管理员回复后会显示在下面' }
     await load()
   } catch (err) {
-    msg.value = { ok: false, text: err.message }
+    msg.value = { ok: false, text: (err as Error).message }
   } finally {
     sending.value = false
   }
 }
 
-const fmt = (t) => (t ? t.slice(5, 16).replace('T', ' ') : '')
+const fmt = (t?: string | null) => (t ? t.slice(5, 16).replace('T', ' ') : '')
 </script>
 
 <template>

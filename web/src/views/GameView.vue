@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // 实战任务 · 漏洞猎人（打怪版）
 // 每一关的合约里盘踞着一只「漏洞怪兽」，你要用代码打败它，分两个回合：
 //   ① 锁定弱点：在代码里点出漏洞所在的那一行 → 暴击，怪兽掉一大截血
@@ -8,17 +8,27 @@
 // 3 点信誉用完就失败，这道题进错题本；赢的时候剩几点信誉就拿几颗星
 // 提示不会自动出现：要自己点「求助情报」，每用一条，这关最多能拿的星星就少一颗——不能光靠提示过关
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import type { Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { levels } from '../data/levels.js'
-import { useGameStore } from '../stores/game.js'
-import { useMistakesStore } from '../stores/mistakes.js'
-import { useAiStore } from '../stores/ai.js'
+import { levels } from '../data/levels'
+import { useGameStore } from '../stores/game'
+import { useMistakesStore } from '../stores/mistakes'
+import { useAiStore } from '../stores/ai'
 import MedalPopup from '../components/MedalPopup.vue'
 import MedalWall from '../components/MedalWall.vue'
 import CodeFrame from '../components/CodeFrame.vue'
 import ImgSlot from '../components/ImgSlot.vue'
 import Monster3D from '../components/Monster3D.vue'
-import { useThemeStore } from '../stores/theme.js'
+import { useThemeStore } from '../stores/theme'
+import type { Level, FixOption } from '../types'
+
+// 3D 怪兽的动作指令、飘字、勋章弹窗、反击特效的数据形状
+interface MonsterAction { name: string; id: number }
+interface Popup { id: number; text: string; kind: string }
+interface Medal { stars: number; firstTime: boolean }
+interface Point { x: number; y: number }
+interface CodeRow { no: number; text: string; bug?: boolean; fixed?: boolean }
+interface Fx { type: string; id: number; m: Point; h: Point; c: Point }
 
 const game = useGameStore()
 const mistakes = useMistakesStore()
@@ -36,47 +46,47 @@ onMounted(async () => {
 
 // 打完一关：把这一关的合约交给 AI 审计 Agent 复盘，看看 AI 找到的和自己找到的是不是一样
 function reviewWithAI() {
-  router.push({ path: '/audit', query: { level: level.value.id } })
+  router.push({ path: '/audit', query: { level: level.value!.id } })
 }
 
 
 // 第 1 关一开始就能玩；之后每关要先通过上一关才解锁
-function unlocked(lv) {
+function unlocked(lv: Level) {
   return lv.id === 1 || game.cleared[lv.id - 1]
 }
 
 // ===== 战斗状态 =====
 const MAX_HEARTS = 3
-const level = ref(null)       // 当前关卡，null 表示在选关界面
+const level = ref<Level | null>(null)       // 当前关卡，null 表示在选关界面
 const phase = ref('scan')     // scan 锁定弱点 / patch 修补漏洞 / win 胜利 / lose 失败
-const picked = ref(null)      // 玩家点中的行号
+const picked = ref<number | null>(null)      // 玩家点中的行号
 const hearts = ref(MAX_HEARTS) // 信誉值
 const monsterHp = ref(100)
-const options = ref([])       // 修补方案（打乱顺序）
-const chosen = ref(null)      // 选中的修补方案
+const options = ref<FixOption[]>([])       // 修补方案（打乱顺序）
+const chosen = ref<FixOption | null>(null)      // 选中的修补方案
 const counter = ref('')       // 怪兽这次反击的台词
 const whyWrong = ref('')      // 选错修补方案时，告诉你为什么不行
 const hitFx = ref(false)      // 怪兽被打中的闪烁
 const hurtFx = ref(false)     // 自己被反击的红屏
-const popups = ref([])        // 飘出来的伤害数字
-const medal = ref(null)       // 胜利时的勋章弹窗：{ stars, firstTime }
-const act3d = ref(null)       // 让 3D 怪兽做动作：{ name: 'hit' | 'attack' | 'death', id }
+const popups = ref<Popup[]>([])        // 飘出来的伤害数字
+const medal = ref<Medal | null>(null)       // 胜利时的勋章弹窗：{ stars, firstTime }
+const act3d = ref<MonsterAction | null>(null)       // 让 3D 怪兽做动作：{ name: 'hit' | 'attack' | 'death', id }
 const no3d = ref(false)       // 3D 显示不了（电脑不支持、模型缺失）时，退回平面图标
-const doAct = (name) => (act3d.value = { name, id: Date.now() + Math.random() })
+const doAct = (name: string) => (act3d.value = { name, id: Date.now() + Math.random() })
 
 // ===== 求助情报（提示）=====
 const hintsUsed = ref(0)
 const starCap = computed(() => MAX_HEARTS - hintsUsed.value) // 这关最多还能拿几颗星
 function useHint() {
-  if (hintsUsed.value < level.value.hints.length) hintsUsed.value++
+  if (hintsUsed.value < level.value!.hints.length) hintsUsed.value++
 }
 
 // ===== 倒计时 =====
 // 锁定弱点：合约越长给的时间越多（30 秒 + 每行 1 秒）；修补漏洞：45 秒
-const limitOf = (p) => (p === 'scan' ? 30 + (level.value?.code.length || 0) : p === 'patch' ? 45 : 0)
+const limitOf = (p: string) => (p === 'scan' ? 30 + (level.value?.code.length || 0) : p === 'patch' ? 45 : 0)
 const limit = computed(() => limitOf(phase.value))
 const timeLeft = ref(0)
-let ticker = null
+let ticker: ReturnType<typeof setInterval> | undefined = undefined
 function resetTimer() {
   timeLeft.value = limit.value
 }
@@ -93,20 +103,20 @@ onUnmounted(stopTicker)
 
 // ===== 反击特效：每只怪兽用「自己的漏洞方式」打你 =====
 // 特效要从怪兽飞向你的信誉值（右上角的心），所以先量出几个元素在战场里的位置
-const battleEl = ref(null)
-const monsterEl = ref(null)
-const heartsEl = ref(null)
-const codeEl = ref(null)
-const fx = ref(null) // { type, id, m: 怪兽中心, h: 心的位置, c: 代码区中心 }
+const battleEl = ref<HTMLDivElement | null>(null)
+const monsterEl = ref<HTMLDivElement | null>(null)
+const heartsEl = ref<HTMLElement | null>(null)
+const codeEl = ref<HTMLElement | null>(null)
+const fx = ref<Fx | null>(null) // { type, id, m: 怪兽中心, h: 心的位置, c: 代码区中心 }
 function playFx() {
   if (!battleEl.value) return
   const b = battleEl.value.getBoundingClientRect()
-  const center = (el) => {
+  const center = (el: Element) => {
     const r = el.getBoundingClientRect()
     return { x: Math.round(r.left + r.width / 2 - b.left), y: Math.round(r.top + r.height / 2 - b.top) }
   }
   const id = Date.now()
-  fx.value = { type: level.value.monster.fx, id, m: center(monsterEl.value), h: center(heartsEl.value), c: center(codeEl.value) }
+  fx.value = { type: level.value!.monster.fx, id, m: center(monsterEl.value!), h: center(heartsEl.value!), c: center(codeEl.value!) }
   setTimeout(() => fx.value?.id === id && (fx.value = null), 1800)
 }
 // 特效元素的位置用 CSS 变量传进去：--mx/--my 怪兽、--hx/--hy 心、--cx/--cy 代码区
@@ -131,7 +141,7 @@ watch(level, (lv) => {
 })
 onUnmounted(() => theme.setMood(null))
 
-function start(lv) {
+function start(lv: Level) {
   if (!unlocked(lv)) return
   level.value = lv
   phase.value = 'scan'
@@ -151,18 +161,18 @@ function start(lv) {
 }
 
 // 飘一个数字，0.9 秒后消失
-function popup(text, kind) {
+function popup(text: string, kind: string) {
   const id = ++popupId
   popups.value.push({ id, text, kind })
   setTimeout(() => (popups.value = popups.value.filter((p) => p.id !== id)), 900)
 }
-function flash(fx) {
+function flash(fx: Ref<boolean>) {
   fx.value = true
   setTimeout(() => (fx.value = false), 450)
 }
 
 // 打中怪兽
-function damage(n, text) {
+function damage(n: number, text: string) {
   monsterHp.value = Math.max(0, monsterHp.value - n)
   popup(text, 'crit')
   flash(hitFx)
@@ -171,7 +181,7 @@ function damage(n, text) {
 
 // 出错：怪兽用漏洞反击。反击台词按顺序一句一句演，演的就是这个漏洞被利用的过程
 function countered(timeout = false) {
-  const attacks = level.value.monster.attacks
+  const attacks = level.value!.monster.attacks
   const line = attacks[(MAX_HEARTS - hearts.value) % attacks.length]
   counter.value = timeout ? `⏰ 你犹豫太久了！${line}` : line
   hearts.value--
@@ -187,7 +197,7 @@ function countered(timeout = false) {
 // ① 锁定弱点
 function scan() {
   if (picked.value === null) return
-  if (level.value.bugLines.includes(picked.value)) {
+  if (level.value!.bugLines.includes(picked.value)) {
     counter.value = ''
     damage(60, '暴击 -60')
     phase.value = 'patch'
@@ -199,7 +209,7 @@ function scan() {
 }
 
 // ② 修补漏洞
-function patch(opt) {
+function patch(opt: FixOption) {
   if (phase.value !== 'patch') return
   chosen.value = opt
   if (opt.correct) {
@@ -220,16 +230,16 @@ function win() {
   theme.setMood('#8ee6c4') // 漏洞补上了，世界恢复成安全的绿色
   const stars = Math.max(1, Math.min(hearts.value, starCap.value)) // 剩几点信誉就拿几颗星，用过提示要再扣
   // 先记下「之前有没有通过」，再保存成绩，这样才知道是不是第一次拿到这枚勋章
-  const firstTime = !game.cleared[level.value.id]
-  game.clear(level.value.id, stars)
+  const firstTime = !game.cleared[level.value!.id]
+  game.clear(level.value!.id, stars)
   setTimeout(() => (medal.value = { stars, firstTime }), 900) // 等怪兽消散的动画放完再弹勋章
 }
 
 function lose() {
   phase.value = 'lose'
   stopTicker()
-  const lv = level.value
-  const right = lv.fix.options.find((o) => o.correct)
+  const lv = level.value!
+  const right = lv.fix.options.find((o) => o.correct)!
   // 失败：这道题自动进错题本，附上正确的修补代码
   mistakes.add(
     `【漏洞猎人 · ${lv.title}】这份合约的漏洞在哪？怎么修补？\n\n${lv.code.join('\n')}`,
@@ -239,19 +249,19 @@ function lose() {
 }
 
 // 代码面板要显示的行：胜利后，漏洞那几行换成修补好的代码（绿色）
-const shownLines = computed(() => {
+const shownLines = computed((): CodeRow[] => {
   const lv = level.value
   if (!lv) return []
   const [from, to] = lv.fix.lines
-  const rows = lv.code.map((text, i) => ({ no: i + 1, text, bug: lv.bugLines.includes(i + 1) }))
+  const rows: CodeRow[] = lv.code.map((text, i) => ({ no: i + 1, text, bug: lv.bugLines.includes(i + 1) }))
   if (phase.value !== 'win') return rows
-  const fixed = lv.fix.options.find((o) => o.correct).code.map((text) => ({ text, fixed: true }))
+  const fixed = lv.fix.options.find((o) => o.correct)!.code.map((text) => ({ text, fixed: true }))
   return [...rows.slice(0, from - 1), ...fixed, ...rows.slice(to)].map((r, i) => ({ ...r, no: i + 1 }))
 })
 
 // 让白帽导师结合教材再讲一遍
 function askMentor() {
-  ai.ask(`我在漏洞猎人里遇到了「${level.value.type}」漏洞，请结合教材讲讲它的原理，以及怎么防范。`)
+  ai.ask(`我在漏洞猎人里遇到了「${level.value!.type}」漏洞，请结合教材讲讲它的原理，以及怎么防范。`)
 }
 
 // 选关页顶部的总进度
@@ -259,7 +269,7 @@ const showWall = ref(false) // 勋章墙开关
 const clearedCount = computed(() => levels.filter((l) => game.cleared[l.id]).length)
 const totalStars = computed(() => levels.reduce((n, l) => n + (game.cleared[l.id] || 0), 0))
 
-const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1))
+const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as number) + 1))
 </script>
 
 <template>
@@ -334,7 +344,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
           <div class="floor"></div>
           <div ref="monsterEl" :class="['monster', { hit: hitFx, dead: phase === 'win', swell: fx?.type === 'swell' }]">
             <!-- 优先显示 3D 模型（/monsters/level-N.glb）；显示不了就用平面图（/monsters/level-N.png），再不行就用 emoji -->
-            <Monster3D v-if="!no3d" :key="level.id" :src="`/monsters/level-${level.id}.glb`" :color="level.monster.color" :action="act3d" @error="no3d = true" />
+            <Monster3D v-if="!no3d" :key="level.id" :src="`/monsters/level-${level.id}.glb`" :color="level.monster.color" :action="act3d ?? undefined" @error="no3d = true" />
             <ImgSlot v-else :src="`/monsters/level-${level.id}.png`" :fallback="level.monster.emoji" :label="`level-${level.id}.png`" compact />
           </div>
           <!-- 飘出来的伤害数字 -->
@@ -428,7 +438,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
         </div>
         <div><b>漏洞类型：</b>{{ level.type }}</div>
         <div class="explain">{{ level.explanation }}</div>
-        <div v-if="phase === 'win'" class="explain ok">✓ {{ level.fix.options.find((o) => o.correct).why }}</div>
+        <div v-if="phase === 'win'" class="explain ok">✓ {{ level.fix.options.find((o) => o.correct)!.why }}</div>
         <div class="result-actions">
           <button @click="askMentor">🧑‍💻 请白帽导师结合教材再讲讲</button>
           <button @click="start(level)">🔄 再战一次</button>
@@ -706,4 +716,22 @@ const nextLevel = computed(() => levels.find((l) => l.id === level.value?.id + 1
 }
 .result-actions button:hover { border-color: var(--accent); color: #fff; }
 .result-actions .primary { border: none; color: #05020f; }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  /* 战斗：不再固定一屏高度，整页往下滑；怪兽在上，代码在下，回合面板在最下面 */
+  .battle { height: auto; min-height: 0; gap: 10px; }
+  .play-head { flex-wrap: wrap; gap: 8px 12px; font-size: 14px; }
+  .timer { margin-left: 0; }
+  .timebar { width: 80px; }
+  .hearts { font-size: 18px; letter-spacing: 2px; }
+  .arena { grid-template-columns: 1fr; gap: 10px; }
+  .monster-side { height: 260px; }
+  .monster { font-size: 110px; }
+  .code-side { min-height: 320px; }
+  /* 回合面板：说明文字占一整行，按钮排在下面 */
+  .panel { flex-wrap: wrap; }
+  .panel .hint { flex-basis: 100%; }
+  .fix pre { white-space: pre-wrap; word-break: break-all; }
+}
 </style>

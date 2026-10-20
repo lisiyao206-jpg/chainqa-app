@@ -13,7 +13,8 @@ const BASE = process.env.ZHIPU_BASE_URL || "https://open.bigmodel.cn/api/paas/v4
 const PROMPT = `你是智能合约安全课程的出题老师。请根据下面这一讲教材出 4 道单选题，用来检验学生是否真的读懂了。
 要求：
 1. 前 2 道是「文字题」：考概念、原理、易错点；后 2 道是「代码题」：给一小段 Solidity 代码（3~12 行），问它的运行结果、漏洞或正确写法。
-2. 每题 4 个选项，只有 1 个正确；错误选项要像真的，考的是理解，不是背原文。
+2. 每题 4 个选项，只有 1 个正确；错误选项要像真的、语句通顺，考的是理解，不是背原文。不要出「以上都是 / 以上都不是」这类选项。
+   选项里只写内容，不要自己加「A.」「B.」这样的编号（界面会自动显示 ABCD）。
 3. 题目必须能从教材内容推出来，不要超纲。
 4. 只输出 JSON 数组，不要任何解释，不要用代码块包起来。格式：
 [{"type":"text","question":"题目","options":["A","B","C","D"],"answer":0,"explain":"为什么选它（不超过 60 字）"},
@@ -55,7 +56,8 @@ function parseQuiz(raw) {
       type: q.type === "code" && q.code ? "code" : "text",
       question: q.question.slice(0, 300),
       code: q.type === "code" && q.code ? String(q.code).slice(0, 1500) : undefined,
-      options: q.options.map((o) => o.slice(0, 200)),
+      // AI 偶尔还是会在选项前写「A. 」，界面上会和自动显示的 ABCD 重复，这里去掉
+      options: q.options.map((o) => o.replace(/^\s*[(（]?[A-DＡ-Ｄa-d][)）.．、:：]\s*/, "").slice(0, 200)),
       answer: q.answer,
       explain: String(q.explain || "").slice(0, 200),
     }));

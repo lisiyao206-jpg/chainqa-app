@@ -1,36 +1,61 @@
-<script setup>
+<script setup lang="ts">
 // 帖子列表：好友圈和广场共用这一个组件，用 square 区分
 //   好友圈（square = false）：只有自己和好友能看到；评论也只显示好友写的（和微信朋友圈一样）
 //   广场（square = true）：所有人都能看到，不认识的人也能讨论；帖子有标题，可以按「最新 / 最热」排，
 //                         看到聊得来的人可以直接加好友；管理员可以删除不合适的帖子和评论
 // 两种都能带一个附件：图片、视频（mp4 / webm）或学习资料
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useUserStore } from '../stores/user.js'
-import { uploadFile, isVideoName } from '../utils/files.js'
-import { copyText, fileFromPaste } from '../utils/clipboard.js'
+import { useUserStore } from '../stores/user'
+import { uploadFile, isVideoName } from '../utils/files'
+import { copyText, fileFromPaste } from '../utils/clipboard'
 import FileChip from './FileChip.vue'
 import UserAvatar from './UserAvatar.vue'
+import type { User, FileInfo } from '../types'
 
-const props = defineProps({ square: Boolean })
+type UserBrief = Pick<User, 'userId' | 'account' | 'nickname' | 'avatar'>
+interface Comment {
+  id: number
+  from: UserBrief
+  text: string
+  mine: boolean
+  canDelete: boolean
+}
+interface Post {
+  id: number
+  author: UserBrief
+  title: string | null
+  text: string
+  file: FileInfo | null
+  time: string
+  mine: boolean
+  friend: boolean
+  canDelete: boolean
+  likes: string[]
+  liked: boolean
+  favorited: boolean
+  comments: Comment[]
+}
+
+const props = defineProps<{ square?: boolean }>()
 const userStore = useUserStore()
-const posts = ref([])
+const posts = ref<Post[]>([])
 const title = ref('')
 const text = ref('')
-const attached = ref(null) // 已上传、准备随帖子一起发的文件
+const attached = ref<FileInfo | null>(null) // 已上传、准备随帖子一起发的文件
 const busy = ref(false)
 const error = ref('')
 const tip = ref('')
-const drafts = ref({})     // 每条帖子下面评论框里正在写的字：{ 帖子id: 文字 }
-const fileInput = ref(null)
+const drafts = ref<Record<number, string>>({})     // 每条帖子下面评论框里正在写的字：{ 帖子id: 文字 }
+const fileInput = ref<HTMLInputElement | null>(null)
 const sort = ref('new')    // 广场的排序：new 最新 / hot 最热
 const maxLen = computed(() => (props.square ? 2000 : 500))
-let timer
+let timer: ReturnType<typeof setInterval> | undefined
 
 async function load() {
   try {
-    posts.value = await userStore.api(props.square ? `/api/social/square?sort=${sort.value}` : '/api/social/posts')
+    posts.value = await userStore.api<Post[]>(props.square ? `/api/social/square?sort=${sort.value}` : '/api/social/posts')
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 }
 onMounted(() => {
@@ -39,31 +64,32 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(timer))
 
-function changeSort(s) {
+function changeSort(s: string) {
   sort.value = s
   load()
 }
 
 // 统一处理：执行操作 → 出错就显示 → 最后重新加载列表
-async function act(fn) {
+async function act(fn: () => Promise<unknown>) {
   error.value = ''
   tip.value = ''
   try {
     await fn()
     await load()
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 }
 
-async function pickFile(e) {
-  const file = e.target.files[0]
-  e.target.value = ''
+async function pickFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files![0]
+  input.value = ''
   if (file) attach(file)
 }
 
 // 在发帖框里 Ctrl + V：粘贴文字照常；粘贴截图、图片、文件就自动变成这条帖子的附件
-function onPaste(e) {
+function onPaste(e: ClipboardEvent) {
   const file = fileFromPaste(e)
   if (!file) return
   e.preventDefault()
@@ -71,20 +97,20 @@ function onPaste(e) {
 }
 
 // 复制帖子正文
-const copiedId = ref(null)
-async function copyPost(p) {
+const copiedId = ref<number | null>(null)
+async function copyPost(p: Post) {
   await copyText((p.title ? p.title + '\n' : '') + p.text)
   copiedId.value = p.id
   setTimeout(() => copiedId.value === p.id && (copiedId.value = null), 1500)
 }
 
-async function attach(file) {
+async function attach(file: File) {
   busy.value = true
   error.value = ''
   try {
     attached.value = await uploadFile(file)
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   } finally {
     busy.value = false
   }
@@ -102,12 +128,12 @@ function publish() {
     attached.value = null
   })
 }
-const like = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/like`, {}))
+const like = (p: Post) => act(() => userStore.api(`/api/social/posts/${p.id}/like`, {}))
 // 收藏：收藏和点赞过的帖子都会进「情报收集文件夹」
-const favorite = (p) => act(() => userStore.api(`/api/social/posts/${p.id}/favorite`, {}))
-const remove = (p) => confirm('删除这条帖子？') && act(() => userStore.api(`/api/social/posts/${p.id}`, null, 'DELETE'))
-const removeComment = (c) => act(() => userStore.api(`/api/social/comments/${c.id}`, null, 'DELETE'))
-function comment(p) {
+const favorite = (p: Post) => act(() => userStore.api(`/api/social/posts/${p.id}/favorite`, {}))
+const remove = (p: Post) => confirm('删除这条帖子？') && act(() => userStore.api(`/api/social/posts/${p.id}`, null, 'DELETE'))
+const removeComment = (c: Comment) => act(() => userStore.api(`/api/social/comments/${c.id}`, null, 'DELETE'))
+function comment(p: Post) {
   const t = (drafts.value[p.id] || '').trim()
   if (!t) return
   return act(async () => {
@@ -116,12 +142,12 @@ function comment(p) {
   })
 }
 // 广场上看到不认识的人：一键发好友申请
-const addFriend = (p) =>
+const addFriend = (p: Post) =>
   act(async () => {
-    tip.value = (await userStore.api('/api/social/friends', { account: p.author.account })).message
+    tip.value = (await userStore.api<{ message: string }>('/api/social/friends', { account: p.author.account })).message
   })
 
-const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
+const shortTime = (t: string) => t.slice(5, 16).replace('T', ' ')
 </script>
 
 <template>
@@ -137,7 +163,7 @@ const shortTime = (t) => t.slice(5, 16).replace('T', ' ')
         @paste="onPaste"
       ></textarea>
       <div class="bar">
-        <button class="btn" :disabled="busy" @click="fileInput.click()">📎 {{ busy ? '上传中…' : '图片 / 视频 / 资料' }}</button>
+        <button class="btn" :disabled="busy" @click="fileInput!.click()">📎 {{ busy ? '上传中…' : '图片 / 视频 / 资料' }}</button>
         <input ref="fileInput" type="file" hidden @change="pickFile" />
         <span v-if="attached" class="attached">{{ isVideoName(attached.name) ? '🎬' : '📄' }} {{ attached.name }} <a @click="attached = null">✕</a></span>
         <span class="len">{{ text.length }} / {{ maxLen }}</span>

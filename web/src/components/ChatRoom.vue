@@ -1,31 +1,48 @@
-<script setup>
+<script setup lang="ts">
 // 聊天窗口：显示一个聊天室（私聊或讨论组）的消息，可以发文字和文件
 // 「实时」的做法：每 2 秒问一次后端「有没有比我手上最新那条更新的消息」（轮询）
 // 比 WebSocket 简单很多，内网穿透也能用；比赛演示完全够用
 import { ref, watch, nextTick, onUnmounted } from 'vue'
-import { useUserStore } from '../stores/user.js'
-import { uploadFile } from '../utils/files.js'
-import { copyText, fileFromPaste } from '../utils/clipboard.js'
+import { useUserStore } from '../stores/user'
+import { uploadFile } from '../utils/files'
+import { copyText, fileFromPaste } from '../utils/clipboard'
 import FileChip from './FileChip.vue'
 import UserAvatar from './UserAvatar.vue'
+import type { User, FileInfo } from '../types'
 
-const props = defineProps({
-  room: Object,     // { id, type, name, memberCount }
-  friends: Array,   // 我的好友：讨论组「拉人」时用
-})
+type UserBrief = Pick<User, 'userId' | 'account' | 'nickname' | 'avatar'>
+interface Room {
+  id: number
+  type: 'dm' | 'group' | string
+  name: string
+  memberCount: number
+  [key: string]: any
+}
+interface Message {
+  id: number
+  from: UserBrief
+  text: string | null
+  file: FileInfo | null
+  time: string
+}
+
+const props = defineProps<{
+  room?: Room,           // { id, type, name, memberCount }
+  friends?: UserBrief[], // 我的好友：讨论组「拉人」时用
+}>()
 const emit = defineEmits(['changed', 'left'])
 const userStore = useUserStore()
 const me = () => userStore.user?.userId
 
-const messages = ref([])
+const messages = ref<Message[]>([])
 const text = ref('')
 const sending = ref(false)
 const error = ref('')
-const listEl = ref(null)
-const fileInput = ref(null)
-let timer = null
+const listEl = ref<HTMLDivElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
+let timer: ReturnType<typeof setInterval> | null = null
 const showInvite = ref(false) // 讨论组「拉人」面板开关
-const picked = ref([])        // 勾选了要拉进来的好友
+const picked = ref<number[]>([])        // 勾选了要拉进来的好友
 
 // 滚到最下面（看最新消息）
 async function toBottom() {
@@ -35,25 +52,25 @@ async function toBottom() {
 
 // 只取比手上最新那条更新的消息，接在后面
 async function poll() {
-  const roomId = props.room.id
+  const roomId = props.room!.id
   const after = messages.value.at(-1)?.id || 0
   try {
-    const fresh = await userStore.api(`/api/social/rooms/${roomId}/messages?after=${after}`)
-    if (roomId !== props.room.id || !fresh.length) return // 等结果的时候已经切到别的聊天了
+    const fresh = await userStore.api<Message[]>(`/api/social/rooms/${roomId}/messages?after=${after}`)
+    if (roomId !== props.room!.id || !fresh.length) return // 等结果的时候已经切到别的聊天了
     const nearBottom = listEl.value && listEl.value.scrollHeight - listEl.value.scrollTop - listEl.value.clientHeight < 80
     messages.value.push(...fresh.filter((m) => !messages.value.some((x) => x.id === m.id)))
     if (nearBottom || !after) toBottom() // 正在往上翻旧消息时，不要强行拉到底
     emit('changed')
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 }
 
 // 换了聊天室：清空、重新加载、重新开始轮询
 watch(
-  () => props.room.id,
+  () => props.room!.id,
   () => {
-    clearInterval(timer)
+    clearInterval(timer!)
     messages.value = []
     error.value = ''
     showInvite.value = false
@@ -62,19 +79,19 @@ watch(
   },
   { immediate: true },
 )
-onUnmounted(() => clearInterval(timer))
+onUnmounted(() => clearInterval(timer!))
 
-async function send(body) {
+async function send(body: { text?: string; fileId?: number }) {
   sending.value = true
   error.value = ''
   try {
-    const msg = await userStore.api(`/api/social/rooms/${props.room.id}/messages`, body)
+    const msg = await userStore.api<Message>(`/api/social/rooms/${props.room!.id}/messages`, body)
     if (!messages.value.some((x) => x.id === msg.id)) messages.value.push(msg)
     toBottom()
     emit('changed')
     return true
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   } finally {
     sending.value = false
   }
@@ -86,21 +103,22 @@ async function sendText() {
 }
 
 // Enter 发送；Shift + Enter 换行；输入法正在选字时按 Enter 不算
-function onKey(e) {
+function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault()
     sendText()
   }
 }
 
-async function pickFile(e) {
-  const file = e.target.files[0]
-  e.target.value = '' // 清空，下次选同一个文件也能触发
+async function pickFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files![0]
+  input.value = '' // 清空，下次选同一个文件也能触发
   if (file) sendFile(file)
 }
 
 // 在输入框里 Ctrl + V：粘贴的是文字就照常粘贴；粘贴的是截图、图片、文件就直接发出去
-function onPaste(e) {
+function onPaste(e: ClipboardEvent) {
   const file = fileFromPaste(e)
   if (!file) return // 文字：交给浏览器自己粘贴
   e.preventDefault()
@@ -108,20 +126,20 @@ function onPaste(e) {
 }
 
 // 复制一条消息的文字，按钮上显示「已复制」1.5 秒
-const copiedId = ref(null)
-async function copyMsg(m) {
-  await copyText(m.text)
+const copiedId = ref<number | null>(null)
+async function copyMsg(m: Message) {
+  await copyText(m.text!)
   copiedId.value = m.id
   setTimeout(() => copiedId.value === m.id && (copiedId.value = null), 1500)
 }
 
-async function sendFile(file) {
+async function sendFile(file: File) {
   sending.value = true
   try {
     const f = await uploadFile(file)
     await send({ fileId: f.id })
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
     sending.value = false
   }
 }
@@ -130,22 +148,22 @@ async function sendFile(file) {
 async function invite() {
   if (!picked.value.length) return
   try {
-    await userStore.api(`/api/social/rooms/${props.room.id}/members`, { memberIds: picked.value })
+    await userStore.api(`/api/social/rooms/${props.room!.id}/members`, { memberIds: picked.value })
     picked.value = []
     showInvite.value = false
     emit('changed')
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 }
 async function leave() {
-  if (!confirm(`确定要退出「${props.room.name}」吗？`)) return
-  await userStore.api(`/api/social/rooms/${props.room.id}`, null, 'DELETE')
+  if (!confirm(`确定要退出「${props.room!.name}」吗？`)) return
+  await userStore.api(`/api/social/rooms/${props.room!.id}`, null, 'DELETE')
   emit('left')
 }
 
 // 「22:41」或「10-16 22:41」
-function shortTime(t) {
+function shortTime(t: string) {
   const today = new Date().toISOString().slice(0, 10)
   return t.startsWith(today) ? t.slice(11, 16) : t.slice(5, 16).replace('T', ' ')
 }
@@ -155,10 +173,10 @@ function shortTime(t) {
   <section class="room">
     <header>
       <div>
-        <b>{{ props.room.name }}</b>
-        <span v-if="props.room.type === 'group'" class="count">{{ props.room.memberCount }} 人讨论组</span>
+        <b>{{ props.room!.name }}</b>
+        <span v-if="props.room!.type === 'group'" class="count">{{ props.room!.memberCount }} 人讨论组</span>
       </div>
-      <div v-if="props.room.type === 'group'" class="head-btns">
+      <div v-if="props.room!.type === 'group'" class="head-btns">
         <button class="btn" @click="showInvite = !showInvite">+ 拉人</button>
         <button class="btn danger" @click="leave">退出</button>
       </div>
@@ -169,7 +187,7 @@ function shortTime(t) {
       <label v-for="f in props.friends" :key="f.userId">
         <input type="checkbox" :value="f.userId" v-model="picked" /> {{ f.nickname }}
       </label>
-      <span v-if="!props.friends.length" class="faint">还没有好友</span>
+      <span v-if="!props.friends!.length" class="faint">还没有好友</span>
       <button class="btn primary" @click="invite">确定</button>
     </div>
 
@@ -179,7 +197,7 @@ function shortTime(t) {
         <UserAvatar :user="m.from" :size="32" class="msg-avatar" />
         <div class="msg-body">
         <div class="meta">
-          <span v-if="props.room.type === 'group' && m.from.userId !== me()">{{ m.from.nickname }}</span>
+          <span v-if="props.room!.type === 'group' && m.from.userId !== me()">{{ m.from.nickname }}</span>
           {{ shortTime(m.time) }}
           <a v-if="m.text" class="copy" @click="copyMsg(m)">{{ copiedId === m.id ? '已复制' : '复制' }}</a>
         </div>
@@ -194,7 +212,7 @@ function shortTime(t) {
 
     <div v-if="error" class="error">{{ error }}</div>
     <footer>
-      <button class="attach" title="发送文件（最大 10MB）" :disabled="sending" @click="fileInput.click()">📎</button>
+      <button class="attach" title="发送文件（最大 10MB）" :disabled="sending" @click="fileInput!.click()">📎</button>
       <input ref="fileInput" type="file" hidden @change="pickFile" />
       <textarea v-model="text" rows="2" maxlength="1000" placeholder="输入消息，Enter 发送，Shift + Enter 换行；截图后 Ctrl + V 可以直接发图" @keydown="onKey" @paste="onPaste"></textarea>
       <button class="btn primary" :disabled="sending || !text.trim()" @click="sendText">发送</button>

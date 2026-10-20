@@ -94,3 +94,13 @@ select, option { background: #0b0820; color: var(--text); }
   from { transform: translateY(14px); }
   to { transform: none; }
 }
+
+/* ===== 手机适配（屏幕窄于 760px）：全站通用的规则 =====
+   各个页面自己的手机布局写在页面文件最后的 @media 里 */
+@media (max-width: 760px) {
+  /* 按钮、标签里的字不要被挤成竖排 */
+  .btn, button { white-space: nowrap; }
+  /* 防止某个太宽的元素把整页撑出横向滚动条 */
+  html, body { overflow-x: hidden; }
+  img, video, canvas { max-width: 100%; }
+}

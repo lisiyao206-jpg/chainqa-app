@@ -10,7 +10,7 @@
   <div ref="host" class="galaxy-bg"></div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import * as THREE from 'three'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
@@ -30,16 +30,16 @@ const P = {
   outsideColor: '#00c8ff', // 外围颜色：霓虹青
 }
 
-const host = ref(null)
-let renderer, composer, scene, camera, animId
-let galaxy, blocks = []
+const host = ref<HTMLDivElement | null>(null)
+let renderer: THREE.WebGLRenderer, composer: EffectComposer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, animId: number
+let galaxy: THREE.Points, blocks: THREE.LineSegments[] = []
 const mouse = { x: 0, y: 0 }
 const look = { x: 0, y: 0 }
 
 function softTexture() {
   const c = document.createElement('canvas')
   c.width = c.height = 32
-  const g = c.getContext('2d')
+  const g = c.getContext('2d')!
   const grad = g.createRadialGradient(16, 16, 0, 16, 16, 16)
   grad.addColorStop(0, '#fff')
   grad.addColorStop(0.4, 'rgba(255,255,255,0.4)')
@@ -95,7 +95,7 @@ const fragmentShader = `
     gl_FragColor = vec4(vColor, a * vAlpha);
   }
 `
-let galaxyMat
+let galaxyMat: THREE.ShaderMaterial
 
 function buildGalaxy() {
   const r0 = new Float32Array(P.count)
@@ -129,7 +129,7 @@ function buildGalaxy() {
 }
 
 // 中心的「吸收核心」：一团最亮的光
-function buildCore(dot) {
+function buildCore(dot: THREE.Texture) {
   const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: dot, color: '#ffd6f6', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }))
   core.scale.set(0.7, 0.7, 1)
   return core
@@ -164,7 +164,7 @@ function build() {
   }
 }
 
-function animate(now) {
+function animate(now: number) {
   const t = now / 1000
 
   // 把时间交给着色器，粒子就会动起来（旋转 + 被吸进中心）
@@ -200,7 +200,7 @@ function resize() {
   composer.setSize(window.innerWidth, window.innerHeight)
 }
 
-function onMove(e) {
+function onMove(e: MouseEvent) {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1
   mouse.y = (e.clientY / window.innerHeight) * 2 - 1
 }
@@ -209,7 +209,7 @@ onMounted(() => {
   renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(window.innerWidth, window.innerHeight)
-  host.value.appendChild(renderer.domElement)
+  host.value!.appendChild(renderer.domElement)
   build()
   composer = new EffectComposer(renderer)
   composer.addPass(new RenderPass(scene, camera))

@@ -1,8 +1,8 @@
-// utils/markdown.js —— 把 AI 回答里的 Markdown 转成 HTML（AI 小助手、AI 审计报告共用）
+// utils/markdown.ts —— 把 AI 回答里的 Markdown 转成 HTML（AI 小助手、AI 审计报告共用）
 // 只支持我们用得到的几种写法：代码块、行内代码、粗体、标题、列表、引用编号 [1]
 // 先把 < > & 转义，再加上我们自己的标签：AI 输出里就算有 <script> 也只会显示成文字，不会被执行
-export function escapeHtml(s) {
-  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+export function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' } as Record<string, string>)[c])
 }
 
 export function renderMarkdown(md = '') {

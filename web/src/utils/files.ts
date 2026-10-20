@@ -1,14 +1,15 @@
-// utils/files.js —— 上传、下载文件的小工具（情报站的聊天和好友圈都用它）
+// utils/files.ts —— 上传、下载文件的小工具（情报站的聊天和好友圈都用它）
 // 文件不能用 userStore.api 发：api 只会发 JSON，而文件是「二进制」，要原样发过去
-import { useUserStore } from '../stores/user.js'
+import { useUserStore } from '../stores/user'
+import type { FileInfo } from '../types'
 
 // 和后端一样：普通文件 10MB，视频（mp4 / webm）20MB
 const MAX_SIZE = 10 * 1024 * 1024
 const MAX_VIDEO_SIZE = 20 * 1024 * 1024
-export const isVideoName = (name) => /\.(mp4|webm)$/i.test(name)
+export const isVideoName = (name: string) => /\.(mp4|webm)$/i.test(name)
 
 // 上传：成功后返回 { id, name, size, isImage }，把 id 放进消息或动态里发出去
-export async function uploadFile(file) {
+export async function uploadFile(file: File): Promise<FileInfo> {
   if (isVideoName(file.name) ? file.size > MAX_VIDEO_SIZE : file.size > MAX_SIZE)
     throw new Error(isVideoName(file.name) ? '视频不能超过 20MB' : '文件不能超过 10MB')
   const res = await fetch('/api/social/files', {
@@ -27,7 +28,7 @@ export async function uploadFile(file) {
 
 // 下载：要带着登录凭证，所以不能直接用 <a href>，先 fetch 成 Blob，再交给浏览器
 // 返回一个临时网址（blob:...），图片可以直接放进 <img>，用完要 URL.revokeObjectURL 释放
-export async function fileURL(id) {
+export async function fileURL(id: number | string) {
   const res = await fetch(`/api/social/files/${id}`, {
     headers: { Authorization: `Bearer ${useUserStore().token}` },
   })
@@ -35,7 +36,7 @@ export async function fileURL(id) {
   return URL.createObjectURL(await res.blob())
 }
 
-export async function downloadFile(file) {
+export async function downloadFile(file: { id: number | string; name: string }) {
   const url = await fileURL(file.id)
   const a = document.createElement('a')
   a.href = url
@@ -45,7 +46,7 @@ export async function downloadFile(file) {
 }
 
 // 1536 → 1.5 KB
-export function prettySize(n) {
+export function prettySize(n: number) {
   if (n < 1024) return n + ' B'
   if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB'
   return (n / 1024 / 1024).toFixed(1) + ' MB'

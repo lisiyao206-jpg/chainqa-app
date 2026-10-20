@@ -1,7 +1,7 @@
-// data/swcLinks.js —— 漏洞编号（SWC）和「训练营章节」「实战任务关卡」的对应关系
+// data/swcLinks.ts —— 漏洞编号（SWC）和「训练营章节」「实战任务关卡」的对应关系
 // AI 审计找到某个漏洞后，用它生成「📖 去训练营学这一章」「🎮 去打这只怪练手」的传送门
 // chapter 写章节编号的开头（例如 S01），训练营会打开以它开头的那一章；level 是实战任务的关卡编号
-export const SWC_LINKS = {
+export const SWC_LINKS: Record<string, { chapter: string; level?: number }> = {
   'SWC-101': { chapter: 'S05', level: 2 }, // 整数溢出 → 溢出刺球
   'SWC-104': { chapter: 'S13' },           // 没检查底层调用返回值
   'SWC-105': { chapter: 'S04', level: 1 }, // 未受保护的提款 → 权限窃贼

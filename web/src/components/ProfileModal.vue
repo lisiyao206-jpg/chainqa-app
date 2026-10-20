@@ -1,83 +1,97 @@
-<script setup>
+<script setup lang="ts">
 // 个人资料弹窗：看自己的信息和学习统计，改昵称、改密码
 import { ref, onMounted } from 'vue'
-import { useUserStore } from '../stores/user.js'
-import { useThemeStore, BACKGROUNDS } from '../stores/theme.js'
+import { useUserStore } from '../stores/user'
+import { useThemeStore, BACKGROUNDS } from '../stores/theme'
 import MedalWall from './MedalWall.vue'
 import FeedbackModal from './FeedbackModal.vue'
 import UserAvatar from './UserAvatar.vue'
-import { PRESET_AVATARS } from '../data/avatars.js'
-import { uploadFile } from '../utils/files.js'
+import { PRESET_AVATARS } from '../data/avatars'
+import { uploadFile } from '../utils/files'
+import type { Role } from '../types'
+
+interface Profile {
+  account: string
+  nickname: string
+  role: Role
+  avatar?: string | null
+  registerTime: string
+  loginCount: number
+  noteCount: number
+  mistakeCount: number
+  clearedCount: number
+}
 
 const emit = defineEmits(['close'])
 const userStore = useUserStore()
 const theme = useThemeStore()
 
-const profile = ref(null)
+const profile = ref<Profile | null>(null)
 const nickname = ref('')
 const oldPwd = ref('')
 const newPwd = ref('')
 // 操作结果提示：{ ok: true/false, text }
-const msg = ref(null)
+const msg = ref<{ ok: boolean; text: string } | null>(null)
 const showWall = ref(false) // 勋章墙开关
 const showFeedback = ref(false) // 意见反馈开关
 const unread = ref(0)           // 管理员回复了、我还没看的反馈数
 
 onMounted(async () => {
-  profile.value = await userStore.api('/api/profile')
-  userStore.api('/api/feedback/unread').then((d) => (unread.value = d.n)).catch(() => {})
-  nickname.value = profile.value.nickname
+  profile.value = await userStore.api<Profile>('/api/profile')
+  userStore.api('/api/feedback/unread').then((d: { n: number }) => (unread.value = d.n)).catch(() => {})
+  nickname.value = profile.value!.nickname
 })
 
 async function saveNickname() {
   try {
     await userStore.api('/api/profile', { nickname: nickname.value }, 'PUT')
     // 公告板里的昵称也要改，顶栏头像上的字才会跟着变
-    userStore.user.nickname = nickname.value.trim()
+    userStore.user!.nickname = nickname.value.trim()
     msg.value = { ok: true, text: '昵称已保存' }
   } catch (err) {
-    msg.value = { ok: false, text: err.message }
+    msg.value = { ok: false, text: (err as Error).message }
   }
 }
 
 // ===== 头像 =====
 const showPicker = ref(false)
-const avatarInput = ref(null)
+const avatarInput = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 
-async function saveAvatar(avatar) {
+async function saveAvatar(avatar: string) {
   try {
     await userStore.api('/api/avatar', { avatar }, 'PUT')
     // 公告板和档案里的头像一起改，顶栏、聊天里的头像马上跟着变
-    userStore.user.avatar = profile.value.avatar = avatar
+    userStore.user!.avatar = profile.value!.avatar = avatar
     showPicker.value = false
     msg.value = { ok: true, text: '头像已更换' }
   } catch (err) {
-    msg.value = { ok: false, text: err.message }
+    msg.value = { ok: false, text: (err as Error).message }
   }
 }
 
 // 把图片裁成正中间的正方形，再缩小到 256×256：
 // 头像是圆的，正方形放进去刚好；缩小后文件只有几十 KB，加载快
-function cropSquare(file) {
-  return new Promise((resolve, reject) => {
+function cropSquare(file: File) {
+  return new Promise<File>((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
       const side = Math.min(img.width, img.height)
       const canvas = document.createElement('canvas')
       canvas.width = canvas.height = 256
-      canvas.getContext('2d').drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256)
+      canvas.getContext('2d')!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 256, 256)
       URL.revokeObjectURL(img.src)
-      canvas.toBlob((blob) => resolve(new File([blob], 'avatar.png', { type: 'image/png' })), 'image/png')
+      canvas.toBlob((blob) => resolve(new File([blob!], 'avatar.png', { type: 'image/png' })), 'image/png')
     }
     img.onerror = () => reject(new Error('这张图片打不开，换一张试试'))
     img.src = URL.createObjectURL(file)
   })
 }
 
-async function uploadAvatar(e) {
-  const file = e.target.files[0]
-  e.target.value = ''
+async function uploadAvatar(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files![0]
+  input.value = ''
   if (!file) return
   if (!file.type.startsWith('image/')) return (msg.value = { ok: false, text: '请选择图片文件' })
   uploading.value = true
@@ -85,7 +99,7 @@ async function uploadAvatar(e) {
     const f = await uploadFile(await cropSquare(file))
     await saveAvatar('file:' + f.id)
   } catch (err) {
-    msg.value = { ok: false, text: err.message }
+    msg.value = { ok: false, text: (err as Error).message }
   } finally {
     uploading.value = false
   }
@@ -97,7 +111,7 @@ async function savePassword() {
     oldPwd.value = newPwd.value = ''
     msg.value = { ok: true, text: '密码已修改，下次登录请用新密码' }
   } catch (err) {
-    msg.value = { ok: false, text: err.message }
+    msg.value = { ok: false, text: (err as Error).message }
   }
 }
 </script>
@@ -136,7 +150,7 @@ async function savePassword() {
           >
             <UserAvatar :user="{ avatar: `preset:${i + 1}` }" :size="40" />
           </button>
-          <button class="upload" :disabled="uploading" @click="avatarInput.click()">
+          <button class="upload" :disabled="uploading" @click="avatarInput!.click()">
             {{ uploading ? '上传中…' : '📷 上传本地图片' }}
           </button>
           <input ref="avatarInput" type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden @change="uploadAvatar" />
@@ -260,4 +274,8 @@ form button {
 }
 .theme:hover { border-color: rgba(0, 240, 255, 0.7); }
 .theme.on { border-color: #00f0ff; background: rgba(0, 240, 255, 0.15); color: #fff; }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  .card { width: min(380px, 94vw); }
+}
 </style>

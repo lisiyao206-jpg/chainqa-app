@@ -1,13 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 
 // 图片位：有图就显示图，图还没放进来就显示占位（emoji + 虚线框 + 文件名）
-const props = defineProps({
-  src: String,       // 图片路径，例如 /lobby/hero-figure.png
-  fallback: String,  // 图片缺失时显示的 emoji
-  label: String,     // 占位框上的提示，例如 "hero-figure.png 800高"
-  compact: Boolean,  // 小图位（头像、图标）不显示文字提示，鼠标悬停才看得到
-})
+const props = defineProps<{
+  src?: string       // 图片路径，例如 /lobby/hero-figure.png
+  fallback?: string  // 图片缺失时显示的 emoji
+  label?: string     // 占位框上的提示，例如 "hero-figure.png 800高"
+  compact?: boolean  // 小图位（头像、图标）不显示文字提示，鼠标悬停才看得到
+}>()
 
 const broken = ref(false)
 </script>

@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // 情报站：审计员之间交流的地方，分五栏
 //   广场：外圈，所有人都能看、都能讨论，可以发帖、发视频分享心得（MomentsFeed.vue，square 模式）
 //   聊天：和好友私聊、建讨论组一起讨论题目，可以互相传文件（ChatRoom.vue）
@@ -6,38 +6,60 @@
 //   好友：按账号加好友、处理好友申请、好友列表
 //   情报收集文件夹：我点赞、收藏过的帖子，分「视频」和「笔记 / 文本」，随时复习（StudyStation.vue，原来的「学习站」）
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useUserStore } from '../stores/user.js'
+import { useUserStore } from '../stores/user'
 import ChatRoom from '../components/ChatRoom.vue'
 import MomentsFeed from '../components/MomentsFeed.vue'
 import StudyStation from '../components/StudyStation.vue'
 import { useRoute } from 'vue-router'
 import UserAvatar from '../components/UserAvatar.vue'
+import type { User } from '../types'
+
+type UserBrief = Pick<User, 'userId' | 'account' | 'nickname' | 'avatar'>
+interface Room {
+  id: number
+  type: 'dm' | 'group' | string
+  name: string
+  peer: UserBrief | null
+  memberCount: number
+  last: { text: string; time: string; from?: string } | null
+  unread: number
+  sortKey: number
+}
+interface FriendRequest {
+  id: number
+  from: UserBrief
+  time: string
+}
+// 搜人结果：带上「我和他是什么关系」
+interface SearchUser extends UserBrief {
+  relation: 'none' | 'self' | 'friend' | 'pending'
+}
 
 const userStore = useUserStore()
 // 网址带 ?tab=folder 时直接打开那一栏（旧的 /study 地址会自动跳到这里）
 const TABS = ['square', 'chat', 'moments', 'friends', 'folder']
 const route = useRoute()
-const tab = ref(TABS.includes(route.query.tab) ? route.query.tab : 'square')
-const rooms = ref([])
-const friends = ref([])
-const requests = ref([])
-const currentId = ref(null)
+const tab = ref(TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'square')
+const rooms = ref<Room[]>([])
+const friends = ref<UserBrief[]>([])
+const requests = ref<FriendRequest[]>([])
+const currentId = ref<number | null>(null)
 const current = computed(() => rooms.value.find((r) => r.id === currentId.value))
 const totalUnread = computed(() => rooms.value.reduce((n, r) => n + (currentId.value === r.id ? 0 : r.unread), 0))
 const error = ref('')
 
 async function loadRooms() {
-  rooms.value = await userStore.api('/api/social/rooms')
+  rooms.value = await userStore.api<Room[]>('/api/social/rooms')
 }
 async function loadFriends() {
   ;[friends.value, requests.value] = await Promise.all([
-    userStore.api('/api/social/friends'),
-    userStore.api('/api/social/requests'),
+    userStore.api<UserBrief[]>('/api/social/friends'),
+    userStore.api<FriendRequest[]>('/api/social/requests'),
   ])
 }
 
 // 聊天列表和好友申请每 4 秒刷新一次：有新消息、新申请时，红点会自己冒出来
-let timer
+let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   loadRooms()
   loadFriends()
@@ -48,21 +70,21 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(timer))
 
-async function act(fn) {
+async function act<T>(fn: () => Promise<T>) {
   error.value = ''
   try {
     return await fn()
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 }
 
 // ===== 好友 =====
 // 搜人：一边打字一边搜，按「一个一个字」匹配账号或昵称（只记得名字里的几个字也能找到）
 const keyword = ref('')
-const results = ref([])
+const results = ref<SearchUser[]>([])
 const tip = ref('')
-let searchTimer
+let searchTimer: ReturnType<typeof setTimeout> | undefined
 // 每打一个字都等 300 毫秒，停下来了才去搜，不会每按一个键就请求一次后端
 function onSearchInput() {
   clearTimeout(searchTimer)
@@ -72,29 +94,29 @@ const search = () =>
   act(async () => {
     tip.value = ''
     const k = keyword.value.trim()
-    results.value = k ? await userStore.api(`/api/social/search?q=${encodeURIComponent(k)}`) : []
+    results.value = k ? await userStore.api<SearchUser[]>(`/api/social/search?q=${encodeURIComponent(k)}`) : []
   })
-const addFriend = (u) =>
+const addFriend = (u: SearchUser) =>
   act(async () => {
-    tip.value = (await userStore.api('/api/social/friends', { account: u.account })).message
+    tip.value = (await userStore.api<{ message: string }>('/api/social/friends', { account: u.account })).message
     await search() // 刷新一下按钮状态（加好友 → 已发送申请）
     loadFriends()
   })
-const respond = (r, accept) =>
+const respond = (r: FriendRequest, accept: boolean) =>
   act(async () => {
     await userStore.api(`/api/social/requests/${r.id}`, { accept }, 'PUT')
     loadFriends()
   })
-const removeFriend = (f) =>
+const removeFriend = (f: UserBrief) =>
   confirm(`删除好友「${f.nickname}」？`) &&
   act(async () => {
     await userStore.api(`/api/social/friends/${f.userId}`, null, 'DELETE')
     loadFriends()
   })
 // 点「私聊」：打开（或新建）和他的聊天室，跳到聊天栏
-const chatWith = (f) =>
+const chatWith = (f: UserBrief) =>
   act(async () => {
-    const { roomId } = await userStore.api('/api/social/rooms/dm', { friendId: f.userId })
+    const { roomId } = await userStore.api<{ roomId: number }>('/api/social/rooms/dm', { friendId: f.userId })
     await loadRooms()
     currentId.value = roomId
     tab.value = 'chat'
@@ -103,10 +125,10 @@ const chatWith = (f) =>
 // ===== 新建讨论组 =====
 const showNew = ref(false)
 const groupName = ref('')
-const groupMembers = ref([])
+const groupMembers = ref<number[]>([])
 const createGroup = () =>
   act(async () => {
-    const { roomId } = await userStore.api('/api/social/rooms/group', { name: groupName.value, memberIds: groupMembers.value })
+    const { roomId } = await userStore.api<{ roomId: number }>('/api/social/rooms/group', { name: groupName.value, memberIds: groupMembers.value })
     showNew.value = false
     groupName.value = ''
     groupMembers.value = []
@@ -274,4 +296,13 @@ aside { border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; di
 .person > span:nth-child(2) { flex: 1; }
 .person small { color: var(--text-faint); margin-left: 4px; }
 .person .btn { padding: 5px 14px; font-size: 12px; }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  /* 标签太多时左右滑动，不要挤成竖排 */
+  .tabs { display: flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs button { flex-shrink: 0; }
+  /* 聊天：会话列表在上，聊天窗口在下 */
+  .chat { grid-template-columns: 1fr; grid-template-rows: minmax(0, 32%) minmax(0, 1fr); height: calc(100vh - 210px); }
+}
 </style>

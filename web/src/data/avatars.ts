@@ -1,4 +1,4 @@
-// data/avatars.js —— 系统提供的 6 个头像
+// data/avatars.ts —— 系统提供的 6 个头像
 // 美术同学设计好后，把图片命名成 avatar-1.png ~ avatar-6.png，放进 web/public/avatars/ 文件夹，就会自动显示
 // 图片还没放进来时，先用 emoji + 渐变色代替（emoji 和颜色可以随便改）
 export const PRESET_AVATARS = [

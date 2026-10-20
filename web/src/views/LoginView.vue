@@ -1,9 +1,9 @@
-<script setup>
+<script setup lang="ts">
 // 登录 / 注册页：和大厅一样的极简排版，背景用 App.vue 里全站共用的紫色流动色彩
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '../stores/user.js'
-import { useThemeStore, BACKGROUNDS } from '../stores/theme.js'
+import { useUserStore } from '../stores/user'
+import { useThemeStore, BACKGROUNDS } from '../stores/theme'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -25,12 +25,12 @@ async function submit() {
     else await userStore.register(account.value, pwd.value, nickname.value)
     router.push('/') // 成功后进入大厅
   } catch (err) {
-    error.value = err.message
+    error.value = (err as Error).message
   }
   loading.value = false
 }
 
-function switchMode(m) {
+function switchMode(m: string) {
   mode.value = m
   error.value = ''
 }
@@ -122,5 +122,9 @@ function switchMode(m) {
 .theme.on::after {
   content: ''; position: absolute; left: 50%; bottom: -8px; width: 4px; height: 4px; margin-left: -2px;
   border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent);
+}
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  .box { width: min(420px, 92vw); padding: 30px 22px; }
 }
 </style>

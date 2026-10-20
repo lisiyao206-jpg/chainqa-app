@@ -1,19 +1,31 @@
-<script setup>
+<script setup lang="ts">
 import { ref, nextTick, watch, onUnmounted } from 'vue'
-import { useAiStore } from '../stores/ai.js'
-import { useUserStore } from '../stores/user.js'
-import { renderMarkdown } from '../utils/markdown.js'
+import { useAiStore } from '../stores/ai'
+import { useUserStore } from '../stores/user'
+import { renderMarkdown } from '../utils/markdown'
+import type { Source } from '../types'
 
 // 对话记录：每条是 { role: 'user' | 'bot', text, sources, error, logId, rating }
 // logId 是后端问答日志的编号，有了它才能给这条回答点「有帮助 / 没帮助」
+interface ChatMessage {
+  role: 'user' | 'bot'
+  text: string
+  sources?: (Source & { text?: string })[]
+  error?: string
+  logId?: number | null
+  rating?: 'up' | 'down' | null
+  reason?: string
+  askReason?: boolean
+  thanks?: boolean
+}
 const userStore = useUserStore()
-const messages = ref([])
+const messages = ref<ChatMessage[]>([])
 // 输入框里的内容
 const input = ref('')
 // AI 是否正在回答（回答时禁用发送按钮）
 const loading = ref(false)
 // 消息区的 DOM 元素，用来自动滚到底部
-const listEl = ref(null)
+const listEl = ref<HTMLDivElement | null>(null)
 
 function scrollToBottom() {
   nextTick(() => {
@@ -36,7 +48,7 @@ watch(
 )
 
 // text 不传时，发送输入框里的内容
-async function send(text) {
+async function send(text?: string | Event) {
   const question = (typeof text === 'string' ? text : input.value).trim()
   if (!question || loading.value) return
 
@@ -59,7 +71,7 @@ async function send(text) {
     if (!res.ok) throw new Error('请求失败，后端开着吗？')
 
     // 后端用 SSE 流式返回，每段形如：event: delta \n data: "一段文字"
-    const reader = res.body.getReader()
+    const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     while (true) {
@@ -67,7 +79,7 @@ async function send(text) {
       if (done) break
       buffer += decoder.decode(value, { stream: true })
       const events = buffer.split('\n\n')
-      buffer = events.pop()
+      buffer = events.pop() as string
       for (const raw of events) {
         const event = raw.match(/^event: (.+)$/m)?.[1]
         const data = JSON.parse(raw.match(/^data: (.+)$/m)?.[1] || 'null')
@@ -81,27 +93,27 @@ async function send(text) {
       }
     }
   } catch (err) {
-    bot.error = err.message
+    bot.error = (err as Error).message
   }
   loading.value = false
 }
 
 // ===== 语音（多模态）：🎤 说话提问、🔊 朗读回答 =====
 // 用的是浏览器自带的语音识别和语音合成，不花 AI 额度。Chrome / Edge 支持；不支持的浏览器不显示麦克风按钮
-const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition
+const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 const canListen = !!Recognition
 const listening = ref(false)
-let recognizer = null
+let recognizer: any = null
 function toggleMic() {
   if (listening.value) return recognizer?.stop()
   recognizer = new Recognition()
   recognizer.lang = 'zh-CN'
   recognizer.interimResults = true // 边说边出字
   const before = input.value
-  recognizer.onresult = (e) => {
-    input.value = before + [...e.results].map((r) => r[0].transcript).join('')
+  recognizer.onresult = (e: any) => {
+    input.value = before + [...e.results].map((r: any) => r[0].transcript).join('')
   }
-  recognizer.onerror = (e) => {
+  recognizer.onerror = (e: any) => {
     if (e.error !== 'aborted') alert(e.error === 'not-allowed' ? '请允许浏览器使用麦克风' : '语音识别出错了：' + e.error + '（语音识别需要联网）')
   }
   recognizer.onend = () => (listening.value = false)
@@ -111,7 +123,7 @@ function toggleMic() {
 
 // 朗读：去掉代码块和 Markdown 符号再读，代码读出来没意义
 const speakingIdx = ref(-1)
-function speak(msg, i) {
+function speak(msg: ChatMessage, i: number) {
   speechSynthesis.cancel()
   if (speakingIdx.value === i) return (speakingIdx.value = -1) // 再点一次就停止
   const text = msg.text.replace(/```[\s\S]*?```/g, '（代码略）').replace(/[`*#>]|\[\d+\]/g, '')
@@ -128,19 +140,19 @@ onUnmounted(() => {
 })
 
 // ===== 评价这条回答（进入管理员后台的「反馈处理」）=====
-async function rate(msg, rating) {
+async function rate(msg: ChatMessage, rating: 'up' | 'down') {
   msg.rating = rating
   msg.thanks = false
   msg.askReason = rating === 'down' // 没帮助：请用户说说哪里不好
   if (rating === 'up') await submitRating(msg)
 }
-async function submitRating(msg) {
+async function submitRating(msg: ChatMessage) {
   try {
     await userStore.api('/api/feedback', { type: 'answer', logId: msg.logId, rating: msg.rating, content: msg.reason })
     msg.askReason = false
     msg.thanks = true
   } catch (err) {
-    msg.error = err.message
+    msg.error = (err as Error).message
   }
 }
 </script>

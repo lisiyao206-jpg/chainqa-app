@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import LobbyView from './views/LobbyView.vue'
 import LoginView from './views/LoginView.vue'
-import { useUserStore } from './stores/user.js'
+import { useUserStore } from './stores/user'
 
 // 性能优化：路由懒加载。登录页和大厅一打开就要用，直接打包进首页；
 // 其他页面写成 () => import(...)，等用户真的点进去才下载，首页加载快很多

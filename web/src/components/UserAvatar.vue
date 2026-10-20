@@ -1,20 +1,26 @@
-<script setup>
+<script setup lang="ts">
 // 圆形头像：全站统一用它（顶栏、档案、聊天、好友圈、好友列表）
 // user.avatar 有三种：
 //   'preset:3'   系统头像：图片放在 web/public/avatars/avatar-3.png（美术同学设计的 6 张）
 //   'file:xxxx'  自己上传的图片
 //   空           显示昵称的第一个字
 import { ref, watch, computed } from 'vue'
-import { fileURL } from '../utils/files.js'
-import { PRESET_AVATARS } from '../data/avatars.js'
+import { fileURL } from '../utils/files'
+import { PRESET_AVATARS } from '../data/avatars'
 
-const props = defineProps({
-  user: Object,                       // { nickname, avatar }
-  size: { type: Number, default: 32 }, // 直径（像素）
+interface AvatarUser {
+  nickname?: string
+  avatar?: string | null
+}
+const props = withDefaults(defineProps<{
+  user?: AvatarUser | null  // { nickname, avatar }
+  size?: number             // 直径（像素）
+}>(), {
+  size: 32,
 })
 
 // 上传的头像要带登录凭证才能下载，下载一次后存起来，同一个头像不用反复下载
-const cache = (window.__avatarCache ||= new Map())
+const cache: Map<string, Promise<string>> = ((window as any).__avatarCache ||= new Map())
 const src = ref('')
 const broken = ref(false)
 
@@ -33,7 +39,7 @@ watch(
     if (!id) return
     try {
       if (!cache.has(id)) cache.set(id, fileURL(id))
-      src.value = await cache.get(id)
+      src.value = (await cache.get(id))!
     } catch {
       cache.delete(id)
       broken.value = true

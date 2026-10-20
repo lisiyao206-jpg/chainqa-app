@@ -1,20 +1,21 @@
-<script setup>
+<script setup lang="ts">
 // 文件卡片：聊天和好友圈里显示一个文件
 // 图片直接显示缩略图（点一下下载原图）；视频点「播放」后才下载（视频比较大，不自动下载）；
 // 其他文件显示文件名和大小，点一下下载
 import { ref, onMounted, onUnmounted } from 'vue'
-import { fileURL, downloadFile, prettySize } from '../utils/files.js'
+import { fileURL, downloadFile, prettySize } from '../utils/files'
+import type { FileInfo } from '../types'
 
-const props = defineProps({ file: Object })
+const props = defineProps<{ file?: FileInfo }>()
 const src = ref('')
 const err = ref('')
 
 onMounted(async () => {
-  if (!props.file.isImage) return
+  if (!props.file!.isImage) return
   try {
-    src.value = await fileURL(props.file.id)
+    src.value = await fileURL(props.file!.id)
   } catch (e) {
-    err.value = e.message
+    err.value = (e as Error).message
   }
 })
 // 离开时释放临时网址，不然图片一直占着内存
@@ -26,9 +27,9 @@ const loadingVideo = ref(false)
 async function playVideo() {
   loadingVideo.value = true
   try {
-    videoSrc.value = await fileURL(props.file.id)
+    videoSrc.value = await fileURL(props.file!.id)
   } catch (e) {
-    err.value = e.message
+    err.value = (e as Error).message
   } finally {
     loadingVideo.value = false
   }
@@ -37,30 +38,30 @@ onUnmounted(() => videoSrc.value && URL.revokeObjectURL(videoSrc.value))
 
 async function download() {
   try {
-    await downloadFile(props.file)
+    await downloadFile(props.file!)
   } catch (e) {
-    alert(e.message)
+    alert((e as Error).message)
   }
 }
 
 // 按扩展名给个小图标
-const ext = props.file.name.split('.').pop().toLowerCase()
+const ext = props.file!.name.split('.').pop()!.toLowerCase()
 const icon = { pdf: '📕', doc: '📘', docx: '📘', ppt: '📙', pptx: '📙', xls: '📗', xlsx: '📗', zip: '🗜️', sol: '📜', md: '📝', txt: '📝' }[ext] || '📄'
 </script>
 
 <template>
-  <img v-if="props.file.isImage && src" :src="src" :alt="props.file.name" class="pic" @click="download" title="点击下载原图" />
-  <div v-else-if="props.file.isImage" class="chip">{{ err || '图片加载中…' }}</div>
-  <video v-else-if="props.file.isVideo && videoSrc" :src="videoSrc" class="video" controls autoplay></video>
-  <button v-else-if="props.file.isVideo" class="video-cover" :disabled="loadingVideo" @click="playVideo">
+  <img v-if="props.file!.isImage && src" :src="src" :alt="props.file!.name" class="pic" @click="download" title="点击下载原图" />
+  <div v-else-if="props.file!.isImage" class="chip">{{ err || '图片加载中…' }}</div>
+  <video v-else-if="props.file!.isVideo && videoSrc" :src="videoSrc" class="video" controls autoplay></video>
+  <button v-else-if="props.file!.isVideo" class="video-cover" :disabled="loadingVideo" @click="playVideo">
     <span class="play">{{ loadingVideo ? '…' : '▶' }}</span>
-    <span>{{ err || (loadingVideo ? '视频加载中…' : props.file.name) }}</span>
-    <span class="size">{{ prettySize(props.file.size) }}</span>
+    <span>{{ err || (loadingVideo ? '视频加载中…' : props.file!.name) }}</span>
+    <span class="size">{{ prettySize(props.file!.size) }}</span>
   </button>
   <button v-else class="chip" @click="download" title="点击下载">
     <span class="icon">{{ icon }}</span>
-    <span class="name">{{ props.file.name }}</span>
-    <span class="size">{{ prettySize(props.file.size) }}</span>
+    <span class="name">{{ props.file!.name }}</span>
+    <span class="size">{{ prettySize(props.file!.size) }}</span>
   </button>
 </template>
 

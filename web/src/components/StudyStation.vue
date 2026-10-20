@@ -1,33 +1,58 @@
-<script setup>
+<script setup lang="ts">
 // 情报收集文件夹（放在情报站里，原来叫「学习站」）：我点赞过、收藏过的帖子都收在这里，方便随时复习
 // 分两栏：视频（带视频的帖子，排成网格）/ 笔记·文本（其余的帖子，排成列表，可以展开看全文）
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { useUserStore } from '../stores/user.js'
+import { useUserStore } from '../stores/user'
 import FileChip from './FileChip.vue'
 import UserAvatar from './UserAvatar.vue'
+import type { User, FileInfo } from '../types'
+
+type UserBrief = Pick<User, 'userId' | 'account' | 'nickname' | 'avatar'>
+interface Comment {
+  id: number
+  from: UserBrief
+  text: string
+  mine: boolean
+  canDelete: boolean
+}
+interface Post {
+  id: number
+  author: UserBrief
+  title: string | null
+  text: string
+  file: FileInfo | null
+  time: string
+  mine: boolean
+  friend: boolean
+  canDelete: boolean
+  likes: string[]
+  liked: boolean
+  favorited: boolean
+  comments: Comment[]
+}
 
 const userStore = useUserStore()
-const kind = ref('video')
+const kind = ref<'video' | 'text'>('video')
 // 两栏的数据一打开页面就一起取回来，切换栏目时只是「显示 / 隐藏」，不再重新请求。
 // 以前每次切换都重新请求：点得快的时候，旧请求的结果可能比新请求晚回来，把内容盖掉，看起来就是「第二次点击内容不见了」
-const lists = ref({ video: [], text: [] })
+const lists = ref<{ video: Post[]; text: Post[] }>({ video: [], text: [] })
 const items = computed(() => lists.value[kind.value])
 const keyword = ref('')
 const loading = ref(false)
 const error = ref('')
-const open = ref({}) // 笔记·文本：哪几条展开了全文 { 帖子id: true }
+const open = ref<Record<number, boolean>>({}) // 笔记·文本：哪几条展开了全文 { 帖子id: true }
 
 async function load() {
   loading.value = true
   error.value = ''
   try {
     const [video, text] = await Promise.all([
-      userStore.api('/api/social/study?kind=video'),
-      userStore.api('/api/social/study?kind=text'),
+      userStore.api<Post[]>('/api/social/study?kind=video'),
+      userStore.api<Post[]>('/api/social/study?kind=text'),
     ])
     lists.value = { video, text }
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   } finally {
     loading.value = false
   }
@@ -40,14 +65,14 @@ onMounted(load)
 // 2. 视频和笔记一起搜：记不清是视频还是笔记也没关系，结果里会标出是哪一种，还可以再按类型筛
 const chars = computed(() => [...keyword.value.toLowerCase()].filter((c) => c.trim()))
 const searching = computed(() => chars.value.length > 0)
-const resultKind = ref('all') // 搜索结果再筛一次：all 全部 / video 视频 / text 笔记
+const resultKind = ref<'all' | 'video' | 'text'>('all') // 搜索结果再筛一次：all 全部 / video 视频 / text 笔记
 
-function matchChars(text, cs) {
+function matchChars(text: string, cs: string[]) {
   let i = 0
   for (const c of text.toLowerCase()) if (c === cs[i]) i++
   return i === cs.length
 }
-const fields = (p) => [p.title, p.text, p.author.nickname, p.file?.name]
+const fields = (p: Post) => [p.title, p.text, p.author.nickname, p.file?.name]
 const hits = computed(() => ({
   video: lists.value.video.filter((p) => fields(p).some((s) => s && matchChars(s, chars.value))),
   text: lists.value.text.filter((p) => fields(p).some((s) => s && matchChars(s, chars.value))),
@@ -61,7 +86,7 @@ const shown = computed(() => items.value) // 没在搜索时：当前栏目的�
 
 // 高亮：把匹配上的字标出来，一眼看出「为什么搜到了它」
 // 返回 [{ t: '重', hit: true }, { t: '入', hit: false }, ...]；这一段文字没有完整匹配上就不高亮
-function highlight(text) {
+function highlight(text: string | null) {
   if (!text || !searching.value || !matchChars(text, chars.value)) return [{ t: text, hit: false }]
   let i = 0
   return [...text].map((c) => {
@@ -73,8 +98,8 @@ function highlight(text) {
 
 // 跳转：从搜索结果跳到它所在的栏目（视频 / 笔记），滚到那一条并闪一下
 // 比如你停在「视频」栏，搜到的是一篇笔记，点「跳转」就会切到「笔记 / 文本」栏并定位到它
-const flash = ref(null) // 正在闪烁的那条帖子 id
-async function jump(p) {
+const flash = ref<number | null>(null) // 正在闪烁的那条帖子 id
+async function jump(p: Post) {
   kind.value = p.file?.isVideo ? 'video' : 'text'
   keyword.value = ''
   open.value[p.id] = true // 笔记直接展开全文
@@ -84,7 +109,7 @@ async function jump(p) {
   setTimeout(() => flash.value === p.id && (flash.value = null), 2000)
 }
 
-async function remove(p) {
+async function remove(p: Post) {
   if (!confirm('移出情报收集文件夹？（会同时取消点赞和收藏）')) return
   await userStore.api(`/api/social/study/${p.id}`, null, 'DELETE')
   // 搜索结果里移出时，不一定是当前栏目，所以两栏都删一下
@@ -92,8 +117,8 @@ async function remove(p) {
 }
 
 // 列表里只显示前 80 个字，点「展开」看全文
-const preview = (p) => (open.value[p.id] || p.text.length <= 80 ? p.text : p.text.slice(0, 80) + '…')
-const shortTime = (t) => t.slice(0, 10)
+const preview = (p: Post) => (open.value[p.id] || p.text.length <= 80 ? p.text : p.text.slice(0, 80) + '…')
+const shortTime = (t: string) => t.slice(0, 10)
 </script>
 
 <template>
@@ -143,8 +168,8 @@ const shortTime = (t) => t.slice(0, 10)
     <!-- 用 v-show 而不是 v-if：切换栏目、搜索时卡片不会被销毁再重建，视频播放进度、展开状态也都还在 -->
     <div v-show="!searching && kind === 'video'" class="grid">
       <article v-for="p in lists.video" :id="'study-' + p.id" :key="p.id" :class="['card', 'panel', { flash: flash === p.id }]">
-        <FileChip :file="p.file" />
-        <h4>{{ p.title || p.text.slice(0, 30) || p.file.name }}</h4>
+        <FileChip :file="p.file!" />
+        <h4>{{ p.title || p.text.slice(0, 30) || p.file!.name }}</h4>
         <div class="meta">
           <UserAvatar :user="p.author" :size="22" />
           <span>{{ p.author.nickname }} · {{ shortTime(p.time) }}</span>
@@ -229,4 +254,9 @@ mark { background: rgba(252, 238, 10, 0.25); color: var(--gold); padding: 0 1px;
   50% { border-color: var(--gold); box-shadow: 0 0 24px rgba(252, 238, 10, 0.45); }
 }
 .remove:hover { color: var(--danger); }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  .search { max-width: none; width: 100%; }
+  .grid { grid-template-columns: 1fr; }
+}
 </style>

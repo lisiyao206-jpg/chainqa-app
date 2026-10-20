@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 // 大厅：沉浸式排版（参考 Of the Oak）
 // 画面是主角：紫色流动色彩（在 App.vue 里，全站共用）铺满全屏，界面只留最少的文字
 // 四个「发光点」就是四个功能入口：鼠标移上去，右侧淡入介绍；点击进入
@@ -6,7 +6,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ProfileModal from '../components/ProfileModal.vue'
 import UserAvatar from '../components/UserAvatar.vue'
-import { useUserStore } from '../stores/user.js'
+import { useUserStore } from '../stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -29,7 +29,7 @@ const spots = [
 ]
 
 // 当前「点亮」的入口：鼠标移到发光点或左侧目录上时设置，移开时清空
-const active = ref(null)
+const active = ref<string | null>(null)
 const current = computed(() => spots.find((s) => s.no === active.value))
 
 // 退出登录：和其他页面顶栏的「退出」一样，先确认，再回到登录页
@@ -39,7 +39,7 @@ async function logout() {
   router.push('/login')
 }
 
-function go(s) {
+function go(s: (typeof spots)[number]) {
   router.push(s.to)
 }
 </script>
@@ -75,7 +75,7 @@ function go(s) {
     <button
       v-for="s in spots"
       :key="s.no"
-      :class="['spot', { on: active === s.no }]"
+      :class="['spot', 's' + s.no, { on: active === s.no }]"
       :style="{ left: s.x + '%', top: s.y + '%' }"
       @mouseenter="active = s.no"
       @mouseleave="active = null"
@@ -192,4 +192,25 @@ function go(s) {
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 .slide-enter-active, .slide-leave-active { transition: all 0.5s ease; }
 .slide-enter-from, .slide-leave-to { opacity: 0; transform: translate(20px, -50%); }
+/* ===== 手机（屏幕窄于 760px） ===== */
+@media (max-width: 760px) {
+  /* 顶部只留站名和头像：导航由下面的发光点负责 */
+  .top { padding: 16px 18px; }
+  .links a:not(.brand) { display: none; }
+  .brand { font-size: 17px; }
+  .me { gap: 14px; font-size: 14px; }
+  .headline { top: 26%; width: 90%; white-space: normal; }
+  .headline h1 { font-size: 26px; letter-spacing: 4px; line-height: 1.5; }
+  .headline p { font-size: 14px; letter-spacing: 2px; }
+  /* 六个发光点排成两列三行（覆盖电脑版写在 style 里的位置） */
+  .spot { width: 64px; height: 64px; }
+  .label { left: 52px; font-size: 16px; letter-spacing: 2px; }
+  .s01, .s03, .s05 { left: 16% !important; }
+  .s02, .s04, .s06 { left: 60% !important; }
+  .s01, .s02 { top: 50% !important; }
+  .s03, .s04 { top: 63% !important; }
+  .s05, .s06 { top: 76% !important; }
+  .info { display: none; }
+  .hint { font-size: 12px; }
+}
 </style>
