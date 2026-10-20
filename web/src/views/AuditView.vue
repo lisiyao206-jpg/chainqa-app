@@ -20,6 +20,18 @@ interface AgentStep {
   args?: Record<string, unknown>
 }
 
+// 审计记录（列表里只有概要；点开一条再取完整内容）
+interface AuditRecord {
+  id: number
+  title: string
+  risk: string
+  auditCount: number
+  findingsCount: number
+  createdAt: string
+  updatedAt: string
+  repeat?: boolean
+}
+
 const userStore = useUserStore()
 const code = ref('')
 const editing = ref(true)   // true 编辑代码 / false 查看审计结果（标出问题行）
@@ -97,8 +109,59 @@ function loadSample(e: Event) {
   editing.value = true
 }
 
-async function audit() {
+// ===== 审计记录 =====
+const records = ref<AuditRecord[]>([])
+const showHistory = ref(false)
+const dup = ref<AuditRecord | null>(null)  // 这份合约以前审计过：让用户选看上次的还是重新审计
+const savedTip = ref('')
+const RISK_CLASS: Record<string, string> = { 高危: 'high', 中危: 'mid', 低危: 'low' }
+const shortTime = (t: string) => t.slice(5, 16).replace('T', ' ') // 2026-10-20T17:50:08 → 10-20 17:50
+
+async function loadRecords() {
+  try {
+    records.value = await userStore.api<AuditRecord[]>('/api/audits')
+  } catch {}
+}
+
+// 打开一条记录：代码、扫描结果、Agent 当时的每一步和报告都恢复出来，不用再花时间重新审计
+async function openRecord(id: number) {
+  try {
+    const r = await userStore.api(`/api/audits/${id}`)
+    code.value = r.code
+    findings.value = r.findings
+    steps.value = r.steps
+    report.value = r.report
+    error.value = ''
+    logId.value = rating.value = null
+    editing.value = false
+    dup.value = null
+    showHistory.value = false
+    savedTip.value = `📁 这是 ${shortTime(r.updatedAt)} 的审计记录（共审计 ${r.auditCount} 次）`
+  } catch (err) {
+    error.value = (err as Error).message
+  }
+}
+
+async function removeRecord(r: AuditRecord) {
+  if (!confirm(`删除「${r.title}」的审计记录？`)) return
+  await userStore.api(`/api/audits/${r.id}`, null, 'DELETE')
+  records.value = records.value.filter((x) => x.id !== r.id)
+}
+
+// force = true：用户看过提示，坚持要重新审计
+async function audit(force = false) {
   if (!code.value.trim() || running.value) return
+  dup.value = null
+  savedTip.value = ''
+  if (!force) {
+    try {
+      const { record } = await userStore.api<{ record: AuditRecord | null }>('/api/audits/check', { code: code.value })
+      if (record) {
+        dup.value = record
+        return
+      }
+    } catch {}
+  }
   running.value = true
   editing.value = false
   steps.value = []
@@ -134,6 +197,10 @@ async function audit() {
         else if (event === 'report') report.value = data
         else if (event === 'error') error.value = data
         else if (event === 'log') logId.value = data
+        else if (event === 'saved') {
+          savedTip.value = data.repeat ? `📁 这份合约之前审计过，已更新审计记录（共审计 ${data.auditCount} 次）` : '📁 已存入「审计记录」'
+          loadRecords()
+        }
       }
     }
   } catch (err) {
@@ -156,6 +223,7 @@ const SEV = { 高危: 'high', 中危: 'mid', 低危: 'low', 提示: 'info' }
 // 从实战任务的「让 AI 审计复盘」跳过来：网址带着 ?level=3，自动填入那一关的合约并开始审计
 const route = useRoute()
 onMounted(() => {
+  loadRecords()
   const lv = levels.find((l) => l.id === Number(route.query.level))
   if (lv) {
     code.value = lv.code.join('\n')
@@ -202,8 +270,9 @@ async function rate(r: 'up' | 'down') {
           </button>
           <input ref="imageInput" type="file" accept="image/png,image/jpeg,image/webp" hidden @change="pickImage" />
           <button v-if="!editing" class="btn" @click="editing = true">✏️ 编辑代码</button>
+          <button class="btn" @click="showHistory = true">🗂 审计记录{{ records.length ? `（${records.length}）` : '' }}</button>
           <span class="len">{{ code.length }} / 12000</span>
-          <button class="btn primary" :disabled="running || !code.trim()" @click="audit">{{ running ? '审计中…' : '🔍 开始审计' }}</button>
+          <button class="btn primary" :disabled="running || !code.trim()" @click="audit()">{{ running ? '审计中…' : '🔍 开始审计' }}</button>
         </div>
         <div v-if="reading" class="reading">🔍 视觉模型正在读截图里的代码……</div>
         <div v-else-if="visionTip" class="vision-tip">{{ visionTip }}</div>
@@ -221,7 +290,16 @@ async function rate(r: 'up' | 'down') {
 
       <!-- 右：Agent 的思考过程 + 审计报告 -->
       <section class="pane agent-pane">
-        <div v-if="!steps.length && !running && !report && !error" class="idle">
+        <!-- 这份合约以前审计过：不用再等一遍，可以直接看上次的报告 -->
+        <div v-if="dup" class="dup">
+          <span>📁 这份合约在 <b>{{ shortTime(dup.updatedAt) }}</b> 审计过（共 {{ dup.auditCount }} 次），结论：<b :class="RISK_CLASS[dup.risk]">{{ dup.risk }}</b></span>
+          <span class="dup-actions">
+            <button class="btn primary" @click="openRecord(dup.id)">查看上次的报告</button>
+            <button class="btn" @click="audit(true)">重新审计</button>
+          </span>
+        </div>
+        <div v-if="savedTip && !running" class="saved-tip">{{ savedTip }}</div>
+        <div v-if="!steps.length && !running && !report && !error && !dup" class="idle">
           <div class="big">🛡️</div>
           <p>审计 Agent 待命中</p>
           <ol>
@@ -276,6 +354,24 @@ async function rate(r: 'up' | 'down') {
         </article>
       </section>
     </div>
+
+    <!-- 审计记录 -->
+    <div v-if="showHistory" class="mask" @click.self="showHistory = false">
+      <div class="history">
+        <header>
+          <b>🗂 我的审计记录</b>
+          <span class="h-tip">同一份合约只保留一条，记录审计次数</span>
+          <button class="close" @click="showHistory = false">✕</button>
+        </header>
+        <div v-if="!records.length" class="h-empty">还没有审计记录。审计完一份合约，会自动存到这里。</div>
+        <div v-for="r in records" :key="r.id" class="h-row" @click="openRecord(r.id)">
+          <span :class="['risk', RISK_CLASS[r.risk] || 'ok']">{{ r.risk }}</span>
+          <span class="h-title">{{ r.title }}</span>
+          <span class="h-meta">{{ r.findingsCount }} 个疑似问题 · 审计 {{ r.auditCount }} 次 · {{ shortTime(r.updatedAt) }}</span>
+          <button class="h-del" title="删除" @click.stop="removeRecord(r)">删除</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -288,7 +384,10 @@ async function rate(r: 'up' | 'down') {
 .pane { display: flex; flex-direction: column; min-height: 0; background: rgba(8, 6, 24, 0.9); border: 1px solid var(--line-strong); }
 
 /* 代码 */
-.bar { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+/* 按钮多：放不下就换到第二行，按钮里的字不要被挤成竖排 */
+.bar .btn { white-space: nowrap; padding: 8px 14px; }
+.bar .sample { flex: 1 1 150px; min-width: 0; }
 .sample { padding: 7px 10px; font-size: 13px; color: var(--text); background: rgba(6, 4, 20, 0.85); border: 1px solid var(--line-strong); outline: none; cursor: pointer; }
 .reading, .vision-tip { padding: 8px 14px; font-size: 13px; border-bottom: 1px solid var(--line); }
 .reading { color: var(--accent); animation: blink 1s ease-in-out infinite; }
@@ -352,11 +451,43 @@ async function rate(r: 'up' | 'down') {
 .rate { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
 .rate button { padding: 2px 10px; cursor: pointer; background: none; border: 1px solid var(--line); border-radius: 999px; }
 .rate button.on { background: var(--accent); border-color: var(--accent); }
+/* ===== 审计记录 ===== */
+.dup {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 12px 12px 0; padding: 12px 14px; font-size: 13px; line-height: 1.6;
+  border: 1px solid var(--gold); background: rgba(252, 238, 10, 0.06);
+}
+.dup b.high { color: var(--danger); } .dup b.mid { color: #ffb86b; } .dup b.low { color: var(--gold); }
+.dup-actions { display: flex; gap: 8px; }
+.saved-tip { margin: 12px 12px 0; font-size: 12px; color: var(--ok); }
+.mask { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.7); }
+.history {
+  width: min(720px, 94vw); max-height: 80vh; overflow-y: auto; padding: 18px 20px;
+  background: rgba(8, 4, 22, 0.98); border: 1px solid var(--line-strong); box-shadow: 0 0 40px rgba(0, 240, 255, 0.15);
+}
+.history header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; color: #fff; }
+.h-tip { font-size: 12px; color: var(--text-faint); }
+.close { margin-left: auto; border: none; background: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+.h-empty { padding: 30px 0; text-align: center; color: var(--text-dim); font-size: 14px; }
+.h-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px; cursor: pointer;
+  border-bottom: 1px solid var(--line); transition: background 0.2s;
+}
+.h-row:hover { background: rgba(0, 240, 255, 0.06); }
+.risk { flex-shrink: 0; font-size: 12px; padding: 2px 8px; border: 1px solid currentColor; }
+.risk.high { color: var(--danger); } .risk.mid { color: #ffb86b; } .risk.low { color: var(--gold); } .risk.ok { color: var(--ok); }
+.h-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-family: var(--font-code); }
+.h-meta { flex-shrink: 0; font-size: 12px; color: var(--text-faint); }
+.h-del { flex-shrink: 0; border: none; background: none; color: var(--text-faint); font-size: 12px; cursor: pointer; }
+.h-del:hover { color: var(--danger); }
+
 /* ===== 手机（屏幕窄于 760px） ===== */
 @media (max-width: 760px) {
   /* 代码和报告上下排，各自能滚动 */
   .grid { grid-template-columns: 1fr; height: auto; }
   .grid > * { min-height: 360px; }
   .rel-id { min-width: 0; }
+  .h-row { flex-wrap: wrap; }
+  .h-meta { width: 100%; order: 3; }
 }
 </style>

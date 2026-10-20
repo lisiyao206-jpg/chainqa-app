@@ -95,6 +95,7 @@ function removeMistake(m) {
         <div v-for="m in mistakes.list" :key="m.id" class="item">
           <div class="item-head">
             <span :class="['tag', m.status]">{{ m.status === 'todo' ? '🔁 待温习' : '✅ 已掌握' }}</span>
+            <span v-if="(m.wrongCount ?? 1) > 1" class="tag count">错了 {{ m.wrongCount }} 次</span>
             <span class="actions">
               <button @click="mistakes.setStatus(m.id, m.status === 'todo' ? 'mastered' : 'todo')">切换状态</button>
               <button @click="removeMistake(m)">删除</button>
@@ -157,6 +158,7 @@ textarea:focus { border-color: var(--accent); }
 .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
 .tag.todo { background: rgba(255, 107, 129, 0.2); color: var(--danger); }
 .tag.mastered { background: rgba(142, 230, 196, 0.2); color: var(--ok); }
+.tag.count { margin-left: 6px; margin-right: auto; background: rgba(252, 238, 10, 0.15); color: var(--gold); }
 .actions button { border: none; background: none; color: var(--text-dim); cursor: pointer; font-size: 12px; }
 .actions button:hover { color: var(--accent); }
 .q { font-weight: bold; white-space: pre-wrap; color: #fff; }

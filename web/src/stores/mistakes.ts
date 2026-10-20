@@ -20,7 +20,8 @@ export const useMistakesStore = defineStore('mistakes', {
     // source：'manual' 自己加的 / 'game' 漏洞猎人答错自动加的
     async add(question: string, answer: string, source = 'manual') {
       const m = await useUserStore().api<Mistake>('/api/mistakes', { question, answer, source })
-      this.list.unshift(m)
+      // 同一道题又错了：后端返回的是原来那条（错的次数 +1），把旧的换掉、挪到最上面，不要重复显示
+      this.list = [m, ...this.list.filter((x) => x.id !== m.id)]
     },
     async setStatus(id: number, status: MistakeStatus) {
       const m = this.list.find((x) => x.id === id)

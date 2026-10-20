@@ -169,3 +169,7 @@ try {
 try {
   db.exec("ALTER TABLE posts ADD COLUMN title TEXT");
 } catch {}
+// 错题：同一道题错了好几次，不再重复记录，只记「错了几次」
+try {
+  db.exec("ALTER TABLE mistakes ADD COLUMN wrong_count INTEGER NOT NULL DEFAULT 1");
+} catch {}

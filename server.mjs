@@ -14,6 +14,7 @@ import * as data from "./data.mjs";
 import * as admin from "./admin.mjs";
 import * as social from "./social.mjs";
 import * as feedback from "./feedback.mjs";
+import * as audits from "./audits.mjs";
 import { runAudit } from "./agent.mjs";
 import { extractCode } from "./vision.mjs";
 import { checkInjection } from "./safety.mjs";
@@ -109,9 +110,11 @@ async function handleAudit(req, res) {
   const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   auditing.add(user.userId);
   let report = "", errMsg = null, result = { sources: [] };
+  const steps = []; // 记下 Agent 的每一步，存进审计记录
   try {
     result = await runAudit(code, (event, data) => {
       if (event === "report") report = data;
+      if (event === "step") steps.push(data);
       send(event, data);
     });
   } catch (err) {
@@ -125,6 +128,12 @@ async function handleAudit(req, res) {
     const logId = feedback.logAsk({ userId: user.userId, question: "[AI 审计] " + code.slice(0, 1500), answer: report, sources: result.sources, refused: false, error: errMsg });
     send("log", logId);
   } catch {}
+  // 存进「我的审计记录」：同一份合约不重复记录，只更新报告、审计次数 +1
+  if (report && !errMsg) {
+    try {
+      send("saved", audits.saveAudit(user.userId, { code, report, findings: result.findings, sources: result.sources, steps }));
+    } catch {}
+  }
   send("done", true);
   res.end();
 }
@@ -267,7 +276,7 @@ async function withUser(req, res, fn, { admin = false } = {}) {
 // 根据「方法 + 网址」找到对应的数据操作；找不到就返回 null
 function routeData(req, res) {
   const { method, url } = req;
-  const m = url.match(/^\/api\/(notes|mistakes)\/(\d+)$/); // 例如 /api/notes/12
+  const m = url.match(/^\/api\/(notes|mistakes|audits)\/(\d+)$/); // 例如 /api/notes/12
   const id = m ? Number(m[2]) : null;
   const W = (fn) => withUser(req, res, fn);
 
@@ -280,6 +289,12 @@ function routeData(req, res) {
   if (url === "/api/mistakes" && method === "POST") return W((uid, b) => data.addMistake(uid, b));
   if (m?.[1] === "mistakes" && method === "PUT") return W((uid, b) => data.setMistakeStatus(uid, id, b.status));
   if (m?.[1] === "mistakes" && method === "DELETE") return W((uid) => data.deleteMistake(uid, id));
+
+  // AI 审计记录：列表、查看一条、删除；开始审计前查一下这份合约以前审计过没有
+  if (url === "/api/audits" && method === "GET") return W((uid) => audits.listAudits(uid));
+  if (url === "/api/audits/check" && method === "POST") return W((uid, b) => audits.findAudit(uid, b.code));
+  if (m?.[1] === "audits" && method === "GET") return W((uid) => audits.getAudit(uid, id));
+  if (m?.[1] === "audits" && method === "DELETE") return W((uid) => audits.deleteAudit(uid, id));
 
   if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
   if (url === "/api/progress" && method === "POST") return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));

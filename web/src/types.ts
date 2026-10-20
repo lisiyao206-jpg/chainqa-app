@@ -33,6 +33,7 @@ export interface Mistake {
   answer: string
   status: MistakeStatus
   source: 'manual' | 'game' | string
+  wrongCount?: number // 这道题错了几次
 }
 
 // 教材里的一章
