@@ -7,9 +7,11 @@ import { useRouter } from 'vue-router'
 import ProfileModal from '../components/ProfileModal.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { useUserStore } from '../stores/user'
+import { useThemeStore, BACKGROUNDS } from '../stores/theme'
 
 const router = useRouter()
 const userStore = useUserStore()
+const theme = useThemeStore()
 const showProfile = ref(false)
 
 // 四个入口：x、y 是发光点在屏幕上的位置（百分比）
@@ -100,6 +102,18 @@ function go(s: (typeof spots)[number]) {
     <!-- 底部提示 -->
     <div class="hint">移动鼠标，寻找发光点 · 点击进入</div>
 
+    <!-- 左下角：换背景。点一下整个网站的背景马上跟着变，选好的会记住 -->
+    <div class="bg-switch">
+      <span class="bg-label">背景</span>
+      <button
+        v-for="b in BACKGROUNDS"
+        :key="b.id"
+        :class="{ on: theme.bg === b.id }"
+        :title="b.desc"
+        @click="theme.setBg(b.id)"
+      >{{ b.name }}</button>
+    </div>
+
     <ProfileModal v-if="showProfile" @close="showProfile = false" />
   </div>
 </template>
@@ -187,6 +201,21 @@ function go(s: (typeof spots)[number]) {
   font-size: 15px; letter-spacing: 3px; color: rgba(233, 230, 255, 0.55);
 }
 
+/* ===== 左下角：换背景 ===== */
+.bg-switch {
+  position: absolute; left: 36px; bottom: 26px; z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+}
+.bg-label { white-space: nowrap; font-size: 12px; letter-spacing: 3px; color: rgba(233, 230, 255, 0.45); margin-right: 2px; }
+.bg-switch button {
+  padding: 5px 12px; font-size: 12px; letter-spacing: 1px; cursor: pointer;
+  color: rgba(233, 230, 255, 0.65); background: rgba(5, 2, 15, 0.45);
+  border: 1px solid rgba(0, 240, 255, 0.25); border-radius: 999px;
+  backdrop-filter: blur(6px); transition: all 0.25s;
+}
+.bg-switch button:hover { color: #fff; border-color: var(--accent); }
+.bg-switch button.on { color: #fff; border-color: var(--accent); background: rgba(0, 240, 255, 0.15); box-shadow: 0 0 12px rgba(0, 240, 255, 0.35); }
+
 /* ===== 过渡动画 ===== */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
@@ -211,6 +240,7 @@ function go(s: (typeof spots)[number]) {
   .s03, .s04 { top: 63% !important; }
   .s05, .s06 { top: 76% !important; }
   .info { display: none; }
-  .hint { font-size: 12px; }
+  .hint { font-size: 12px; bottom: 64px; }
+  .bg-switch { left: 50%; transform: translateX(-50%); bottom: 18px; }
 }
 </style>

@@ -117,7 +117,8 @@ async function saveForm() {
   const f = form.value!
   try {
     if (f.mode === 'create') {
-      await userStore.api('/api/admin/users', { account: f.account, pwd: f.pwd, nickname: f.nickname, role: f.role })
+      const r = await userStore.api<{ account: string }>('/api/admin/users', { account: f.account, pwd: f.pwd, nickname: f.nickname, role: f.role })
+      if (!f.account) alert(`已创建，系统分配的账号是：${r.account}`)
     } else {
       // 密码不填就不改
       await userStore.api(`/api/admin/users/${f.userId}`, { nickname: f.nickname, role: f.role, pwd: f.pwd || undefined }, 'PUT')
@@ -226,10 +227,10 @@ onMounted(loadUsers)
       <!-- 新增 / 编辑用户 -->
       <form v-if="form" class="user-form" @submit.prevent="saveForm">
         <b>{{ form.mode === 'create' ? '新增用户' : `编辑「${form.account}」` }}</b>
-        <input v-if="form.mode === 'create'" v-model="form.account" placeholder="账号（3~20 位字母、数字、下划线）" />
+        <input v-if="form.mode === 'create'" v-model="form.account" placeholder="账号（留空自动分配 6 位数字）" />
         <input v-model="form.nickname" maxlength="12" placeholder="昵称" />
         <input v-model="form.pwd" type="password" :placeholder="form.mode === 'create' ? '密码（至少 6 位）' : '重置密码（不填就不改）'" />
-        <select v-model="form.role" :disabled="form.userId === userStore.user!.userId">
+        <select v-model="form.role" :disabled="form.userId === userStore.user?.userId">
           <option value="user">审计员</option>
           <option value="admin">管理员</option>
         </select>
@@ -264,7 +265,7 @@ onMounted(loadUsers)
               <button @click="openDetail(u)">详情</button>
               <button @click="openEdit(u)">编辑</button>
               <!-- 不能对自己操作，所以自己那一行不显示这两个按钮 -->
-              <template v-if="u.userId !== userStore.user!.userId">
+              <template v-if="u.userId !== userStore.user?.userId">
                 <button @click="toggleStatus(u)">{{ u.status === 'active' ? '禁用' : '恢复' }}</button>
                 <button class="danger" @click="removeUser(u)">删除</button>
               </template>

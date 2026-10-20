@@ -2,7 +2,7 @@
 // 只有管理员能调用：权限在 server.mjs 的 withUser(..., { admin: true }) 里检查
 
 import { db } from "./db.mjs";
-import { hashPassword } from "./auth.mjs";
+import { hashPassword, newAccountNo } from "./auth.mjs";
 
 const toISO = (t) => (t ? t.replace(" ", "T") : t);
 
@@ -58,7 +58,8 @@ export function userDetail(id) {
 
 // ===== 新增用户（管理员直接开账号，比如给评委、老师开演示账号）=====
 export function createUser({ account, pwd, nickname, role }) {
-  account = String(account || "").trim();
+  // 账号留空：和用户自己注册一样，系统发一个 6 位数字账号；也可以手动指定（比如给评委准备好记的账号）
+  account = String(account || "").trim() || newAccountNo();
   pwd = String(pwd || "");
   if (!/^[A-Za-z0-9_]{3,20}$/.test(account)) throw new Error("账号要 3~20 位，只能用字母、数字、下划线");
   if (pwd.length < 6) throw new Error("密码至少 6 位");
@@ -68,7 +69,7 @@ export function createUser({ account, pwd, nickname, role }) {
   const { lastInsertRowid } = db
     .prepare("INSERT INTO users (account, pwd, nickname, role) VALUES (?, ?, ?, ?)")
     .run(account, hashPassword(pwd), nickname, role);
-  return { userId: Number(lastInsertRowid) };
+  return { userId: Number(lastInsertRowid), account };
 }
 
 // ===== 编辑用户：改昵称、改身份、重置密码（都是可选的，传了哪个改哪个）=====

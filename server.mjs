@@ -15,6 +15,7 @@ import * as admin from "./admin.mjs";
 import * as social from "./social.mjs";
 import * as feedback from "./feedback.mjs";
 import * as audits from "./audits.mjs";
+import * as phone from "./phone.mjs";
 import { runAudit } from "./agent.mjs";
 import { extractCode } from "./vision.mjs";
 import { checkInjection } from "./safety.mjs";
@@ -227,9 +228,9 @@ async function readJSON(req) {
 
 // POST /api/register：注册（成功后直接登录）
 async function handleRegister(req, res) {
-  const { account, pwd, nickname } = await readJSON(req);
+  const { pwd, nickname } = await readJSON(req);
   try {
-    sendJSON(res, 200, register(account, pwd, nickname));
+    sendJSON(res, 200, register(pwd, nickname)); // 账号由系统分配（6 位数字）
   } catch (err) {
     sendJSON(res, 400, { error: err.message });
   }
@@ -240,6 +241,26 @@ async function handleLogin(req, res) {
   const { account, pwd } = await readJSON(req);
   try {
     sendJSON(res, 200, login(account, pwd));
+  } catch (err) {
+    sendJSON(res, 401, { error: err.message });
+  }
+}
+
+// 手机验证码：发验证码（登录用的不用登录；绑定手机号用的要先登录）、验证码登录
+async function handleSmsSend(req, res) {
+  try {
+    const { phone: p, purpose } = await readJSON(req);
+    const user = purpose === "bind" ? userFromToken(getToken(req)) : null;
+    if (purpose === "bind" && !user) return sendJSON(res, 401, { error: "请先登录" });
+    sendJSON(res, 200, await phone.sendCode(p, purpose, user?.userId));
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+  }
+}
+async function handleSmsLogin(req, res) {
+  try {
+    const { phone: p, code } = await readJSON(req);
+    sendJSON(res, 200, phone.loginByCode(p, code));
   } catch (err) {
     sendJSON(res, 401, { error: err.message });
   }
@@ -311,6 +332,7 @@ function routeData(req, res) {
   if (url === "/api/profile" && method === "GET") return W((uid) => getProfile(uid));
   if (url === "/api/profile" && method === "PUT") return W((uid, b) => updateNickname(uid, b.nickname));
   if (url === "/api/avatar" && method === "PUT") return W((uid, b) => setAvatar(uid, b.avatar));
+  if (url === "/api/phone" && method === "PUT") return W((uid, b) => phone.bindPhone(uid, b.phone, b.code));
   if (url === "/api/password" && method === "PUT") return W((uid, b) => changePassword(uid, b.oldPwd, b.newPwd));
   return null;
 }
@@ -452,6 +474,9 @@ http
     else if (req.method === "POST" && req.url === "/api/vision/code") handleVision(req, res);
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);
+    else if (req.method === "POST" && req.url === "/api/login/sms") handleSmsLogin(req, res);
+    else if (req.method === "POST" && req.url === "/api/sms/send") handleSmsSend(req, res);
+    else if (req.method === "GET" && req.url === "/api/sms/status") sendJSON(res, 200, phone.smsStatus());
     else if (req.method === "POST" && req.url === "/api/logout") handleLogout(req, res);
     else if (req.method === "GET" && req.url === "/api/me") handleMe(req, res);
     else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);

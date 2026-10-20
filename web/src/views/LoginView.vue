@@ -1,9 +1,11 @@
 <script setup lang="ts">
 // 登录 / 注册页：和大厅一样的极简排版，背景用 App.vue 里全站共用的紫色流动色彩
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
 import { useThemeStore, BACKGROUNDS } from '../stores/theme'
+import { copyText } from '../utils/clipboard'
+import { useSmsCode } from '../utils/smsCode'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -14,20 +16,60 @@ const mode = ref('login')   // 'login' 登录 / 'register' 注册
 const account = ref('')
 const pwd = ref('')
 const nickname = ref('')
+const pwd2 = ref('')        // 注册时再输一次密码
+const newAccount = ref('')  // 注册成功后系统分配的账号
+const copied = ref(false)
 const error = ref('')
 const loading = ref(false)
+
+// 登录方式：'pwd' 账号 / 手机号 + 密码，'sms' 手机号 + 验证码
+const loginWay = ref<'pwd' | 'sms'>('pwd')
+const phone = ref('')
+const code = ref('')
+const sms = useSmsCode('login')
+const smsEnabled = ref(false) // 后端没开验证码登录（.env 没写 SMS_MODE）就不显示这一栏
+onMounted(async () => {
+  try {
+    smsEnabled.value = (await userStore.api<{ enabled: boolean }>('/api/sms/status')).enabled
+  } catch {}
+})
+async function getCode() {
+  error.value = ''
+  try {
+    await sms.send(phone.value)
+  } catch (err) {
+    error.value = (err as Error).message
+  }
+}
+
+// 账号是系统分配的数字（老用户是字母、数字、下划线）；填了中文多半是把昵称当成了账号，提前提醒
+const accountHint = computed(() => {
+  if (!account.value || /^[A-Za-z0-9_]*$/.test(account.value)) return ''
+  return '请填 6 位数字账号或手机号：你填的可能是昵称'
+})
 
 async function submit() {
   error.value = ''
   loading.value = true
   try {
-    if (mode.value === 'login') await userStore.login(account.value, pwd.value)
-    else await userStore.register(account.value, pwd.value, nickname.value)
-    router.push('/') // 成功后进入大厅
+    if (mode.value === 'login') {
+      if (loginWay.value === 'sms') await userStore.loginBySms(phone.value, code.value)
+      else await userStore.login(account.value, pwd.value) // 账号或手机号都行
+      router.push('/') // 成功后进入大厅
+    } else {
+      if (pwd.value !== pwd2.value) throw new Error('两次输入的密码不一样')
+      // 注册成功：先停在这里，把分配到的账号大字显示出来，记下了再进大厅
+      newAccount.value = await userStore.register(pwd.value, nickname.value)
+    }
   } catch (err) {
     error.value = (err as Error).message
   }
   loading.value = false
+}
+
+async function copyAccount() {
+  await copyText(newAccount.value)
+  copied.value = true
 }
 
 function switchMode(m: string) {
@@ -70,9 +112,45 @@ function switchMode(m: string) {
     <form class="box glass" @submit.prevent="submit">
       <div class="eyebrow">{{ mode === 'login' ? 'Sign in' : 'Join us' }}</div>
       <h2>{{ mode === 'login' ? '欢迎回来，审计员' : '加入链上安全局' }}</h2>
-      <input v-model="account" class="input" placeholder="账号（字母、数字、下划线）" autocomplete="username" />
-      <input v-model="pwd" class="input" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
-      <input v-if="mode === 'register'" v-model="nickname" class="input" placeholder="审计员代号（昵称）" />
+      <!-- 登录：账号 + 密码。注册：只填昵称和密码，账号由系统分配 6 位数字（官方发号，不会重复） -->
+      <!-- 登录方式切换：密码登录 / 验证码登录 -->
+      <div v-if="mode === 'login' && smsEnabled" class="ways">
+        <button type="button" :class="{ on: loginWay === 'pwd' }" @click="loginWay = 'pwd'; error = ''">密码登录</button>
+        <button type="button" :class="{ on: loginWay === 'sms' }" @click="loginWay = 'sms'; error = ''">验证码登录</button>
+      </div>
+      <template v-if="mode === 'login' && loginWay === 'sms'">
+        <label class="field">
+          <span class="label">手机号</span>
+          <input v-model="phone" class="input" placeholder="已绑定的手机号" maxlength="11" inputmode="numeric" autocomplete="tel" />
+        </label>
+        <label class="field">
+          <span class="label">验证码</span>
+          <span class="code-row">
+            <input v-model="code" class="input" placeholder="6 位验证码" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+            <button type="button" class="btn get-code" :disabled="sms.countdown.value > 0 || sms.sending.value" @click="getCode">
+              {{ sms.countdown.value > 0 ? `${sms.countdown.value} 秒后重发` : '获取验证码' }}
+            </button>
+          </span>
+          <span v-if="sms.demoCode.value" class="field-tip">演示模式（不真发短信）：验证码是 {{ sms.demoCode.value }}</span>
+        </label>
+      </template>
+      <label v-else-if="mode === 'login'" class="field">
+        <span class="label">账号 / 手机号</span>
+        <input v-model="account" class="input" placeholder="6 位数字账号或手机号" autocomplete="username" />
+        <span v-if="accountHint" class="field-tip">{{ accountHint }}</span>
+      </label>
+      <label v-else class="field">
+        <span class="label">昵称</span>
+        <input v-model="nickname" class="input" placeholder="你的昵称" maxlength="12" />
+      </label>
+      <label v-if="!(mode === 'login' && loginWay === 'sms')" class="field">
+        <span class="label">密码</span>
+        <input v-model="pwd" class="input" type="password" placeholder="密码（至少 6 位）" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" />
+      </label>
+      <label v-if="mode === 'register'" class="field">
+        <span class="label">确认密码</span>
+        <input v-model="pwd2" class="input" type="password" placeholder="再输一次密码" autocomplete="new-password" />
+      </label>
       <div v-if="error" class="error">{{ error }}</div>
       <button class="btn primary submit" :disabled="loading">
         {{ loading ? '请稍候…' : mode === 'login' ? '登 录' : '注 册' }}
@@ -83,6 +161,20 @@ function switchMode(m: string) {
       </p>
       <p class="privacy">我们会记录你的登录时间，仅用于学习数据统计。</p>
     </form>
+
+    <!-- 注册成功：大字显示系统分配的账号 -->
+    <div v-if="newAccount" class="mask">
+      <div class="issued glass">
+        <div class="eyebrow">Your agent ID</div>
+        <h3>🎉 注册成功，这是你的审计员编号</h3>
+        <div class="acc-no">{{ newAccount }}</div>
+        <p>以后用这个 <b>6 位数字账号</b> + 密码登录。<br />请截图或记下来；登录后在「我的档案」里也能看到。</p>
+        <div class="issued-actions">
+          <button class="btn" type="button" @click="copyAccount">{{ copied ? '✅ 已复制' : '📋 复制账号' }}</button>
+          <button class="btn primary" type="button" @click="router.push('/')">记好了，进入大厅 →</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -106,6 +198,31 @@ function switchMode(m: string) {
 .box :deep(.input), .box .input { font-size: 16px; padding: 12px 2px; }
 .intro .eyebrow, .box .eyebrow { font-size: 13px; }
 .box h2 { margin: -8px 0 6px; font-size: 28px; font-weight: 300; letter-spacing: 3px; color: #fff; }
+.ways { display: flex; gap: 22px; margin-top: -4px; }
+.ways button {
+  position: relative; padding: 0 0 6px; border: none; background: none; cursor: pointer;
+  font-family: var(--font); font-size: 15px; letter-spacing: 1px; color: var(--text-dim);
+}
+.ways button.on { color: #fff; }
+.ways button.on::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.code-row { display: flex; align-items: flex-end; gap: 10px; }
+.code-row .input { flex: 1; min-width: 0; }
+.get-code { flex-shrink: 0; white-space: nowrap; padding: 7px 14px; font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: 2px; }
+.label { font-size: 14px; letter-spacing: 1px; color: #fff; }
+.field-tip { margin-top: 4px; font-size: 13px; color: var(--gold); }
+/* 注册成功弹窗 */
+.mask { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.7); }
+.issued { width: min(440px, 92vw); padding: 32px 30px; text-align: center; background: rgba(8, 4, 22, 0.97); border: 1px solid var(--line-strong); }
+.issued h3 { margin: 10px 0 18px; font-size: 20px; font-weight: 400; color: #fff; }
+.acc-no {
+  font-family: var(--font-code); font-size: 54px; letter-spacing: 14px; text-indent: 14px; color: #fff;
+  text-shadow: 0 0 20px var(--accent), 0 0 44px rgba(255, 43, 214, 0.5); animation: pop-in 0.6s ease-out;
+}
+@keyframes pop-in { from { transform: scale(0.6); opacity: 0; } }
+.issued p { margin: 18px 0 22px; font-size: 14px; line-height: 1.8; color: var(--text-dim); }
+.issued p b { color: var(--gold); }
+.issued-actions { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
 .submit { margin-top: 8px; padding: 14px; font-size: 17px; letter-spacing: 4px; }
 .error { color: var(--danger); font-size: 15px; }
 .switch { margin: 0; text-align: center; font-size: 15px; color: var(--text-dim); }

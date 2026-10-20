@@ -2,12 +2,13 @@
 // 个人资料弹窗：看自己的信息和学习统计，改昵称、改密码
 import { ref, onMounted } from 'vue'
 import { useUserStore } from '../stores/user'
-import { useThemeStore, BACKGROUNDS } from '../stores/theme'
 import MedalWall from './MedalWall.vue'
 import FeedbackModal from './FeedbackModal.vue'
 import UserAvatar from './UserAvatar.vue'
 import { PRESET_AVATARS } from '../data/avatars'
 import { uploadFile } from '../utils/files'
+import { copyText } from '../utils/clipboard'
+import { useSmsCode } from '../utils/smsCode'
 import type { Role } from '../types'
 
 interface Profile {
@@ -15,6 +16,7 @@ interface Profile {
   nickname: string
   role: Role
   avatar?: string | null
+  phone: string | null    // 绑定的手机号（中间 4 位打了星号）
   registerTime: string
   loginCount: number
   noteCount: number
@@ -24,7 +26,6 @@ interface Profile {
 
 const emit = defineEmits(['close'])
 const userStore = useUserStore()
-const theme = useThemeStore()
 
 const profile = ref<Profile | null>(null)
 const nickname = ref('')
@@ -114,6 +115,40 @@ async function savePassword() {
     msg.value = { ok: false, text: (err as Error).message }
   }
 }
+
+// 复制账号（登录要用）
+const accCopied = ref(false)
+async function copyAccount() {
+  await copyText(profile.value!.account)
+  accCopied.value = true
+  setTimeout(() => (accCopied.value = false), 1500)
+}
+
+// 绑定手机号
+const binding = ref(false)
+const newPhone = ref('')
+const bindCode = ref('')
+const bindMsg = ref<{ ok: boolean; text: string } | null>(null)
+const bindSms = useSmsCode('bind')
+async function sendBindCode() {
+  bindMsg.value = null
+  try {
+    await bindSms.send(newPhone.value)
+  } catch (err) {
+    bindMsg.value = { ok: false, text: (err as Error).message }
+  }
+}
+async function bindPhone() {
+  bindMsg.value = null
+  try {
+    const r = await userStore.api<{ phone: string }>('/api/phone', { phone: newPhone.value, code: bindCode.value }, 'PUT')
+    profile.value!.phone = r.phone
+    binding.value = false
+    newPhone.value = bindCode.value = ''
+  } catch (err) {
+    bindMsg.value = { ok: false, text: (err as Error).message }
+  }
+}
 </script>
 
 <template>
@@ -130,7 +165,19 @@ async function savePassword() {
         <!-- 基本信息 + 右上角的圆形头像（点一下换头像） -->
         <div class="top">
           <dl class="info">
-            <dt>账号</dt><dd>{{ profile.account }}</dd>
+            <dt>昵称</dt><dd>{{ profile.nickname }}</dd>
+            <!-- 账号放在昵称下面，随时能看到、一键复制，防止忘记 -->
+            <dt>账号</dt>
+            <dd class="acc">
+              <b>{{ profile.account }}</b>
+              <button class="copy" type="button" @click="copyAccount">{{ accCopied ? '已复制' : '复制' }}</button>
+            </dd>
+            <!-- 手机号：绑定后可以用「手机号 + 密码」或「手机号 + 验证码」登录 -->
+            <dt>手机号</dt>
+            <dd class="acc">
+              <span :class="{ dim: !profile.phone }">{{ profile.phone || '未绑定' }}</span>
+              <button class="copy" type="button" @click="binding = !binding">{{ profile.phone ? '更换' : '绑定' }}</button>
+            </dd>
             <dt>身份</dt><dd>{{ profile.role === 'admin' ? '管理员' : '审计员' }}</dd>
             <dt>入职时间</dt><dd>{{ profile.registerTime.slice(0, 10) }}</dd>
           </dl>
@@ -139,6 +186,20 @@ async function savePassword() {
             <span class="change">更换</span>
           </button>
         </div>
+
+        <!-- 绑定 / 更换手机号：先收验证码，证明手机号是你的 -->
+        <form v-if="binding" class="bind" @submit.prevent="bindPhone">
+          <input v-model="newPhone" placeholder="手机号" maxlength="11" inputmode="numeric" />
+          <span class="bind-code">
+            <input v-model="bindCode" placeholder="验证码" maxlength="6" inputmode="numeric" />
+            <button type="button" :disabled="bindSms.countdown.value > 0 || bindSms.sending.value" @click="sendBindCode">
+              {{ bindSms.countdown.value > 0 ? `${bindSms.countdown.value} 秒` : '获取验证码' }}
+            </button>
+          </span>
+          <button class="primary-btn">确认绑定</button>
+          <div v-if="bindSms.demoCode.value" class="demo">演示模式（不真发短信）：验证码是 {{ bindSms.demoCode.value }}</div>
+          <div v-if="bindMsg" :class="bindMsg.ok ? 'ok' : 'error'">{{ bindMsg.text }}</div>
+        </form>
 
         <!-- 选头像：6 个系统头像，或者上传本地图片 -->
         <div v-if="showPicker" class="picker">
@@ -170,19 +231,8 @@ async function savePassword() {
         </button>
         <FeedbackModal v-if="showFeedback" @close="showFeedback = false" />
 
+        <!-- 背景主题已经挪到大厅左下角 -->
         <!-- 改昵称 -->
-        <!-- 背景主题：点一下就换，整个网站的背景马上跟着变 -->
-        <h4>背景主题</h4>
-        <div class="themes">
-          <button
-            v-for="b in BACKGROUNDS"
-            :key="b.id"
-            :class="['theme', { on: theme.bg === b.id }]"
-            :title="b.desc"
-            @click="theme.setBg(b.id)"
-          >{{ b.name }}</button>
-        </div>
-
         <h4>修改昵称</h4>
         <form class="row" @submit.prevent="saveNickname">
           <input v-model="nickname" maxlength="12" />
@@ -266,14 +316,19 @@ form button {
 }
 .ok { color: #4ade80; font-size: 14px; }
 .error { color: #ff8a93; font-size: 14px; }
-.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.theme {
-  padding: 8px 4px; border-radius: 8px; cursor: pointer; font-size: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.04); color: #e5e7eb;
-  transition: all 0.2s;
-}
-.theme:hover { border-color: rgba(0, 240, 255, 0.7); }
-.theme.on { border-color: #00f0ff; background: rgba(0, 240, 255, 0.15); color: #fff; }
+.acc { display: flex; align-items: center; gap: 8px; }
+.acc b { font-family: var(--font-code); letter-spacing: 2px; color: var(--gold); }
+.copy { padding: 1px 8px; font-size: 11px; cursor: pointer; color: var(--text-dim); background: none; border: 1px solid var(--line-strong); border-radius: 999px; }
+.copy:hover { color: #fff; border-color: var(--accent); }
+.acc .dim { color: var(--text-faint); }
+.bind { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; padding: 12px; border: 1px solid var(--line); background: rgba(0, 240, 255, 0.04); }
+.bind input { flex: 1 1 130px; min-width: 0; padding: 7px 10px; font-size: 13px; color: var(--text); background: rgba(255, 255, 255, 0.04); border: 1px solid var(--line-strong); outline: none; }
+.bind-code { flex: 1 1 200px; display: flex; gap: 6px; }
+.bind-code button, .primary-btn { flex-shrink: 0; white-space: nowrap; padding: 7px 12px; font-size: 13px; cursor: pointer; color: var(--text); background: none; border: 1px solid var(--line-strong); }
+.bind-code button:disabled { opacity: 0.5; cursor: default; }
+.primary-btn { color: #05020f; font-weight: 600; border: none; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); }
+.bind .demo { width: 100%; font-size: 12px; color: var(--gold); }
+.bind .ok, .bind .error { width: 100%; }
 /* ===== 手机（屏幕窄于 760px） ===== */
 @media (max-width: 760px) {
   .card { width: min(380px, 94vw); }

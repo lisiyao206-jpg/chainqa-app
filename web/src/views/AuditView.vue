@@ -117,10 +117,14 @@ const savedTip = ref('')
 const RISK_CLASS: Record<string, string> = { 高危: 'high', 中危: 'mid', 低危: 'low' }
 const shortTime = (t: string) => t.slice(5, 16).replace('T', ' ') // 2026-10-20T17:50:08 → 10-20 17:50
 
+const recordsError = ref('')
 async function loadRecords() {
   try {
     records.value = await userStore.api<AuditRecord[]>('/api/audits')
-  } catch {}
+    recordsError.value = ''
+  } catch (err) {
+    recordsError.value = (err as Error).message
+  }
 }
 
 // 打开一条记录：代码、扫描结果、Agent 当时的每一步和报告都恢复出来，不用再花时间重新审计
@@ -163,6 +167,7 @@ async function audit(force = false) {
     } catch {}
   }
   running.value = true
+  let saved = false
   editing.value = false
   steps.value = []
   findings.value = []
@@ -198,6 +203,7 @@ async function audit(force = false) {
         else if (event === 'error') error.value = data
         else if (event === 'log') logId.value = data
         else if (event === 'saved') {
+          saved = true
           savedTip.value = data.repeat ? `📁 这份合约之前审计过，已更新审计记录（共审计 ${data.auditCount} 次）` : '📁 已存入「审计记录」'
           loadRecords()
         }
@@ -206,6 +212,8 @@ async function audit(force = false) {
   } catch (err) {
     error.value = (err as Error).message
   }
+  // 报告出来了却没收到「已存档」：通常是后端还是旧代码（没有更新 server.mjs / audits.mjs，或者更新后没重启）
+  if (report.value && !saved) savedTip.value = '⚠️ 这次没能存入审计记录：请确认后端已更新 server.mjs 和 audits.mjs，并且重启了 node server.mjs'
   running.value = false
 }
 
@@ -298,7 +306,7 @@ async function rate(r: 'up' | 'down') {
             <button class="btn" @click="audit(true)">重新审计</button>
           </span>
         </div>
-        <div v-if="savedTip && !running" class="saved-tip">{{ savedTip }}</div>
+        <div v-if="savedTip && !running" :class="['saved-tip', { warn: savedTip.startsWith('⚠️') }]">{{ savedTip }}</div>
         <div v-if="!steps.length && !running && !report && !error && !dup" class="idle">
           <div class="big">🛡️</div>
           <p>审计 Agent 待命中</p>
@@ -363,7 +371,8 @@ async function rate(r: 'up' | 'down') {
           <span class="h-tip">同一份合约只保留一条，记录审计次数</span>
           <button class="close" @click="showHistory = false">✕</button>
         </header>
-        <div v-if="!records.length" class="h-empty">还没有审计记录。审计完一份合约，会自动存到这里。</div>
+        <div v-if="recordsError" class="h-empty err">审计记录加载失败：{{ recordsError }}</div>
+        <div v-else-if="!records.length" class="h-empty">还没有审计记录。审计完一份合约，会自动存到这里。</div>
         <div v-for="r in records" :key="r.id" class="h-row" @click="openRecord(r.id)">
           <span :class="['risk', RISK_CLASS[r.risk] || 'ok']">{{ r.risk }}</span>
           <span class="h-title">{{ r.title }}</span>
@@ -460,6 +469,7 @@ async function rate(r: 'up' | 'down') {
 .dup b.high { color: var(--danger); } .dup b.mid { color: #ffb86b; } .dup b.low { color: var(--gold); }
 .dup-actions { display: flex; gap: 8px; }
 .saved-tip { margin: 12px 12px 0; font-size: 12px; color: var(--ok); }
+.saved-tip.warn { color: var(--gold); }
 .mask { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.7); }
 .history {
   width: min(720px, 94vw); max-height: 80vh; overflow-y: auto; padding: 18px 20px;
@@ -468,6 +478,7 @@ async function rate(r: 'up' | 'down') {
 .history header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; color: #fff; }
 .h-tip { font-size: 12px; color: var(--text-faint); }
 .close { margin-left: auto; border: none; background: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+.h-empty.err { color: var(--danger); }
 .h-empty { padding: 30px 0; text-align: center; color: var(--text-dim); font-size: 14px; }
 .h-row {
   display: flex; align-items: center; gap: 12px; padding: 12px; cursor: pointer;

@@ -43,8 +43,11 @@ export const useUserStore = defineStore('user', {
     async login(account: string, pwd: string) {
       this.saveLogin(await this.api<LoginResult>('/api/login', { account, pwd }))
     },
-    async register(account: string, pwd: string, nickname: string) {
-      this.saveLogin(await this.api<LoginResult>('/api/register', { account, pwd, nickname }))
+    // 注册只填密码和昵称，账号由系统分配（6 位数字）；返回分配到的账号，页面上大字显示给用户记下
+    async register(pwd: string, nickname: string) {
+      const r = await this.api<LoginResult>('/api/register', { pwd, nickname })
+      this.saveLogin(r)
+      return r.user.account
     },
     // 打开网页时调用：用存着的 token 问后端「我是谁」
     async fetchMe() {
@@ -54,6 +57,10 @@ export const useUserStore = defineStore('user', {
       } catch {
         this.clear() // token 过期或无效，就当没登录
       }
+    },
+    // 手机号 + 验证码登录
+    async loginBySms(phone: string, code: string) {
+      this.saveLogin(await this.api<LoginResult>('/api/login/sms', { phone, code }))
     },
     async logout() {
       try { await this.api('/api/logout', {}) } catch {}

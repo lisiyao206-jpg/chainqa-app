@@ -169,6 +169,11 @@ try {
 try {
   db.exec("ALTER TABLE posts ADD COLUMN title TEXT");
 } catch {}
+// 手机号：可以绑定一个手机号，用「手机号 + 密码」或「手机号 + 验证码」登录；一个手机号只能绑一个账号
+try {
+  db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
+} catch {}
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)");
 // 错题：同一道题错了好几次，不再重复记录，只记「错了几次」
 try {
   db.exec("ALTER TABLE mistakes ADD COLUMN wrong_count INTEGER NOT NULL DEFAULT 1");

@@ -103,20 +103,38 @@ async function send(text?: string | Event) {
 const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 const canListen = !!Recognition
 const listening = ref(false)
+const voiceTip = ref('')
 let recognizer: any = null
+let watchdog: ReturnType<typeof setTimeout> | undefined
+// 浏览器的语音识别其实是把声音发到浏览器厂商的服务器去识别：
+// Chrome 用的是谷歌的服务，在国内经常连不上或者很慢；Edge 用的是微软的服务，国内能正常用
+const isChrome = /Chrome\//.test(navigator.userAgent) && !/Edg\//.test(navigator.userAgent)
 function toggleMic() {
   if (listening.value) return recognizer?.stop()
   recognizer = new Recognition()
   recognizer.lang = 'zh-CN'
   recognizer.interimResults = true // 边说边出字
   const before = input.value
+  voiceTip.value = isChrome ? '💡 Chrome 的语音服务在国内很慢，换成 Edge 浏览器会快很多' : ''
+  // 说话后 6 秒还一个字都没出来：多半是连不上语音服务，给个提示，不让用户干等
+  clearTimeout(watchdog)
+  watchdog = setTimeout(() => {
+    if (listening.value && input.value === before) voiceTip.value = '⚠️ 语音服务一直没有响应：检查网络，或者换 Edge 浏览器试试；也可以直接打字提问'
+  }, 6000)
   recognizer.onresult = (e: any) => {
+    if (!isChrome) voiceTip.value = ''
     input.value = before + [...e.results].map((r: any) => r[0].transcript).join('')
   }
   recognizer.onerror = (e: any) => {
-    if (e.error !== 'aborted') alert(e.error === 'not-allowed' ? '请允许浏览器使用麦克风' : '语音识别出错了：' + e.error + '（语音识别需要联网）')
+    if (e.error === 'aborted' || e.error === 'no-speech') return
+    voiceTip.value = e.error === 'not-allowed' ? '⚠️ 请允许浏览器使用麦克风（地址栏左边的图标里可以打开）'
+      : e.error === 'network' ? '⚠️ 连不上语音服务（Chrome 在国内常见），请换 Edge 浏览器'
+      : '⚠️ 语音识别出错了：' + e.error
   }
-  recognizer.onend = () => (listening.value = false)
+  recognizer.onend = () => {
+    listening.value = false
+    clearTimeout(watchdog)
+  }
   recognizer.start()
   listening.value = true
 }
@@ -137,6 +155,7 @@ function speak(msg: ChatMessage, i: number) {
 onUnmounted(() => {
   speechSynthesis.cancel()
   recognizer?.abort()
+  clearTimeout(watchdog)
 })
 
 // ===== 评价这条回答（进入管理员后台的「反馈处理」）=====
@@ -193,6 +212,7 @@ async function submitRating(msg: ChatMessage) {
       </div>
     </div>
 
+    <div v-if="voiceTip" class="voice-tip">{{ voiceTip }}</div>
     <form class="input-row" @submit.prevent="send">
       <input v-model="input" :placeholder="listening ? '正在听……说完点一下麦克风' : '输入你的问题，或点 🎤 说出来'" />
       <button v-if="canListen" type="button" :class="['mic', { on: listening }]" :title="listening ? '停止' : '语音提问'" @click="toggleMic">🎤</button>
@@ -257,6 +277,7 @@ async function submitRating(msg: ChatMessage) {
   background: linear-gradient(90deg, var(--accent-strong), var(--accent));
 }
 .input-row button:disabled { opacity: 0.4; cursor: default; }
+.voice-tip { margin-bottom: 6px; font-size: 12px; color: var(--gold); }
 .mic { flex-shrink: 0; width: 40px; cursor: pointer; font-size: 16px; background: none !important; border: 1px solid var(--line-strong) !important; }
 .mic.on { border-color: var(--danger) !important; box-shadow: 0 0 14px rgba(255, 107, 129, 0.6); animation: rec 1s ease-in-out infinite; }
 @keyframes rec { 50% { box-shadow: 0 0 4px rgba(255, 107, 129, 0.3); } }

@@ -34,30 +34,53 @@ function publicUser(u) {
   return { userId: u.user_id, account: u.account, nickname: u.nickname, role: u.role, avatar: u.avatar || null };
 }
 
+// ===== 官方发号：账号由系统分配，是一个不重复的 6 位数字 =====
+// 以前让用户自己起账号，很多人把昵称当成账号填，登录时又记不清。
+// 现在注册只填昵称和密码，系统随机发一个 100000~999999 之间、还没人用过的号码（像 QQ 号）
+export function newAccountNo() {
+  const used = db.prepare("SELECT 1 FROM users WHERE account = ?");
+  for (let i = 0; i < 100; i++) {
+    const no = String(crypto.randomInt(100000, 1000000));
+    if (!used.get(no)) return no;
+  }
+  // 6 位数快用完了（几十万用户之后）：改发 7 位
+  for (;;) {
+    const no = String(crypto.randomInt(1000000, 10000000));
+    if (!used.get(no)) return no;
+  }
+}
+
 // ===== 注册 =====
-export function register(account, pwd, nickname) {
-  account = String(account || "").trim();
+export function register(pwd, nickname) {
   pwd = String(pwd || "");
-  if (!/^[A-Za-z0-9_]{3,20}$/.test(account)) throw new Error("账号要 3~20 位，只能用字母、数字、下划线");
+  nickname = moderate(String(nickname || "").trim()); // 昵称公开显示，也要过内容过滤
+  if (!nickname || nickname.length > 12) throw new Error("昵称要 1~12 个字");
   if (pwd.length < 6) throw new Error("密码至少 6 位");
 
-  const exists = db.prepare("SELECT 1 FROM users WHERE account = ?").get(account);
-  if (exists) throw new Error("这个账号已经被注册了");
-
-  // .env 里写的 ADMIN_ACCOUNT 注册时自动成为管理员（只有开发者知道）
+  const account = newAccountNo();
+  // .env 里写的 ADMIN_ACCOUNT 对应的账号是管理员（只有开发者知道）
   const role = account === process.env.ADMIN_ACCOUNT ? "admin" : "user";
   db.prepare("INSERT INTO users (account, pwd, nickname, role) VALUES (?, ?, ?, ?)")
-    .run(account, hashPassword(pwd), String(nickname || account).trim(), role);
-  return login(account, pwd);
+    .run(account, hashPassword(pwd), nickname, role);
+  return login(account, pwd); // 返回的 user 里带着新账号，前端会大字显示给用户记下
 }
 
 // ===== 登录：成功后发一个 token，并记一条登录日志 =====
+// account 可以填账号，也可以填绑定过的手机号（11 位，和 6 位账号不会撞）
 export function login(account, pwd) {
-  const u = db.prepare("SELECT * FROM users WHERE account = ?").get(String(account || "").trim());
+  account = String(account || "").trim();
+  const u = db.prepare("SELECT * FROM users WHERE account = ? OR phone = ?").get(account, account);
+  // 常见的错：把昵称当成账号来登录。昵称本来就是公开显示的，提示出来不会泄露什么
+  if (!u && db.prepare("SELECT 1 FROM users WHERE nickname = ?").get(account))
+    throw new Error(`「${account}」是昵称，不是账号。请用注册时系统分配的 6 位数字账号登录`);
   // 账号不存在和密码错误给同一个提示，不让别人试出哪些账号存在
   if (!u || !checkPassword(String(pwd || ""), u.pwd)) throw new Error("账号或密码错误");
-  if (u.status === "disabled") throw new Error("这个账号已被管理员禁用");
+  return issueSession(u);
+}
 
+// 发登录凭证：密码登录、验证码登录最后都走这里
+export function issueSession(u) {
+  if (u.status === "disabled") throw new Error("这个账号已被管理员禁用");
   const token = crypto.randomBytes(32).toString("hex");
   db.prepare(`INSERT INTO sessions (token, user_id, expire_time)
               VALUES (?, ?, datetime('now', 'localtime', '+${SESSION_DAYS} days'))`).run(token, u.user_id);
@@ -80,6 +103,7 @@ export function getProfile(userId) {
   const count = (sql) => db.prepare(sql).get(userId).n;
   return {
     ...publicUser(u),
+    phone: u.phone ? u.phone.slice(0, 3) + "****" + u.phone.slice(7) : null, // 手机号只显示前 3 位和后 4 位
     registerTime: u.register_time.replace(" ", "T"),
     loginCount: count("SELECT COUNT(*) AS n FROM login_logs WHERE user_id = ?"),
     noteCount: count("SELECT COUNT(*) AS n FROM notes WHERE user_id = ?"),
