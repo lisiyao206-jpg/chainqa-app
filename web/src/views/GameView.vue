@@ -14,6 +14,7 @@ import { levels } from '../data/levels'
 import { useGameStore } from '../stores/game'
 import { useMistakesStore } from '../stores/mistakes'
 import { useAiStore } from '../stores/ai'
+import { useUserStore } from '../stores/user'
 import MedalPopup from '../components/MedalPopup.vue'
 import MedalWall from '../components/MedalWall.vue'
 import CodeFrame from '../components/CodeFrame.vue'
@@ -160,6 +161,36 @@ function start(lv: Level) {
   startTicker()
 }
 
+// ===== 变种挑战：AI 换场景出同一类漏洞的新题 =====
+// 打通一关后，卡片上出现「🔁 变种挑战」。AI 依据教材，以这一关为样例换新场景出题
+// （考点不变，但代码、写法、藏漏洞的位置都变），由后端规则扫描器验题、存库复用。
+const user = useUserStore()
+const variantLoading = ref<number | null>(null)   // 正在出题的关卡（防止重复点击）
+const variantError = ref('')                     // 出题失败时的提示
+async function challengeVariant(lv: Level) {
+  if (variantLoading.value !== null) return
+  if (!unlocked(lv)) return
+  variantLoading.value = lv.id
+  variantError.value = ''
+  try {
+    // 传给后端的样例关卡：标题、类型、教材章节、代码、漏洞行、修复方案
+    const sample = {
+      id: lv.id, title: lv.title, type: lv.type, chapter: lv.chapter,
+      difficulty: lv.difficulty, story: lv.story, code: lv.code,
+      bugLines: lv.bugLines, fix: { lines: lv.fix.lines, options: lv.fix.options },
+    }
+    // force=false：同关已有缓存题就直接复用；想再出一道，等这道拿完了天然可按同一按钮再触发即可
+    const variantLevel = await user.api<Level>('/api/variant/generate', { baseLevel: lv.id, sample }, 'POST')
+    if (!variantLevel?.isVariant) throw new Error('出题失败，请稍后重试')
+    start(variantLevel)
+  } catch (err: any) {
+    variantError.value = err?.message || '出题失败，请稍后重试'
+    setTimeout(() => (variantError.value = ''), 2600)
+  } finally {
+    variantLoading.value = null
+  }
+}
+
 // 飘一个数字，0.9 秒后消失
 function popup(text: string, kind: string) {
   const id = ++popupId
@@ -270,6 +301,58 @@ const clearedCount = computed(() => levels.filter((l) => game.cleared[l.id]).len
 const totalStars = computed(() => levels.reduce((n, l) => n + (game.cleared[l.id] || 0), 0))
 
 const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as number) + 1))
+const editMode = ref(false)          // true = 亲手改代码编辑器；false = 四选一
+const codeText = ref('')             // 编辑器里当前代码
+const verifyState = ref<'idle' | 'checking' | 'fixed' | 'fail'>('idle')
+const verifyMsg = ref('')            // 校验结果的提示
+let lastFixed: number[] | null = null // 记录上次成功修复的行，用于标记
+// 进入亲手改代码模式：把当前关卡的漏洞行代码预填进编辑器
+function enableEditor() {  
+editMode.value = true  
+verifyState.value = 'idle'  
+verifyMsg.value = ''  
+codeText.value = level.value!.code.join('\n')
+}
+// 回到四选一
+function backToChoices() {  
+editMode.value = false  
+verifyState.value = 'idle'  
+verifyMsg.value = ''
+}
+// 提交亲手写好的代码，交给后端 /api/variant/verify 校验
+async function submitFix() {  
+if (verifyState.value === 'checking' || !level.value) return  
+const lv = level.value  
+verifyState.value = 'checking'  
+verifyMsg.value = ''  
+try {    
+const res = await user.api<{ fixed: boolean; swc?: string; remaining?: { line: number }[]; note?: string }>(      
+'/api/variant/verify',      
+{ baseLevel: lv.id, swc: LEVEL_SWC_FRONT?.[lv.id] ?? swcFor(lv), codeLines: codeText.value.split('\n') },      
+'POST'    
+)    
+if (res?.fixed) {      
+verifyState.value = 'fixed'      
+verifyMsg.value = res.note || '漏洞已修复 🎉'      
+lastFixed = (res.remaining || []).map((r) => r.line)      
+damage(40, '亲手修复 -40')      
+win()    
+} else {      
+verifyState.value = 'fail'      
+verifyMsg.value = res?.note || '还没修好，再检查一下漏洞所在的行'      
+countered()    
+}  
+} catch {    
+verifyState.value = 'fail'    
+verifyMsg.value = '校验失败，请稍后重试'  
+}
+}
+// 前端也能查到关卡对应的 SWC（与后端 LEVEL_SWC 保持一致）
+const LEVEL_SWC_FRONT: Record<number, string> = {  
+1: 'SWC-105', 2: 'SWC-101', 3: 'SWC-107', 4: 'SWC-115', 5: 'SWC-120',  
+6: 'SWC-112', 7: 'SWC-104', 8: 'SWC-113', 9: 'SWC-116', 10: 'SWC-121',
+}
+function swcFor(lv: Level) { return LEVEL_SWC_FRONT[lv.id] || '' }
 </script>
 
 <template>
@@ -310,6 +393,19 @@ const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as
           <div class="diff" :title="`难度 ${lv.difficulty} / 5`">难度 <i v-for="n in 5" :key="n" :class="{ on: n <= lv.difficulty }"></i></div>
           <div class="stars">
             <span v-for="i in 3" :key="i" :class="{ on: i <= (game.cleared[lv.id] || 0) }">★</span>
+          </div>
+          <!-- 打通一关后可发起「变种挑战」：AI 依据教材换新场景出同一类漏洞的新题（规则扫描器验过题） -->
+          <div class="card-actions">
+            <button
+              v-if="game.cleared[lv.id]"
+              class="variant-btn"
+              :class="{ loading: variantLoading === lv.id }"
+              :disabled="variantLoading !== null"
+              @click.stop="challengeVariant(lv)"
+            >
+              {{ variantLoading === lv.id ? 'AI 出题中…' : '🔁 变种挑战' }}
+              <small v-if="unlocked(lv) && game.cleared[lv.id]">换场景·同漏洞</small>
+            </button>
           </div>
           <div class="card-go">{{ unlocked(lv) ? (game.cleared[lv.id] ? '再次讨伐 →' : '开始讨伐 →') : '🔒' }}</div>
         </div>
@@ -442,9 +538,16 @@ const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as
         <div class="result-actions">
           <button @click="askMentor">🧑‍💻 请白帽导师结合教材再讲讲</button>
           <button @click="start(level)">🔄 再战一次</button>
+          <!-- 变种挑战：AI 换场景出同一类漏洞的新题（打完一关后可用，规则扫描器验过题） -->
+          <button
+            v-if="phase === 'win'"
+            :disabled="variantLoading !== null"
+            @click="challengeVariant(level)"
+          >{{ variantLoading !== null ? 'AI 出题中…' : '🔁 变种挑战（换场景·同漏洞）' }}</button>
           <button @click="reviewWithAI">🤖 让 AI 审计复盘这份合约</button>
           <button v-if="phase === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一只怪兽 →</button>
         </div>
+        <div v-if="variantError" class="variant-err">⚠ {{ variantError }}</div>
       </div>
 
       <!-- 胜利时弹出勋章 -->
@@ -494,6 +597,20 @@ const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as
 .stars { margin-top: 14px; font-size: 16px; letter-spacing: 3px; color: rgba(255, 255, 255, 0.18); }
 .stars .on { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
 .card-go { margin-top: 12px; font-size: 12px; letter-spacing: 1px; color: var(--accent-strong); }
+
+/* 变种挑战 */
+.card-actions { margin-top: 12px; display: flex; }
+.variant-btn {
+  width: 100%; padding: 8px 10px; cursor: pointer; border-radius: 6px; text-align: center;
+  font-size: 13px; letter-spacing: 1px; color: var(--accent-strong);
+  background: rgba(0, 240, 255, 0.1); border: 1px solid var(--accent-strong);
+  transition: all 0.2s;
+}
+.variant-btn:hover { background: rgba(0, 240, 255, 0.2); box-shadow: 0 0 12px rgba(0, 240, 255, 0.4); }
+.variant-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.variant-btn.loading { animation: blink 0.8s steps(2) infinite; }
+.variant-btn small { display: block; margin-top: 2px; font-size: 10px; opacity: 0.7; }
+.variant-err { margin-top: 10px; padding: 8px 12px; border-radius: 6px; text-align: center; font-size: 13px; color: var(--danger); background: rgba(255, 43, 214, 0.1); border: 1px solid var(--danger); }
 
 /* 选关卡片上的怪兽 */
 .card-monster { margin-top: 10px; font-size: 40px; line-height: 1; filter: drop-shadow(0 0 10px var(--mc)); }
@@ -588,7 +705,7 @@ const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as
   animation: steal 0.8s calc(var(--i) * 0.09s) ease-in forwards;
 }
 @keyframes steal {
-  0% { opacity: 1; translate: calc((var(--i) - 4) * 22px) calc((var(--i) % 3 - 1) * 30px); }
+  0% { opacity: 1; }
   100% { opacity: 0.2; left: var(--mx); top: var(--my); scale: 0.4; }
 }
 

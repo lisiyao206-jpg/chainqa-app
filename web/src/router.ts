@@ -20,6 +20,8 @@ const router = createRouter({
     // title 是页面名字，顶栏会显示它
     { path: '/login', component: LoginView, meta: { title: '登录', public: true } },
     { path: '/', component: LobbyView, meta: { title: '大厅' } },
+    // 预备营和训练营共用同一个阅读页面，只是读的教材不同（book: 'prep' 读区块链基础）
+    { path: '/prep', component: TextbookView, meta: { title: '预备营', book: 'prep' } },
     { path: '/camp', component: TextbookView, meta: { title: '训练营' } },
     { path: '/mentor', component: MentorView, meta: { title: '白帽导师' } },
     { path: '/archive', component: NotebookView, meta: { title: '案件档案' } },

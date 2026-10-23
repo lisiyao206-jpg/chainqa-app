@@ -14,8 +14,10 @@ const userStore = useUserStore()
 const theme = useThemeStore()
 const showProfile = ref(false)
 
-// 四个入口：x、y 是发光点在屏幕上的位置（百分比）
+// 七个入口：x、y 是发光点在屏幕上的位置（百分比）
 const spots = [
+  { no: '00', to: '/prep', title: '预备营', en: 'Prep Camp', x: 13, y: 56,
+    desc: '新手从这里开始。用生活中的比喻讲清楚区块链是什么：区块、哈希、私钥、交易、共识，以及智能合约为什么需要安全审计。' },
   { no: '01', to: '/camp', title: '训练营', en: 'Training Camp', x: 30, y: 34,
     desc: '从入门到合约安全，按章节阅读区块链教材。读到哪里不懂，选中文字就能问 AI；每一章都能一键生成思维导图。' },
   { no: '02', to: '/mentor', title: '白帽导师', en: 'White-hat Mentor', x: 66, y: 28,
@@ -31,12 +33,19 @@ const spots = [
 ]
 
 // 当前「点亮」的入口：鼠标移到发光点或左侧目录上时设置，移开时清空
+// 学习路线：预备营 → 训练营 → 实战任务 → AI 审计
+const ROUTE = [
+  { to: '/prep', title: '预备营' },
+  { to: '/camp', title: '训练营' },
+  { to: '/mission', title: '实战任务' },
+  { to: '/audit', title: 'AI 审计' },
+]
 const active = ref<string | null>(null)
 const current = computed(() => spots.find((s) => s.no === active.value))
 
 // 退出登录：和其他页面顶栏的「退出」一样，先确认，再回到登录页
 async function logout() {
-  if (!confirm(`要退出「${userStore.user?.nickname}」吗？`)) return
+  if (!confirm(`确定要退出「${userStore.user?.nickname || userStore.user?.account || '当前账号'}」吗？`)) return
   await userStore.logout()
   router.push('/login')
 }
@@ -70,6 +79,14 @@ function go(s: (typeof spots)[number]) {
       <div v-if="!current" class="headline">
         <h1>在链上，每一行代码都是边界</h1>
         <p>边读、边问、边破案，成为一名智能合约审计员</p>
+        <!-- 学习路线：第一次来的人一眼就知道从哪开始、按什么顺序学 -->
+        <div class="route">
+          <span class="r-label">学习路线</span>
+          <template v-for="(r, i) in ROUTE" :key="r.to">
+            <span v-if="i" class="r-arrow">→</span>
+            <RouterLink :to="r.to"><i>{{ i + 1 }}</i>{{ r.title }}</RouterLink>
+          </template>
+        </div>
       </div>
     </Transition>
 
@@ -148,6 +165,16 @@ function go(s: (typeof spots)[number]) {
   text-align: center; pointer-events: none; z-index: 3; white-space: nowrap;
 }
 .headline h1 { margin: 0; font-size: 46px; font-weight: 200; letter-spacing: 10px; color: #fff; text-shadow: 0 0 24px rgba(0, 240, 255, 0.35); }
+.route {
+  display: inline-flex; align-items: center; gap: 10px; margin-top: 26px; padding: 8px 18px;
+  pointer-events: auto; font-size: 14px; letter-spacing: 1px;
+  border: 1px solid rgba(0, 240, 255, 0.3); border-radius: 999px; background: rgba(5, 2, 15, 0.5); backdrop-filter: blur(6px);
+}
+.r-label { color: rgba(233, 230, 255, 0.5); margin-right: 4px; }
+.route a { color: #fff; text-decoration: none; transition: color 0.2s; }
+.route a:hover { color: var(--accent); }
+.route i { font-style: normal; display: inline-block; width: 18px; height: 18px; margin-right: 5px; line-height: 18px; text-align: center; border-radius: 50%; font-size: 11px; color: #05020f; background: var(--accent); }
+.r-arrow { color: rgba(0, 240, 255, 0.6); }
 .headline p { margin: 18px 0 0; font-size: 18px; letter-spacing: 4px; color: rgba(233, 230, 255, 0.7); }
 
 /* ===== 发光点：更大、更亮，一眼就能看到 ===== */
@@ -231,13 +258,16 @@ function go(s: (typeof spots)[number]) {
   .headline { top: 26%; width: 90%; white-space: normal; }
   .headline h1 { font-size: 26px; letter-spacing: 4px; line-height: 1.5; }
   .headline p { font-size: 14px; letter-spacing: 2px; }
-  /* 六个发光点排成两列三行（覆盖电脑版写在 style 里的位置） */
+  .route { flex-wrap: wrap; justify-content: center; gap: 6px; padding: 6px 12px; font-size: 12px; }
+  .r-label { width: 100%; text-align: center; }
+  /* 七个发光点：预备营单独在最上面，其余六个排成两列三行（覆盖电脑版写在 style 里的位置） */
   .spot { width: 64px; height: 64px; }
   .label { left: 52px; font-size: 16px; letter-spacing: 2px; }
+  .s00 { left: 38% !important; top: 40% !important; }
   .s01, .s03, .s05 { left: 16% !important; }
   .s02, .s04, .s06 { left: 60% !important; }
-  .s01, .s02 { top: 50% !important; }
-  .s03, .s04 { top: 63% !important; }
+  .s01, .s02 { top: 52% !important; }
+  .s03, .s04 { top: 64% !important; }
   .s05, .s06 { top: 76% !important; }
   .info { display: none; }
   .hint { font-size: 12px; bottom: 64px; }

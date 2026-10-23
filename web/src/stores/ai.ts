@@ -6,6 +6,7 @@ export const useAiStore = defineStore('ai', {
   state: () => ({
     open: false,      // AI 面板是否展开
     pending: '',      // 等待发送的问题（别的页面塞进来，ChatPanel 负责发出去）
+    thinking: false,  // AI 正在回答：右下角的小机器人会晃得更明显，像在说话
   }),
   actions: {
     toggle() {

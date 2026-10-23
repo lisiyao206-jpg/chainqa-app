@@ -100,12 +100,15 @@ function switchMode(m: string) {
     <section class="intro">
       <div class="eyebrow">On-chain Security Bureau</div>
       <h1>边读、边问、边破案</h1>
-      <p>一个带 AI 导师的智能合约安全学习平台</p>
-      <ul>
-        <li><span>01</span>训练营 · 读教材，选中就能问 AI</li>
-        <li><span>02</span>白帽导师 · 回答都标注教材出处</li>
-        <li><span>03</span>实战任务 · 在合约里找出漏洞</li>
-      </ul>
+      <p>从零认识区块链，一步步成长为智能合约安全审计员</p>
+      <!-- 学习路线：四步，从「区块链是什么」一路走到「审计真实合约」 -->
+      <ol class="route">
+        <li><span>01</span><b>预备营</b>认识区块链：区块、哈希、私钥、交易、共识</li>
+        <li><span>02</span><b>训练营</b>学 Solidity 与合约漏洞，学完一章打一场防御战</li>
+        <li><span>03</span><b>实战任务</b>和漏洞怪兽对战：找出漏洞，选对修法</li>
+        <li><span>04</span><b>AI 审计</b>用审计 Agent 检查真实合约，问题直通对应知识点</li>
+      </ol>
+      <p class="aside">全程有 <b>白帽导师</b> 答疑（每句话都标注教材出处），笔记和错题存进 <b>案件档案</b>，在 <b>情报站</b> 和其他审计员交流</p>
     </section>
 
     <!-- 右边：登录 / 注册 -->
@@ -190,8 +193,11 @@ function switchMode(m: string) {
 /* 左边介绍 */
 .intro h1 { margin: 16px 0 14px; font-size: 56px; font-weight: 200; letter-spacing: 8px; color: #fff; }
 .intro p { margin: 0; font-size: 18px; letter-spacing: 2px; color: var(--text-dim); }
-.intro ul { list-style: none; padding: 0; margin: 44px 0 0; font-size: 17px; line-height: 2.4; color: var(--text-dim); }
-.intro li span { display: inline-block; width: 40px; color: var(--text-faint); }
+.route { list-style: none; padding: 0; margin: 36px 0 0; font-size: 16px; line-height: 2.3; color: var(--text-dim); }
+.route li span { display: inline-block; width: 40px; color: var(--text-faint); }
+.route li b { display: inline-block; min-width: 88px; font-weight: 500; color: #fff; }
+.intro .aside { margin-top: 22px; max-width: 520px; font-size: 14px; line-height: 1.8; letter-spacing: 1px; color: var(--text-faint); }
+.intro .aside b { font-weight: 500; color: var(--accent); }
 
 /* 右边登录框 */
 .box { width: 420px; padding: 40px 38px; display: flex; flex-direction: column; gap: 20px; }
@@ -242,6 +248,17 @@ function switchMode(m: string) {
 }
 /* ===== 手机（屏幕窄于 760px） ===== */
 @media (max-width: 760px) {
-  .box { width: min(420px, 92vw); padding: 30px 22px; }
+  /* 手机：上面是标题和学习路线，下面是登录框，整页可以上下滑 */
+  .login-page { height: auto; min-height: 100vh; flex-direction: column; justify-content: flex-start; gap: 24px; padding: 64px 4vw 80px; }
+  .brand { top: 18px; left: 18px; }
+  .intro { width: 100%; }
+  .intro h1 { font-size: 30px; letter-spacing: 3px; margin: 10px 0 8px; }
+  .intro p { font-size: 14px; letter-spacing: 1px; }
+  .route { margin-top: 16px; font-size: 13px; line-height: 1.9; }
+  .route li span { width: 26px; }
+  .route li b { min-width: 64px; }
+  .intro .aside { font-size: 12px; margin-top: 12px; }
+  .box { width: 100%; padding: 26px 20px; }
+  .themes { position: static; flex-wrap: wrap; gap: 14px; font-size: 13px; }
 }
 </style>

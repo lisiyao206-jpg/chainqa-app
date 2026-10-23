@@ -17,6 +17,16 @@ const BASE = process.env.ZHIPU_BASE_URL || "https://open.bigmodel.cn/api/paas/v4
 const MODEL = "glm-4-flash";
 const MAX_STEPS = 6;          // 最多和工具来回 6 轮，防止死循环、浪费额度
 const MAX_CODE = 12000;       // 合约最长 12000 字
+// ===== 工具函数 =====
+async function fetchWithTimeout(url, opts, timeoutMs = 30000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const SYSTEM = `你是「链上安全局」的智能合约审计 Agent。你的任务：审计用户提交的 Solidity 合约，找出安全漏洞并给出修复方案。
 
@@ -75,7 +85,7 @@ const TOOLS = [
 ];
 
 async function chat(messages, withTools = true) {
-  const res = await fetch(`${BASE}/chat/completions`, {
+  const res = await fetchWithTimeout(`${BASE}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.ZHIPU_API_KEY}` },
     body: JSON.stringify({
@@ -161,7 +171,17 @@ export async function runAudit(code, emit) {
       if (r.sources) ctx.sources.push(...r.sources);
       if (call.function.name === "scan_contract") emit("findings", ctx.findings);
       emit("step", { type: "result", name: call.function.name, text: r.summary });
-      messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(r.result).slice(0, 6000) });
+      // 安全截断：保证发给模型的是合法字符串
+      const toolStr = JSON.stringify(r.result);
+      const truncated = toolStr.length > 6000 ? toolStr.slice(0, 5980) + '...(内容过长已截断)' : toolStr;
+      // 截断后 JSON 可能不合法（字符串没闭合、数组没闭合），做安全收尾
+      let safeContent = truncated;
+      try { JSON.parse(truncated); } catch {
+        const tries = [truncated + '"', truncated + '"]', truncated + '"}', truncated + '""'];
+        for (const t of tries) { try { JSON.parse(t); safeContent = t; break; } catch {} }
+        if (safeContent === truncated) safeContent = JSON.stringify("[工具返回内容过大，已截断]");
+      }
+      messages.push({ role: "tool", tool_call_id: call.id, content: safeContent });
     }
   }
 

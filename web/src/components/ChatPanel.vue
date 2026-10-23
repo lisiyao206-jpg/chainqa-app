@@ -37,6 +37,8 @@ function scrollToBottom() {
 
 // 别的页面（比如训练营选中文字）通过公告板塞进来的问题，自动发出去
 const ai = useAiStore()
+// 正在回答时告诉公告板，右下角的小机器人据此做「说话」的动作
+watch(loading, (v) => (ai.thinking = v))
 watch(
   () => ai.pending,
   (q) => {
@@ -178,7 +180,8 @@ async function submitRating(msg: ChatMessage) {
 
 <template>
   <div class="chat">
-    <div class="chat-header">🤖 AI 小助手</div>
+    <!-- 标识：白帽导师机器人的头像（public/models/mentor-avatar.png，由 3D 模型渲染而来） -->
+    <div class="chat-header"><img class="hd-icon" src="/models/mentor-avatar.png" alt="" />AI 小助手</div>
 
     <div class="messages" ref="listEl">
       <div v-if="messages.length === 0" class="empty">还没有对话，问我点什么吧～</div>
@@ -224,7 +227,8 @@ async function submitRating(msg: ChatMessage) {
 <style scoped>
 /* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
 .chat { display: flex; flex-direction: column; height: 100%; color: var(--text); }
-.chat-header { font-weight: 500; letter-spacing: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.chat-header { display: flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.hd-icon { width: 30px; height: 30px; flex-shrink: 0; filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.5)); }
 .messages { flex: 1; padding: 12px 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .empty { color: var(--text-faint); }
 .msg { font-size: 14px; line-height: 1.7; }

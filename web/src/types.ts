@@ -72,6 +72,11 @@ export interface Level {
   explanation: string
   monster: Monster
   fix: { lines: [number, number]; options: FixOption[] }
+  // 变种挑战的题带这几个字段（后端 AI 出的变种题）
+  variantId?: number    // 变种题自身 id（当作进度 key 用）
+  variantNo?: number    // 这一关的第几道变种
+  isVariant?: boolean   // 是否 AI 出的变种题
+  baseLevel?: number    // 基于哪一关（1~5）
 }
 
 // 规则扫描 / AI 审计发现的问题

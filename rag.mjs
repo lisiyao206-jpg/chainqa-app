@@ -16,11 +16,22 @@ function loadEnv() {
   }
 }
 loadEnv();
+// ===== 工具函数 =====
+async function fetchWithTimeout(url, opts, timeoutMs = 30000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 const ZHIPU_KEY = process.env.ZHIPU_API_KEY;
 const BASE = process.env.ZHIPU_BASE_URL || "https://open.bigmodel.cn/api/paas/v4";
 const DB_FILE = "vectors.json";
 const DOCS_DIR = "knowledge";
+const PREP_DIR = "prep"; // 预备营：我们自己写的区块链基础教材，也放进知识库
 
 if (!ZHIPU_KEY) {
   console.error("❌ 请在 .env 文件里填写 ZHIPU_API_KEY");
@@ -68,7 +79,7 @@ function splitDoc(text, fileName) {
 
 // ---------- 3. 向量化 ----------
 async function embed(texts) {
-  const res = await fetch(`${BASE}/embeddings`, {
+  const res = await fetchWithTimeout(`${BASE}/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZHIPU_KEY}` },
     body: JSON.stringify({ model: "embedding-3", input: texts }),
@@ -80,7 +91,8 @@ async function embed(texts) {
 
 // ---------- 4. 构建知识库 ----------
 async function build() {
-  const files = walk(DOCS_DIR);
+  // 文件名统一相对 knowledge/ 记录（预备营的文件会显示成 ../prep/...，下面改成 预备营/...）
+  const files = [...walk(DOCS_DIR), ...walk(PREP_DIR)];
   if (!files.length) {
     console.log(`❌ ${DOCS_DIR}/ 下没有 .md 或 .txt 文件`);
     return;
@@ -90,7 +102,7 @@ async function build() {
   const items = [];
   for (const f of files) {
     const content = fs.readFileSync(f, "utf-8");
-    const name = path.relative(DOCS_DIR, f);
+    const name = f.startsWith(PREP_DIR + path.sep) ? "预备营/" + path.relative(PREP_DIR, f) : path.relative(DOCS_DIR, f);
     for (const c of splitDoc(content, name)) {
       items.push({ file: name, heading: c.heading, text: c.text });
     }
@@ -132,9 +144,14 @@ async function build() {
 
 // ---------- 5. 检索 ----------
 function cosine(a, b) {
-  let dot = 0, na = 0, nb = 0;
-  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; na += a[i] ** 2; nb += b[i] ** 2; }
-  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+  let dot = 0, na = 0, nb = 0;  
+  for (let i = 0; i < a.length; i++) {    
+    dot += a[i] * b[i];    
+    na += a[i] * a[i];    
+    nb += b[i] * b[i];  
+  }  
+  const denom = Math.sqrt(na) * Math.sqrt(nb);  
+  return denom > 0 ? dot / denom : 0;
 }
 
 // 向量库只读一次，之后留在内存里（网页连续提问时不用每次重新读文件）
@@ -181,7 +198,7 @@ export async function answer(question, onDelta) {
     .map((h, i) => `[${i + 1}] 来源：${h.file} > ${h.heading}\n${h.text}`)
     .join("\n\n---\n\n");
 
-  const res = await fetch(`${BASE}/chat/completions`, {
+  const res = await fetchWithTimeout(`${BASE}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${ZHIPU_KEY}` },
     body: JSON.stringify({
@@ -199,7 +216,7 @@ export async function answer(question, onDelta) {
   // 智谱按 SSE 格式流式返回，每行形如 data: {...}
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = "";
+  let buffer = "";let parseErrors=0;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -213,7 +230,12 @@ export async function answer(question, onDelta) {
       try {
         const delta = JSON.parse(data).choices[0]?.delta?.content;
         if (delta) onDelta(delta);
-      } catch {}
+          } catch (e) {
+        if (data !== "[DONE]") {
+          parseErrors++;
+          if (parseErrors <= 3) console.warn("[RAG SSE] 解析失败:", data.slice(0, 80));
+        }
+      }
     }
   }
   return { hits, good, refused: false };

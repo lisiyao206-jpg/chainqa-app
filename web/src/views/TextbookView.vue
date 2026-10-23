@@ -16,6 +16,8 @@ interface ChapterGroup {
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
 const route = useRoute() // 网址信息：从 AI 审计跳过来时会带上 ?chapter=
+// 读哪套教材：预备营（区块链基础）还是训练营（WTF-Solidity）
+const isPrep = route.meta.book === 'prep'
 const groups = ref<ChapterGroup[]>([])
 // 哪些分组是展开的，例如 { '入门篇': true }
 const openGroups = ref<Record<string, boolean>>({})
@@ -59,7 +61,7 @@ function onDefenseDone(wall: number) {
 onMounted(async () => {
   userStore.api('/api/camp').then((d: Record<string, number>) => (defended.value = d)).catch(() => {})
   try {
-    const res = await fetch('/api/chapters')
+    const res = await fetch(isPrep ? '/api/chapters?book=prep' : '/api/chapters')
     const data: ChapterGroup[] & { error?: string } = await res.json()
     if (!res.ok) throw new Error(data.error || '加载失败')
     groups.value = data
@@ -204,7 +206,10 @@ function toggle(name: string) {
 
     <!-- 右侧：阅读区 -->
     <section class="reader glass" ref="readerEl" @scroll="onReaderScroll">
-      <div v-if="!current" class="hint">👈 从左边选一章开始训练</div>
+      <div v-if="!current" class="hint">
+        <template v-if="isPrep">👈 从左边选一章，先认识区块链是什么</template>
+        <template v-else>👈 从左边选一章开始训练<p class="prep-tip">刚接触区块链？建议先去 <RouterLink to="/prep">预备营</RouterLink> 了解基础知识</p></template>
+      </div>
       <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
       <template v-else>
         <!-- 本章工具栏 -->
@@ -312,6 +317,8 @@ function toggle(name: string) {
 }
 .zoom img { max-width: 92vw; max-height: 92vh; border-radius: var(--radius); }
 .hint { color: var(--text-faint); }
+.prep-tip { margin: 12px 0 0; font-size: 13px; }
+.prep-tip a { color: var(--accent); }
 .error { color: var(--danger); }
 
 /* 本章工具栏 */

@@ -1,9 +1,15 @@
-// chapters.mjs —— 读取教材目录和章节原文，给「训练营」页面用
+// chapters.mjs —— 读取教材目录和章节原文，给「预备营」「训练营」页面用
+//   训练营：开源教程 WTF-Solidity（knowledge/WTF-Solidity，不上传到仓库）
+//   预备营：我们自己写的区块链基础教材（prep/，原创内容，跟代码一起提交）
 
 import fs from "node:fs";
 import path from "node:path";
 
 const BOOK_DIR = path.join("knowledge", "WTF-Solidity");
+const PREP_DIR = "prep";
+// 章节编号：01_xxx（WTF 正课）、S01_xxx（合约安全）、P01_xxx（预备营）
+const ID_RE = /^(\d{2}|S\d{2}|P\d{2})_[\w-]+$/;
+const dirOf = (id) => (id.startsWith("P") ? PREP_DIR : BOOK_DIR);
 
 // 按讲数分组（和 WTF-Solidity 官方 README 的分法一致）
 const GROUPS = [
@@ -26,8 +32,22 @@ function readTitles() {
   return titles;
 }
 
+// 预备营目录：标题取每章 readme.md 第一行的「# 标题」
+function listPrep() {
+  if (!fs.existsSync(PREP_DIR)) return [];
+  const chapters = fs.readdirSync(PREP_DIR).filter((d) => /^P\d{2}_/.test(d)).sort()
+    .filter((id) => fs.existsSync(path.join(PREP_DIR, id, "readme.md")))
+    .map((id) => {
+      const first = fs.readFileSync(path.join(PREP_DIR, id, "readme.md"), "utf-8").match(/^#\s+(.+)$/m);
+      return { id, no: id.slice(0, 3), title: first ? first[1].trim() : id.slice(4) };
+    });
+  return chapters.length ? [{ name: "区块链基础", chapters }] : [];
+}
+
 // 章节目录：[{ name: "入门篇", chapters: [{ id: "01_HelloWeb3", no: "1", title: "三行代码HelloWeb3" }] }]
-export function listChapters() {
+// book = "prep" 时返回预备营的目录
+export function listChapters(book = "") {
+  if (book === "prep") return listPrep();
   if (!fs.existsSync(BOOK_DIR)) throw new Error("找不到教材，请把 WTF-Solidity 放到 knowledge/ 里");
   const titles = readTitles();
   const groups = GROUPS.map((g) => ({ name: g.name, chapters: [] }));
@@ -48,8 +68,8 @@ export function listChapters() {
 // 读取某一章的原文（Markdown）
 export function readChapter(id) {
   // 只允许形如 23_Delegatecall 的名字，防止通过 ../ 读到别的文件
-  if (!/^(\d{2}|S\d{2})_[\w-]+$/.test(id)) return null;
-  const file = path.join(BOOK_DIR, id, "readme.md");
+  if (!ID_RE.test(id)) return null;
+  const file = path.join(dirOf(id), id, "readme.md");
   if (!fs.existsSync(file)) return null;
   // 去掉开头 --- 包起来的元数据（title、tags 等），那是给教材网站用的，不是正文
   return fs.readFileSync(file, "utf-8").replace(/^---[\s\S]*?\n---\s*/, "");
@@ -57,8 +77,8 @@ export function readChapter(id) {
 
 // 找到某一章文件夹里的附带文件（插图等），返回完整路径；不安全或不存在就返回 null
 export function chapterFile(id, relPath) {
-  if (!/^(\d{2}|S\d{2})_[\w-]+$/.test(id)) return null;
-  const chapterDir = path.resolve(BOOK_DIR, id);
+  if (!ID_RE.test(id)) return null;
+  const chapterDir = path.resolve(dirOf(id), id);
   const file = path.resolve(chapterDir, relPath);
   // 防止 ../ 跳出这一章的文件夹
   if (!file.startsWith(chapterDir + path.sep)) return null;

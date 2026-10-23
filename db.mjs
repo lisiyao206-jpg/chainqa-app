@@ -178,3 +178,14 @@ db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)");
 try {
   db.exec("ALTER TABLE mistakes ADD COLUMN wrong_count INTEGER NOT NULL DEFAULT 1");
 } catch {}
+// ===== 补充索引：加速高频查询 =====
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room_id, create_time);
+  CREATE INDEX IF NOT EXISTS idx_posts_user ON posts(user_id, create_time);
+  CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions(expire_time);
+  CREATE INDEX IF NOT EXISTS idx_friends_user ON friends(user_id);
+  CREATE INDEX IF NOT EXISTS idx_posts_visibility ON posts(visibility, create_time);
+  CREATE INDEX IF NOT EXISTS idx_notes_user ON notes(user_id, update_time);
+  CREATE INDEX IF NOT EXISTS idx_mistakes_user ON mistakes(user_id, status);
+  CREATE INDEX IF NOT EXISTS idx_game_progress_user ON game_progress(user_id);
+`);

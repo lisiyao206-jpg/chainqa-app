@@ -18,6 +18,10 @@ const BG_COMPONENTS = {
   butterfly: defineAsyncComponent(() => import('./components/ButterflySand.vue')),
 }
 const theme = useThemeStore()
+// 右下角的 3D 小机器人（白帽导师），同样按需加载；加载失败就退回原来的「AI」文字按钮
+const MentorBot = defineAsyncComponent(() => import('./components/MentorBot.vue'))
+const botFailed = ref(false)
+const botHover = ref(false) // 鼠标放在机器人上：它会挥手
 
 // 当前所在的页面信息（网址、标题等）
 const route = useRoute()
@@ -34,6 +38,7 @@ watch(() => route.path, () => rain.value?.play())
 
 // 顶栏的导航，和大厅保持一致
 const nav = [
+  { to: '/prep', title: '预备营' },
   { to: '/camp', title: '训练营' },
   { to: '/mentor', title: '白帽导师' },
   { to: '/archive', title: '案件档案' },
@@ -45,7 +50,7 @@ const nav = [
 const userStore = useUserStore()
 const showProfile = ref(false)
 async function logout() {
-  if (!confirm(`要退出「${userStore.user?.nickname}」吗？`)) return
+  if (!confirm(`确定要退出「${userStore.user?.nickname || userStore.user?.account || '当前账号'}」吗？`)) return
   await userStore.logout()
   router.push('/login')
 }
@@ -100,7 +105,13 @@ async function logout() {
     <template v-if="route.path !== '/mentor'">
       <!-- 用 v-show 而不是 v-if：面板收起时只是隐藏，聊天记录不会丢 -->
       <div v-show="ai.open" class="ai-panel glass"><ChatPanel /></div>
-      <button class="ai-fab" title="AI 小助手" @click="ai.toggle()">AI</button>
+      <button v-if="botFailed" class="ai-fab" title="AI 小助手" @click="ai.toggle()">AI</button>
+      <!-- 3D 小机器人代替圆形按钮：点它打开 / 收起 AI 面板 -->
+      <button v-else :class="['ai-bot', { on: ai.open }]" title="白帽导师：点我提问" @click="ai.toggle()"
+        @mouseenter="botHover = true" @mouseleave="botHover = false">
+        <MentorBot :active="ai.open" :thinking="ai.thinking" :wave="botHover" @error="botFailed = true" />
+        <span class="bot-tip">{{ ai.open ? '收起' : '问 AI' }}</span>
+      </button>
     </template>
   </div>
 
@@ -144,8 +155,26 @@ async function logout() {
   transition: all 0.3s;
 }
 .ai-fab:hover { border-color: var(--accent); box-shadow: 0 0 28px rgba(0, 240, 255, 0.6); }
+/* 3D 小机器人：透明背景站在右下角，脚下一圈青色光 */
+.ai-bot {
+  position: fixed; right: 14px; bottom: 6px; z-index: 31;
+  width: 100px; height: 128px; padding: 0; border: none; background: none; cursor: pointer;
+  transition: transform 0.25s;
+}
+.ai-bot::before {
+  content: ''; position: absolute; left: 18%; right: 18%; bottom: 6px; height: 14px; border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 240, 255, 0.55), transparent 70%); filter: blur(2px);
+}
+.ai-bot:hover { transform: scale(1.06); }
+.bot-tip {
+  position: absolute; right: 86%; top: 22%; padding: 4px 10px; white-space: nowrap;
+  font-size: 12px; letter-spacing: 1px; color: #fff; pointer-events: none;
+  background: var(--glass-strong); border: 1px solid var(--line-strong); border-radius: 999px;
+  opacity: 0; transform: translateX(6px); transition: all 0.25s;
+}
+.ai-bot:hover .bot-tip, .ai-bot.on .bot-tip { opacity: 1; transform: none; }
 .ai-panel {
-  position: fixed; right: 28px; bottom: 94px; z-index: 30;
+  position: fixed; right: 28px; bottom: 140px; z-index: 30;
   width: 380px; height: min(540px, calc(100vh - 130px));
   padding: 18px; background: var(--glass-strong);
 }
@@ -164,6 +193,7 @@ async function logout() {
   .me a { white-space: nowrap; }
   .content { padding: 6px 12px 80px; }
   .ai-fab { right: 16px; bottom: 16px; width: 46px; height: 46px; }
-  .ai-panel { left: 8px; right: 8px; bottom: 72px; width: auto; height: calc(100vh - 150px); }
+  .ai-bot { right: 4px; bottom: 2px; width: 76px; height: 98px; }
+  .ai-panel { left: 8px; right: 8px; bottom: 104px; width: auto; height: calc(100vh - 150px); }
 }
 </style>
