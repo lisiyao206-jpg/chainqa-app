@@ -19,6 +19,7 @@ import * as phone from "./phone.mjs";
 import { runAudit } from "./agent.mjs";
 import { extractCode } from "./vision.mjs";
 import { checkInjection } from "./safety.mjs";
+import { generateVariant, getVariant, getVariantByLevel, listVariants, LEVEL_SWC, isGenerating, prewarmLevel, verifyUserFix } from "./variant.mjs";
 
 const PORT = process.env.PORT || 3000;
 // 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
@@ -30,10 +31,14 @@ const TYPES = {
 };
 
 // 读取请求体（问题以 JSON 形式发过来）
-function readBody(req) {
+function readBody(req, maxBytes = 1024 * 1024) {
   return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (c) => (data += c));
+    let data = "", size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > maxBytes) { req.destroy(); reject(new Error("请求体太大（上限 1MB）")); return; }
+      data += c;
+    });
     req.on("end", () => resolve(data));
     req.on("error", reject);
   });
@@ -154,6 +159,69 @@ async function handleVision(req, res) {
   }
 }
 
+// POST /api/variant/generate：出一道实战「变种挑战」题（AI 出题 + 扫描器验题 + 存库）
+// body: { baseLevel: 1~5, sample: 前端样例关卡数据(Level), force: 是否强制新出一题 }
+// force=false：同一关已有缓存题就直接复用，不重复花额度
+// force=true（再出一道）：AI 重新出一题并存库
+//
+// 其余变种接口（取题 / 列表）都在 routeVariant 里，登录即可用。
+async function handleVariantGenerate(req, res) {
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "请先登录" });
+  const { baseLevel, sample, force } = await readJSON(req);
+  if (!LEVEL_SWC[Number(baseLevel)]) return sendJSON(res, 400, { error: "没有这一关，无法出变种题" });
+  if (isGenerating(user.userId)) return sendJSON(res, 429, { error: "正在出题，请稍等片刻" });
+  try {
+    const level = await generateVariant(user.userId, baseLevel, sample, { force: !!force });
+    sendJSON(res, 200, level);
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+  }
+}
+
+// 亲手改代码：POST /api/variant/verify
+// body: { swc: "SWC-105", code: 用户改完的完整合约代码(string[] 或 string) }
+// 用规则扫描器判断目标 SWC 是否还存在，扫不出 = 修好了。
+async function handleVariantVerifyFix(req, res) {
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "请先登录" });
+  try {
+    const { swc, code } = await readJSON(req);
+    const result = verifyUserFix(swc, code);
+    sendJSON(res, 200, result);
+  } catch (err) {
+    sendJSON(res, 400, { error: err.message });
+  }
+}
+
+// 变种关卡的路由：取题 / 列表（登录即可用）
+function routeVariant(req, res) {
+  const { method } = req;
+  const [pathname] = req.url.split("?");
+  if (!pathname.startsWith("/api/variant")) return null;
+  const user = userFromToken(getToken(req));
+  if (!user) return sendJSON(res, 401, { error: "请先登录" });
+
+  // GET /api/variant/level/{baseLevel}：这一关有没有已缓存 / 已存在的变种题（有就复用）
+  let m;
+  if ((m = pathname.match(/^\/api\/variant\/level\/(\d+)$/)) && method === "GET") {
+    const level = getVariantByLevel(user.userId, Number(m[1]));
+    return sendJSON(res, 200, level ? { level } : { level: null });
+  }
+  // GET /api/variant/level/{baseLevel}/list：这一关出过的全部变种题列表
+  if ((m = pathname.match(/^\/api\/variant\/level\/(\d+)\/list$/)) && method === "GET") {
+    return sendJSON(res, 200, listVariants(Number(m[1])));
+  }
+  // GET /api/variant/{id}：取某一道变种题
+  if ((m = pathname.match(/^\/api\/variant\/(\d+)$/)) && method === "GET") {
+    const level = getVariant(user.userId, Number(m[1]));
+    if (!level) return sendJSON(res, 404, { error: "没有这道变种题" });
+    return sendJSON(res, 200, level);
+  }
+  // 其它 /api/variant/*（如 POST /api/variant/generate）不归这里管：放行给后续路由，避免抢占
+  return null;
+}
+
 // 返回 JSON 的小工具
 function sendJSON(res, status, data) {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -163,7 +231,8 @@ function sendJSON(res, status, data) {
 // GET /api/chapters：章节目录（分组）
 function handleChapters(req, res) {
   try {
-    sendJSON(res, 200, listChapters());
+    // ?book=prep：预备营的目录；不带参数：训练营的目录
+    sendJSON(res, 200, listChapters(new URL(req.url, "http://x").searchParams.get("book") || ""));
   } catch (err) {
     sendJSON(res, 500, { error: err.message });
   }
@@ -220,7 +289,7 @@ function getToken(req) {
 // 读取 JSON 格式的请求体
 async function readJSON(req) {
   try {
-    return JSON.parse(await readBody(req));
+    return JSON.parse(await readBody(req, 512 * 1024)); // JSON 接口限制 512KB
   } catch {
     return {};
   }
@@ -318,7 +387,15 @@ function routeData(req, res) {
   if (m?.[1] === "audits" && method === "DELETE") return W((uid) => audits.deleteAudit(uid, id));
 
   if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
-  if (url === "/api/progress" && method === "POST") return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));
+  // 记录通关：先存进度，再在后台给这一关预热变种题（fire-and-forget，不阻塞保存响应）
+  // 只对基础关卡(1~5)预热；变种关自身(levelId 是变种 id)不再触发，避免套娃。
+  if (url === "/api/progress" && method === "POST")
+    return W((uid, b) => {
+      const r = data.saveProgress(uid, b.levelId, b.star);
+      const lv = Number(b.levelId);
+      if (lv >= 1 && lv <= 10) prewarmLevel(lv).catch((e) => console.log(`[预热] 触发失败: ${e?.message}`));
+      return r;
+    });
 
   // 意见反馈：提交、看我的反馈（带管理员回复）、有几条新回复
   if (url === "/api/feedback" && method === "POST") return W((uid, b) => feedback.addFeedback(uid, b));
@@ -442,10 +519,12 @@ function routeSocial(req, res) {
 function handleStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   let file = path.join(PUBLIC_DIR, path.normalize(urlPath));
-  // 防止通过 ../ 读到 web/dist 以外的文件（比如 .env）
-  if (!file.startsWith(PUBLIC_DIR)) {
-    res.writeHead(404);
-    return res.end("Not Found");
+  // 用 resolve 得到绝对路径，防止 ../ 穿越
+  const absFile = path.resolve(file);
+  const absPublic = path.resolve(PUBLIC_DIR);
+  if (!absFile.startsWith(absPublic + path.sep) && absFile !== absPublic) {
+    res.writeHead(403);
+    return res.end("Forbidden");
   }
   // 找不到文件、或者是 /camp 这种页面地址时，都返回 index.html，
   // 由前端路由决定显示哪个页面（否则在 /camp 页面按刷新会 404）
@@ -456,11 +535,19 @@ function handleStatic(req, res) {
     }
     file = path.join(PUBLIC_DIR, "index.html");
   }
-  res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream" });
-  fs.createReadStream(file).pipe(res);
+  const ext = path.extname(file);
+  const isHashed = /\.[0-9a-f]{7,}\./i.test(path.basename(file)); // 文件名带 hash（如 app.a1b2c3d4.js）
+  const cacheControl = isHashed
+    ? "public, max-age=31536000, immutable"   // 带 hash 的资源：缓存一年
+    : (ext === ".html" ? "no-cache" : "public, max-age=3600"); // HTML 不缓存；其它 1 小时
+  res.writeHead(200, {
+    "Content-Type": TYPES[ext] || "application/octet-stream",
+    "Cache-Control": cacheControl,
+  });
+ fs.createReadStream(file).pipe(res);
 }
 
-http
+const server=http
   .createServer((req, res) => {
     const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
     const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
@@ -469,9 +556,12 @@ http
     if (routeData(req, res) !== null) return; // 笔记、错题、关卡进度
     if (routeAdmin(req, res) !== null) return; // 管理员后台
     if (routeSocial(req, res) !== null) return; // 情报站
+    if (routeVariant(req, res) !== null) return; // 实战变种关卡
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "POST" && req.url === "/api/agent/audit") handleAudit(req, res);
     else if (req.method === "POST" && req.url === "/api/vision/code") handleVision(req, res);
+    else if (req.method === "POST" && req.url === "/api/variant/generate") handleVariantGenerate(req, res);
+    else if (req.method === "POST" && req.url === "/api/variant/verify") handleVariantVerifyFix(req, res);
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);
     else if (req.method === "POST" && req.url === "/api/login/sms") handleSmsLogin(req, res);
@@ -479,7 +569,7 @@ http
     else if (req.method === "GET" && req.url === "/api/sms/status") sendJSON(res, 200, phone.smsStatus());
     else if (req.method === "POST" && req.url === "/api/logout") handleLogout(req, res);
     else if (req.method === "GET" && req.url === "/api/me") handleMe(req, res);
-    else if (req.method === "GET" && req.url === "/api/chapters") handleChapters(req, res);
+    else if (req.method === "GET" && req.url.split("?")[0] === "/api/chapters") handleChapters(req, res);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
     else if (req.method === "GET" && mindmapMatch) handleMindmap(req, res, mindmapMatch[1]);
     else if (req.method === "GET" && quizMatch) handleQuiz(req, res, quizMatch[1]);
@@ -491,3 +581,15 @@ http
     }
   })
   .listen(PORT, () => console.log(`✅ 链知答已启动：http://localhost:${PORT}`));
+// ===== 优雅关闭 =====
+for (const sig of ["SIGINT", "SIGTERM"]) {
+  process.on(sig, async () => {
+    console.log(`\n收到 ${sig}，正在关闭...`);
+    server.close(async () => {
+      try { const { db } = await import("./db.mjs"); db.close?.(); } catch {}
+      console.log("✅ 已安全关闭");
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(1), 5000);
+  });
+}
