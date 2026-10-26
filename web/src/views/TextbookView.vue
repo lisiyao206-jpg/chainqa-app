@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { useAiStore } from '../stores/ai'
 import { useNotesStore } from '../stores/notes'
 import MindmapModal from '../components/MindmapModal.vue'
 import DefenseModal from '../components/DefenseModal.vue'
+import VideoPanel from '../components/VideoPanel.vue'
 import { useUserStore } from '../stores/user'
 import type { Chapter } from '../types'
+
 
 interface ChapterGroup {
   name: string
@@ -160,6 +162,15 @@ async function saveSelected() {
 // ===== 思维导图 =====
 const showMindmap = ref(false)
 
+// ===== 视频讲解 =====
+const videoChapterId = computed(() => {
+  if (!current.value) return ''
+  const id = current.value.id
+  const m = id.match(/^([A-Z]\d{2})_/)
+  return m ? m[1] : id
+})
+const videoChapterTitle = computed(() => current.value?.title || '')
+
 // ===== 点击插图放大 =====
 // 正在放大查看的图片地址，空字符串表示没有放大
 const zoomSrc = ref('')
@@ -217,6 +228,12 @@ function toggle(name: string) {
           <button @click="showMindmap = true">🧠 本章思维导图</button>
           <button class="defense-btn" @click="startDefense">🛡 防御战{{ defended[current.id] > 0 ? ` · 最好 ${defended[current.id]}%` : '' }}</button>
         </div>
+        <!-- 视频讲解区域（始终可见，紧跟标题下方） -->
+        <VideoPanel
+          :chapter-id="videoChapterId"
+          :chapter-title="videoChapterTitle"
+          :chapter-no="current.no"
+        />
         <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
       </template>
     </section>

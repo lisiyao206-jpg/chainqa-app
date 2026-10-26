@@ -5,8 +5,10 @@ import { useUserStore } from '../stores/user'
 import { renderMarkdown } from '../utils/markdown'
 import type { Source } from '../types'
 
-// 对话记录：每条是 { role: 'user' | 'bot', text, sources, error, logId, rating }
-// logId 是后端问答日志的编号，有了它才能给这条回答点「有帮助 / 没帮助」
+// ===== 语音识别：用浏览器自带的 SpeechRecognition =====
+// Edge 浏览器走的是微软的语音服务，国内速度很快，免费，不需要配置密钥
+
+// 对话记录
 interface ChatMessage {
   role: 'user' | 'bot'
   text: string
@@ -20,11 +22,8 @@ interface ChatMessage {
 }
 const userStore = useUserStore()
 const messages = ref<ChatMessage[]>([])
-// 输入框里的内容
 const input = ref('')
-// AI 是否正在回答（回答时禁用发送按钮）
 const loading = ref(false)
-// 消息区的 DOM 元素，用来自动滚到底部
 const listEl = ref<HTMLDivElement | null>(null)
 
 function scrollToBottom() {
@@ -33,11 +32,8 @@ function scrollToBottom() {
   })
 }
 
-// 把 AI 回答里的 Markdown 转成 HTML：和 AI 审计报告共用一份（utils/markdown.js）
-
-// 别的页面（比如训练营选中文字）通过公告板塞进来的问题，自动发出去
+// 别的页面通过公告板塞进来的问题，自动发出去
 const ai = useAiStore()
-// 正在回答时告诉公告板，右下角的小机器人据此做「说话」的动作
 watch(loading, (v) => (ai.thinking = v))
 watch(
   () => ai.pending,
@@ -49,13 +45,11 @@ watch(
   { immediate: true }
 )
 
-// text 不传时，发送输入框里的内容
 async function send(text?: string | Event) {
   const question = (typeof text === 'string' ? text : input.value).trim()
   if (!question || loading.value) return
 
   messages.value.push({ role: 'user', text: question })
-  // 先放一条空的 AI 消息，后面一个字一个字往里填
   messages.value.push({ role: 'bot', text: '', sources: [], error: '', logId: null, rating: null, reason: '', askReason: false, thanks: false })
   const bot = messages.value[messages.value.length - 1]
   if (typeof text !== 'string') input.value = ''
@@ -63,16 +57,13 @@ async function send(text?: string | Event) {
   scrollToBottom()
 
   try {
-    // 发给后端（Vite 会把 /api 转到 3000 端口的 server.mjs）
     const res = await fetch('/api/ask', {
       method: 'POST',
-      // 带上登录凭证：后端才知道是谁问的（写进问答日志），也才能评价这条回答
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userStore.token}` },
       body: JSON.stringify({ question }),
     })
     if (!res.ok) throw new Error('请求失败，后端开着吗？')
 
-    // 后端用 SSE 流式返回，每段形如：event: delta \n data: "一段文字"
     const reader = res.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
@@ -100,52 +91,72 @@ async function send(text?: string | Event) {
   loading.value = false
 }
 
-// ===== 语音（多模态）：🎤 说话提问、🔊 朗读回答 =====
-// 用的是浏览器自带的语音识别和语音合成，不花 AI 额度。Chrome / Edge 支持；不支持的浏览器不显示麦克风按钮
+// ===== 语音识别：浏览器自带 SpeechRecognition（Edge 走微软服务，国内快） =====
 const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-const canListen = !!Recognition
+const canListen = ref(!!Recognition)
 const listening = ref(false)
 const voiceTip = ref('')
 let recognizer: any = null
 let watchdog: ReturnType<typeof setTimeout> | undefined
-// 浏览器的语音识别其实是把声音发到浏览器厂商的服务器去识别：
-// Chrome 用的是谷歌的服务，在国内经常连不上或者很慢；Edge 用的是微软的服务，国内能正常用
-const isChrome = /Chrome\//.test(navigator.userAgent) && !/Edg\//.test(navigator.userAgent)
+
 function toggleMic() {
-  if (listening.value) return recognizer?.stop()
+  if (listening.value) {
+    recognizer?.stop()
+    return
+  }
+
+  if (!Recognition) {
+    voiceTip.value = '⚠️ 当前浏览器不支持语音识别，请用 Edge 或 Chrome 浏览器'
+    return
+  }
+
   recognizer = new Recognition()
   recognizer.lang = 'zh-CN'
   recognizer.interimResults = true // 边说边出字
+
   const before = input.value
-  voiceTip.value = isChrome ? '💡 Chrome 的语音服务在国内很慢，换成 Edge 浏览器会快很多' : ''
-  // 说话后 6 秒还一个字都没出来：多半是连不上语音服务，给个提示，不让用户干等
+  voiceTip.value = ''
+  listening.value = true
+
+  // 说话后 5 秒没反应，提示用户
   clearTimeout(watchdog)
   watchdog = setTimeout(() => {
-    if (listening.value && input.value === before) voiceTip.value = '⚠️ 语音服务一直没有响应：检查网络，或者换 Edge 浏览器试试；也可以直接打字提问'
-  }, 6000)
+    if (listening.value && input.value === before) {
+      voiceTip.value = '️ 语音服务没响应，请检查麦克风权限，或换 Edge 浏览器试试'
+    }
+  }, 5000)
+
+  // 中间结果（边说边出字）
   recognizer.onresult = (e: any) => {
-    if (!isChrome) voiceTip.value = ''
-    input.value = before + [...e.results].map((r: any) => r[0].transcript).join('')
+    const transcript = [...e.results].map((r: any) => r[0].transcript).join('')
+    input.value = before + transcript
+    voiceTip.value = ''
   }
+
+  // 错误处理
   recognizer.onerror = (e: any) => {
     if (e.error === 'aborted' || e.error === 'no-speech') return
-    voiceTip.value = e.error === 'not-allowed' ? '⚠️ 请允许浏览器使用麦克风（地址栏左边的图标里可以打开）'
-      : e.error === 'network' ? '⚠️ 连不上语音服务（Chrome 在国内常见），请换 Edge 浏览器'
-      : '⚠️ 语音识别出错了：' + e.error
+    voiceTip.value = e.error === 'not-allowed'
+      ? '️ 请允许浏览器使用麦克风（地址栏左边🔒图标里可以打开）'
+      : e.error === 'network'
+        ? '⚠️ 连不上语音服务，请换 Edge 浏览器试试'
+        : '️ 语音识别出错了：' + e.error
   }
+
+  // 识别结束
   recognizer.onend = () => {
     listening.value = false
     clearTimeout(watchdog)
   }
+
   recognizer.start()
-  listening.value = true
 }
 
-// 朗读：去掉代码块和 Markdown 符号再读，代码读出来没意义
+// 朗读：去掉代码块和 Markdown 符号再读
 const speakingIdx = ref(-1)
 function speak(msg: ChatMessage, i: number) {
   speechSynthesis.cancel()
-  if (speakingIdx.value === i) return (speakingIdx.value = -1) // 再点一次就停止
+  if (speakingIdx.value === i) return (speakingIdx.value = -1)
   const text = msg.text.replace(/```[\s\S]*?```/g, '（代码略）').replace(/[`*#>]|\[\d+\]/g, '')
   const u = new SpeechSynthesisUtterance(text)
   u.lang = 'zh-CN'
@@ -154,17 +165,18 @@ function speak(msg: ChatMessage, i: number) {
   speakingIdx.value = i
   speechSynthesis.speak(u)
 }
+
 onUnmounted(() => {
   speechSynthesis.cancel()
   recognizer?.abort()
   clearTimeout(watchdog)
 })
 
-// ===== 评价这条回答（进入管理员后台的「反馈处理」）=====
+// ===== 评价 =====
 async function rate(msg: ChatMessage, rating: 'up' | 'down') {
   msg.rating = rating
   msg.thanks = false
-  msg.askReason = rating === 'down' // 没帮助：请用户说说哪里不好
+  msg.askReason = rating === 'down'
   if (rating === 'up') await submitRating(msg)
 }
 async function submitRating(msg: ChatMessage) {
@@ -180,17 +192,13 @@ async function submitRating(msg: ChatMessage) {
 
 <template>
   <div class="chat">
-    <!-- 标识：白帽导师机器人的头像（public/models/mentor-avatar.png，由 3D 模型渲染而来） -->
     <div class="chat-header"><img class="hd-icon" src="/models/mentor-avatar.png" alt="" />AI 小助手</div>
 
     <div class="messages" ref="listEl">
       <div v-if="messages.length === 0" class="empty">还没有对话，问我点什么吧～</div>
 
       <div v-for="(msg, i) in messages" :key="i" :class="['msg', msg.role]">
-        <!-- 用户的问题：直接显示文字 -->
         <template v-if="msg.role === 'user'">{{ msg.text }}</template>
-
-        <!-- AI 的回答：渲染 Markdown + 引用来源 -->
         <template v-else>
           <div v-if="!msg.text && !msg.error" class="thinking">正在翻教材…</div>
           <div v-html="renderMarkdown(msg.text)"></div>
@@ -200,7 +208,6 @@ async function submitRating(msg: ChatMessage) {
             <p>{{ s.file }}</p>
             <p>{{ s.text }}…</p>
           </details>
-          <!-- 评价：这条回答有没有帮到你 -->
           <div v-if="msg.logId" class="rate">
             <button :class="{ on: msg.rating === 'up' }" @click="rate(msg, 'up')">👍 有帮助</button>
             <button :class="{ on: msg.rating === 'down' }" @click="rate(msg, 'down')">👎 没帮助</button>
@@ -217,27 +224,34 @@ async function submitRating(msg: ChatMessage) {
 
     <div v-if="voiceTip" class="voice-tip">{{ voiceTip }}</div>
     <form class="input-row" @submit.prevent="send">
-      <input v-model="input" :placeholder="listening ? '正在听……说完点一下麦克风' : '输入你的问题，或点 🎤 说出来'" />
-      <button v-if="canListen" type="button" :class="['mic', { on: listening }]" :title="listening ? '停止' : '语音提问'" @click="toggleMic">🎤</button>
-      <button :disabled="loading">{{ loading ? '回答中' : '发送' }}</button>
+      <input v-model="input" :placeholder="listening ? '正在听……说完点一下麦克风' : '输入你的问题，或点麦克风说出来'" />
+      <button type="button" :class="['mic-btn', { active: listening }]" @click="toggleMic" :title="listening ? '停止录音' : '语音提问'">
+        <span class="mic-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </span>
+      </button>
+      <button class="send-btn" :disabled="loading">{{ loading ? '回答中' : '发送' }}</button>
     </form>
   </div>
 </template>
 
 <style scoped>
-/* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
+/* 赛博朋克深色版 */
 .chat { display: flex; flex-direction: column; height: 100%; color: var(--text); }
 .chat-header { display: flex; align-items: center; gap: 10px; font-weight: 500; letter-spacing: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .hd-icon { width: 30px; height: 30px; flex-shrink: 0; filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.5)); }
 .messages { flex: 1; padding: 12px 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 .empty { color: var(--text-faint); }
 .msg { font-size: 14px; line-height: 1.7; }
-/* 我的问题：品红 → 青的渐变气泡 */
 .msg.user {
   align-self: flex-end; max-width: 85%; padding: 6px 12px; border-radius: 10px 10px 2px 10px;
   background: linear-gradient(90deg, rgba(255, 43, 214, 0.85), rgba(0, 200, 255, 0.85)); color: #fff;
 }
-/* AI 的回答：深色半透明面板 + 青色细边框 */
 .msg.bot {
   padding: 10px 12px; border-radius: 2px 10px 10px 10px;
   background: rgba(10, 8, 30, 0.75); border: 1px solid var(--line); color: var(--text);
@@ -269,20 +283,77 @@ async function submitRating(msg: ChatMessage) {
 .reason button { padding: 4px 10px; font-size: 12px; cursor: pointer; color: #05020f; background: var(--accent); border: none; }
 .source summary { cursor: pointer; color: var(--text-dim); }
 .source p { margin: 4px 0; color: var(--text-dim); white-space: pre-wrap; }
-.input-row { display: flex; gap: 8px; padding-top: 8px; }
+
+/* 输入行 */
+.input-row { display: flex; gap: 8px; padding-top: 8px; align-items: center; }
 .input-row input {
-  flex: 1; padding: 9px 12px; border-radius: 4px; outline: none; font-family: var(--font);
+  flex: 1; padding: 9px 12px; border-radius: 8px; outline: none; font-family: var(--font);
   border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.4); color: var(--text);
+  transition: border-color 0.2s;
 }
 .input-row input::placeholder { color: var(--text-faint); }
 .input-row input:focus { border-color: var(--accent); }
-.input-row button {
-  padding: 9px 18px; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; color: #05020f;
+
+/* 发送按钮 */
+.send-btn {
+  padding: 9px 18px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: #05020f;
   background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+  transition: opacity 0.2s;
 }
-.input-row button:disabled { opacity: 0.4; cursor: default; }
+.send-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 麦克风按钮 — 全新设计 */
+.mic-btn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.25s;
+  padding: 0;
+}
+.mic-btn:hover {
+  border-color: rgba(0, 240, 255, 0.4);
+  background: rgba(0, 240, 255, 0.08);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.15);
+}
+.mic-btn:active {
+  transform: scale(0.92);
+}
+
+/* 麦克风图标 */
+.mic-icon {
+  width: 20px;
+  height: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.25s;
+}
+.mic-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* 录音中状态 */
+.mic-btn.active {
+  border-color: #ff4757;
+  background: rgba(255, 71, 87, 0.12);
+  box-shadow: 0 0 16px rgba(255, 71, 87, 0.3);
+  animation: micPulse 1.5s ease-in-out infinite;
+}
+.mic-btn.active .mic-icon {
+  color: #ff4757;
+}
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 71, 87, 0.2); }
+  50% { box-shadow: 0 0 24px rgba(255, 71, 87, 0.5); }
+}
+
+/* 语音提示 */
 .voice-tip { margin-bottom: 6px; font-size: 12px; color: var(--gold); }
-.mic { flex-shrink: 0; width: 40px; cursor: pointer; font-size: 16px; background: none !important; border: 1px solid var(--line-strong) !important; }
-.mic.on { border-color: var(--danger) !important; box-shadow: 0 0 14px rgba(255, 107, 129, 0.6); animation: rec 1s ease-in-out infinite; }
-@keyframes rec { 50% { box-shadow: 0 0 4px rgba(255, 107, 129, 0.3); } }
 </style>

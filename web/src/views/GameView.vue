@@ -557,7 +557,7 @@ function swcFor(lv: Level) { return LEVEL_SWC_FRONT[lv.id] || '' }
 /* 高度 = 屏幕高度 - 顶栏和页面边距；分三行：标题栏 / 战场（占满剩下的空间）/ 回合面板 */
 .battle {
   display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 14px;
-  height: calc(100vh - 120px); min-height: 560px; max-width: 1360px; margin: 0 auto;Sposition: relative;
+  height: calc(100vh - 120px); min-height: 560px; max-width: 1360px; margin: 0 auto;position: relative;
 }
 /* 被反击：整个画面抖一下 */
 .battle.hurt { animation: shake 0.4s; }

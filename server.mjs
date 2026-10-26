@@ -1,7 +1,7 @@
 // server.mjs —— 网页版服务器（只用 Node 自带模块，不需要 npm install）
 // 用法:
 //   node server.mjs      然后浏览器打开 http://localhost:3000
-
+import { searchBilibili } from './bilibili-search.mjs'
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -569,6 +569,14 @@ const server=http
     else if (req.method === "GET" && req.url === "/api/sms/status") sendJSON(res, 200, phone.smsStatus());
     else if (req.method === "POST" && req.url === "/api/logout") handleLogout(req, res);
     else if (req.method === "GET" && req.url === "/api/me") handleMe(req, res);
+        else if (req.method === "GET" && req.url.startsWith("/api/bilibili/search")) {
+      const bUser = userFromToken(getToken(req));
+      if (!bUser) { res.writeHead(401, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "请先登录" })); }
+      const bUrl = new URL(req.url, "http://localhost");
+      const bKw = bUrl.searchParams.get("keyword") || "";
+      if (!bKw.trim()) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "请输入搜索关键词" })); }
+      searchBilibili(bKw).then(r => sendJSON(res, 200, r)).catch(e => sendJSON(res, 500, { error: e.message }));
+    }
     else if (req.method === "GET" && req.url.split("?")[0] === "/api/chapters") handleChapters(req, res);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
     else if (req.method === "GET" && mindmapMatch) handleMindmap(req, res, mindmapMatch[1]);
