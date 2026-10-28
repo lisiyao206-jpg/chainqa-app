@@ -1,11 +1,9 @@
-git push
 # 链上安全局 · 链知答
 
 > 以 AI 为核心的智能合约安全审计学习与实践平台：读教材问 AI 导师、和漏洞怪兽对战、用 AI Agent 审计自己的合约——学、练、用一条龙。
 
 <!-- 截图：放 2~3 张，大厅 / 训练营 + AI 问答 / 漏洞猎人 -->
 <!-- ![大厅](docs/screenshots/lobby.png) -->
-
 ---
 
 ## ✨ 功能一览
@@ -35,8 +33,9 @@ git push
 | 前端 | **Vue 3**（`<script setup lang="ts">` 组合式 API）、**TypeScript**（严格模式）、**Vue Router**（路由懒加载）、**Pinia**、Vite |
 | 后端 | **Node.js**（原生 `http` 模块，无框架） |
 | 数据库 | **SQLite**（Node 内置 `node:sqlite`，无需安装数据库服务） |
-| AI | 智谱 AI：`embedding-3`（文本向量化）+ `glm-4-flash`（流式生成） |
-| 其他 | marked（Markdown 渲染）、markmap（思维导图）、Canvas（代码雨） |
+| AI | 智谱 AI：`glm-4-flash`（问答、审计 Agent、出题、思维导图）、`glm-4v-flash`（截图识别代码）、`embedding-3`（文本向量化） |
+| 3D 与多媒体 | three.js（3D 背景、AI 导师、漏洞怪兽）、Web Speech（语音提问 / 朗读） |
+| 其他 | marked（Markdown 渲染）、markmap（思维导图）、MCP 协议（开放审计工具） |
 
 ---
 
@@ -55,16 +54,25 @@ git push
 git clone https://github.com/AmazingAng/WTF-Solidity.git knowledge/WTF-Solidity
 ```
 
-### 3. 配置密钥
+预备营的参考资料（可选，让白帽导师也能回答区块链基础问题）：
 
-复制 `.env.example` 为 `.env`，填入：
+- ethereum.org 中文文档：<https://github.com/ethereum/ethereum-org-website>（`public/content/translations/zh/developers/docs/` 下的相关章节）
+- FISCO BCOS 官方文档：<https://github.com/FISCO-BCOS/FISCO-BCOS-DOC>（`3.x/zh_CN/docs/` 下的相关章节）
 
-```ini
-ZHIPU_API_KEY=你的智谱APIKey
-ADMIN_ACCOUNT=你想设为管理员的账号
-```
+整理成 Markdown 后分别放到 `knowledge/ethereum-org/` 和 `knowledge/FISCO-BCOS-DOC/`。不放也能正常运行，只是白帽导师回答区块链基础问题时依据会少一些。
 
-> `ADMIN_ACCOUNT` 对应的账号注册后会自动成为管理员（每次启动后端时也会检查一遍）。
+### 3. 配置环境
+
+复制 `.env.example` 为 `.env`，按文件里的注释填写（`.env` 已加入 `.gitignore`，不会被上传）：
+
+- `ZHIPU_API_KEY`（必填）：智谱 AI 的 API Key
+- `ADMIN_ACCOUNT`（必填）：先在网页上注册一个账号，把系统分配的 6 位数字账号填在这里，重启后端后它就是管理员
+- `PORT`、`SMS_MODE`（可选）：端口、验证码登录演示模式，说明见 `.env.example`
+
+依赖清单：
+
+- 后端：只使用 Node.js 内置模块，无第三方依赖，见根目录 `package.json`（要求 Node.js ≥ 22.5）
+- 前端：见 `web/package.json`，在 `web` 目录运行 `npm install` 安装
 
 ### 4. 构建知识库（只需一次）
 
@@ -72,7 +80,7 @@ ADMIN_ACCOUNT=你想设为管理员的账号
 node rag.mjs build
 ```
 
-把教材切成片段并向量化，生成 `vectors.json`。教材没变时再次运行会跳过，不重复花钱。
+把 `knowledge/` 里的教材和 `prep/` 预备营切成片段并向量化，生成 `vectors.json`。只会处理新增或变更的片段，不重复花钱；教材有变化时重新运行即可。
 
 ### 5. 启动（需要两个终端）
 
@@ -146,6 +154,7 @@ chainqa-app/
 | `user` | 当前用户、token、带 token 的请求工具 `api()` | 所有页面共享登录状态；路由守卫据此判断能否进入页面 |
 | `ai` | AI 面板开关、待发送的问题 | 训练营「选中文字问 AI」时，训练营和聊天面板互不引用，靠 store 传话 |
 | `notes` / `mistakes` / `game` | 笔记、错题、关卡进度 | 作为数据库数据在前端的副本：修改时先更新界面，再异步保存 |
+| `theme` | 背景主题、战斗氛围 | 实战时背景随怪兽变色、受伤闪光，游戏页面不用关心背景怎么画 |
 
 页面只调用 store 的 `load / add / update` 等方法，不关心数据存在哪里。所以把存储从 localStorage 迁移到数据库时，页面几乎不用改。
 
@@ -155,28 +164,29 @@ chainqa-app/
 用户提问
   → embedding-3 把问题转成向量
   → 与教材 900 多个片段计算余弦相似度，取最相关的 4 段
-  → 相似度都低于 0.35：直接拒答「知识库中未找到相关依据」
+  → 相似度都低于 0.45：直接拒答「知识库中未找到相关依据」（阈值由 eval/ 的对照评测确定）
   → 把片段 + 问题 + 规则交给 glm-4-flash，要求只依据资料回答并标注 [1][2]
   → 通过 SSE 流式推送到前端，逐字显示，并附上引用原文
 ```
 
 **怎么防止 AI 胡说：** ① 提示词限定只能依据资料回答；② 相似度阈值过滤不相关资料，资料不足时拒答；③ 回答带引用编号，用户可以点开核对原文。
 
-**AI 的其他用法：** 根据章节原文生成思维导图（Markdown 大纲 → markmap 渲染），生成一次后缓存到文件，之后秒开。
+**AI 的其他用法：** AI 审计 Agent（函数调用，自主调用规则扫描、SWC 漏洞库、教材检索）；AI 举一反三出变种关卡并由规则扫描器验题；防御战出题；截图识别代码；章节思维导图（生成一次后缓存）。
 
 ### 数据库设计
 
-| 表 | 说明 | 主键 |
-|---|---|---|
-| `users` | 账号、密码哈希、昵称、角色（user / admin）、状态（active / disabled） | `user_id` |
-| `sessions` | 登录凭证 token、过期时间（7 天） | `token` |
-| `login_logs` | 登录记录 | `log_id` |
-| `notes` | 笔记，可关联教材章节 | `note_id` |
-| `mistakes` | 错题、状态（待温习 / 已掌握）、来源（手动 / 漏洞猎人） | `mistake_id` |
-| `game_progress` | 每关最好星数 | (`user_id`, `level_id`) 联合主键 |
+共 22 张表，按业务分为四组，用户与其余数据基本为一对多关系：
 
-- 除 `users` 外，每张表都以 `user_id` 外键关联用户（一对多），并设置 `ON DELETE CASCADE`：删除用户时，其数据一并清除。
+| 分组 | 表 |
+|---|---|
+| 账号 | `users` 用户、`sessions` 登录凭证、`login_logs` 登录记录、`sms_codes` 验证码 |
+| 学习 | `notes` 笔记、`mistakes` 错题、`game_progress` 关卡进度、`camp_progress` 防御战记录、`audit_records` 审计记录，以及变种关卡题库 |
+| 社区 | 好友申请、好友、聊天室、成员、消息、文件、帖子、点赞、收藏、评论 |
+| 运营 | `qa_logs` 问答日志、`feedback` 用户反馈 |
+
+- 外键设置 `ON DELETE CASCADE`：删除用户时，其数据一并清除。
 - `game_progress` 用联合主键保证「一人一关一条记录」，保存成绩时用 `ON CONFLICT … DO UPDATE SET star = MAX(…)` 只保留最好成绩。
+- 去重设计：同一道错题只记一次并累计错误次数；审计记录按代码指纹去重。
 
 <!-- E-R 图：docs/er.png -->
 
@@ -191,7 +201,7 @@ chainqa-app/
 
 ### 用户体验
 
-- AI 回答流式输出，首字约 2 秒出现，不用等整段生成完。
+- AI 回答流式输出，不用等整段生成完；审计 Agent 的每一步也实时显示。
 - 笔记输入防抖（停止输入 0.6 秒后才保存），减少请求次数。
 - AI 悬浮窗用 `v-show`，切换页面时聊天记录不丢失。
 - 登录状态保存在本地，刷新页面不掉线。
@@ -204,16 +214,29 @@ chainqa-app/
 
 | 成员 | 分工 |
 |---|---|
-|李思瑶| 项目构思与产品设计、全部代码开发（前端、后端、AI 功能）、主题与背景设计、技术文档、图像设计 |
+| 李思瑶 | 项目构思与产品设计、全部代码开发（前端、后端、AI 功能）、主题与背景设计、技术文档、图像设计 |
+
+---
+
+## 📝 原创性说明
+
+本项目为原创作品，由李思瑶独立完成：
+
+1. 产品构思与设计：「预备营 → 训练营 → 实战任务 → AI 审计」学习路线、漏洞怪兽对战玩法、防御战、变种出题与亲手修复等机制。
+2. 全部前后端代码：Vue 3 + TypeScript 前端、Node.js 后端、数据库设计。
+3. AI 功能的设计与实现：RAG 问答与拒答机制、AI 审计 Agent、规则扫描器、AI 安全防护、MCP 服务、RAG 评测方案。
+4. 10 个实战关卡的漏洞合约、预备营 7 章导读、勋章图案与界面视觉设计。
+
+开发过程中使用了 AI 编程助手辅助编写代码与文档，并使用 AI 工具辅助生成部分图像素材（AI 导师 3D 形象、勋章图案），所有内容均经本人审核、修改与测试。使用的第三方资料与素材见下方「致谢与声明」。
 
 ---
 
 ## 📚 致谢与声明
 
-- 教材内容来自开源项目 [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity)，版权归原作者所有，本项目仅将其作为知识库数据来源。
-- 预备营（`prep/`）为本团队编写的区块链基础导读，内容对照以下官方资料核实，每章末尾列出参考资料；这些资料也作为知识库数据来源放在 `knowledge/`（不上传仓库，获取方式见下）：
-  - [ethereum.org 中文文档](https://ethereum.org/zh/developers/docs/)（MIT 许可）
-  - [FISCO BCOS 官方文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/)，版权归 FISCO BCOS 开源社区所有
-- AI 能力由 [智谱 AI](https://open.bigmodel.cn) 提供。
-- AI 导师 3D 形象：由腾讯混元 3D 生成。
-- 实战任务 3D 怪兽模型：来自 Quaternius（CC0 授权）。
+1. 教材：开源项目 [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity)，版权归原作者所有，本项目仅将其作为知识库数据来源。
+2. 预备营参考资料：预备营（`prep/`）为本项目编写的区块链基础导读，内容对照以下官方资料核实，每章末尾列出参考资料；这些资料也作为知识库数据来源放在 `knowledge/`（不上传仓库，获取方式见「快速开始」）：
+   - [ethereum.org 中文文档](https://ethereum.org/zh/developers/docs/)（MIT 许可）
+   - [FISCO BCOS 官方文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/)，版权归 FISCO BCOS 开源社区所有
+3. AI 能力：[智谱 AI 开放平台](https://open.bigmodel.cn)。
+4. AI 导师 3D 形象：由腾讯混元 3D 生成。
+5. 实战任务 3D 怪兽模型：来自 Quaternius（CC0 授权）。
