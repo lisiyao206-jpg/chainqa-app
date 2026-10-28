@@ -1,3 +1,4 @@
+git push
 # 链上安全局 · 链知答
 
 > 以 AI 为核心的智能合约安全审计学习与实践平台：读教材问 AI 导师、和漏洞怪兽对战、用 AI Agent 审计自己的合约——学、练、用一条龙。
@@ -214,3 +215,5 @@ chainqa-app/
   - [ethereum.org 中文文档](https://ethereum.org/zh/developers/docs/)（MIT 许可）
   - [FISCO BCOS 官方文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/)，版权归 FISCO BCOS 开源社区所有
 - AI 能力由 [智谱 AI](https://open.bigmodel.cn) 提供。
+- AI 导师 3D 形象：由腾讯混元 3D 生成。
+- 实战任务 3D 怪兽模型：来自 Quaternius（CC0 授权）。
