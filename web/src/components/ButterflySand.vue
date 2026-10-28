@@ -165,10 +165,14 @@ function streamPos(s: Stream, k: number) {
   return [a * x0 + b * mx + c * cx, a * s.y0 + b * my + c * cy]
 }
 
+// 画布尺寸跟随它自己实际显示的大小（getBoundingClientRect），
+// 而不是 window.innerHeight —— 否则手机上 CSS 的 100vh 与 innerHeight 不一致，
+// 首开时（浏览器工具栏还展开）蝴蝶会被放大/截断，看起来不完整。读实际盒子两者永远对齐。
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2)
-  w = window.innerWidth
-  h = window.innerHeight
+  const rect = canvasRef.value!.getBoundingClientRect()
+  w = Math.round(rect.width)
+  h = Math.round(rect.height)
   canvasRef.value!.width = w * dpr
   canvasRef.value!.height = h * dpr
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -334,5 +338,5 @@ onUnmounted(() => {
 
 <style scoped>
 /* 铺满屏幕、放在最底层；pointer-events: none 让鼠标能点到上面的登录框 */
-.butterfly { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+.butterfly { position: fixed; inset: 0; width: 100vw; height: 100dvh; z-index: -1; pointer-events: none; }
 </style>
