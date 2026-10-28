@@ -10,7 +10,7 @@
       </div>
       <div class="iframe-wrap">
         <iframe
-          :src="getPlayerUrl(activeVideo.bvid)"
+          :src="getPlayerUrl(activeVideo)"
           scrolling="no"
           border="0"
           frameborder="no"
@@ -26,12 +26,12 @@
       <div v-if="recommendedVideos.length > 0" class="rec-list">
         <div
           v-for="vid in recommendedVideos"
-          :key="vid.bvid"
+          :key="vid.bvid + (vid.page || '')"
           class="rec-item"
-          :class="{ playing: activeVideo?.bvid === vid.bvid }"
+          :class="{ playing: isPlaying(vid) }"
           @click="play(vid)"
         >
-          <div class="rec-icon">{{ activeVideo?.bvid === vid.bvid ? '⏸' : '▶' }}</div>
+          <div class="rec-icon">{{ isPlaying(vid) ? '⏸' : '▶' }}</div>
           <div class="rec-info">
             <div class="rec-title">{{ vid.title }}</div>
             <div class="rec-meta">{{ vid.author }} · {{ vid.duration }}</div>
@@ -68,7 +68,7 @@
         </div>
       </div>
       <div v-else-if="searched && searchResults.length === 0" class="empty">
-        没找到，试试别的关键词
+        站内没搜到结果（B站有时会拦截搜索），可以点下面直接去 B站搜「{{ searchQuery.trim() }}」
       </div>
 
       <div class="bili-link">
@@ -80,12 +80,14 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useUserStore } from '../stores/user'
 
 interface VideoItem {
   bvid: string
   title: string
   author: string
   duration: string
+  page?: number   // 合集视频的第几集（不填就是第 1 集）
   cover?: string
 }
 
@@ -108,36 +110,41 @@ const searchQuery = ref('')
 const searchResults = ref<SearchResult[]>([])
 const searched = ref(false)
 
-// 各章节推荐视频（BV号占位，替换为实际视频）
+// 各章节推荐视频：均为 B 站上的真实视频，通过 B 站官方播放器嵌入播放（不下载、不转存），版权归原作者
+// 每章一个通俗短视频 + 北京大学肖臻老师《区块链技术与应用》公开课的对应一集（page 是公开课第几集）
+// 2026-10-28 逐个打开核对过标题、作者和时长；以后要换视频，记得也先点开确认
+const XIAO = { bvid: 'BV1Vt411X7JF', author: '北京大学肖臻 · 公开课' }
 const chapterVideos: Record<string, VideoItem[]> = {
   P01: [
-    { bvid: 'BV1FW4y157uJ', title: '区块链技术原理动画讲解', author: '区块链科普', duration: '8:32' },
-    { bvid: 'BV1Sv411r7q4', title: '5分钟搞懂区块链是什么', author: '区块链小白', duration: '5:15' },
-    { bvid: 'BV1xU4y1H7Xs', title: '区块链入门科普：分布式账本', author: '科技说', duration: '10:45' },
+    { bvid: 'BV1J7411Z7T9', title: '6分钟，用人话讲清楚区块链', author: '裹小脚的大叔', duration: '6:00' },
+    { bvid: 'BV14E411v7eS', title: '程序员来讲讲什么是区块链（小白也能听懂）', author: '是落拓呀', duration: '10:22' },
   ],
   P02: [
-    { bvid: 'BV1Ab4y1Q7Cv', title: '区块链中的哈希函数详解', author: '加密学院', duration: '12:08' },
-    { bvid: 'BV1dS4y1b7wH', title: '区块结构与挖矿原理动画', author: '区块链学堂', duration: '9:22' },
+    { bvid: 'BV1aa411U7ag', title: '哈希函数是什么？为什么 Hash 是区块链最基础的函数', author: 'BuidlerDAO-Web3', duration: '10:02' },
+    { ...XIAO, page: 3, title: '北大公开课 第3讲：比特币的数据结构（哈希指针、默克尔树）', duration: '37:35' },
   ],
   P03: [
-    { bvid: 'BV1QK4y1A7Jz', title: '非对称加密与数字签名通俗讲解', author: '密码学科普', duration: '11:30' },
-    { bvid: 'BV1hN4y1K7mX', title: '区块链私钥公钥地址的关系', author: '链上学院', duration: '7:45' },
+    { bvid: 'BV1jE411H7xU', title: '私钥和公钥是什么？数字签名什么原理？', author: 'lifeform233', duration: '8:37' },
+    { ...XIAO, page: 2, title: '北大公开课 第2讲：密码学原理（哈希与签名）', duration: '34:42' },
   ],
   P04: [
-    { bvid: 'BV1jT4y1X7Fq', title: '区块链共识机制：PoW与PoS', author: '区块链学堂', duration: '13:20' },
-    { bvid: 'BV1M44y1H7Gn', title: 'Gas机制是什么？以太坊Gas详解', author: '以太坊百科', duration: '8:55' },
+    { bvid: 'BV1iJ411D7nb', title: '程序员带你理解哈希函数和工作量证明机制', author: '是落拓呀', duration: '10:47' },
+    { ...XIAO, page: 4, title: '北大公开课 第4讲：比特币的共识协议', duration: '1:27:34' },
   ],
   P05: [
-    { bvid: 'BV1Yb4y137vE', title: '公链vs联盟链，区别在哪？', author: '链上观察', duration: '10:15' },
-    { bvid: 'BV1FS4y1G7Rw', title: 'FISCO BCOS 联盟链入门', author: '微众区块链', duration: '14:02' },
+    { bvid: 'BV14u41117qC', title: '公链、私链、联盟链……傻傻分不清楚？看这篇就够了', author: '云说区块链', duration: '5:47' },
+    { bvid: 'BV12x411R7d5', title: '探访联盟链底层技术平台 FISCO BCOS', author: '烦立停', duration: '20:57' },
+    { ...XIAO, page: 14, title: '北大公开课 第14讲：以太坊概述', duration: '14:47' },
   ],
   P06: [
-    { bvid: 'BV1rh411R7XE', title: '智能合约是什么？自动售货机比喻', author: 'Solidity教程', duration: '9:40' },
-    { bvid: 'BV1gK4y1m7Lp', title: 'Solidity智能合约入门教程', author: 'WTF Academy', duration: '15:30' },
+    { bvid: 'BV1c64y1k7r7', title: '什么是智能合约？', author: '区块链新说', duration: '4:17' },
+    { bvid: 'BV1wK411f7Vn', title: '智能合约到底有多智能？Solidity 又是什么？', author: '设计师Omega', duration: '6:18' },
+    { ...XIAO, page: 22, title: '北大公开课 第22讲：以太坊智能合约', duration: '2:17:06' },
   ],
   P07: [
-    { bvid: 'BV1vE411S7cP', title: 'The DAO事件：智能合约安全的警钟', author: '区块链安全', duration: '12:50' },
-    { bvid: 'BV1pN411d7sY', title: '智能合约常见漏洞与防范', author: '安全学院', duration: '16:20' },
+    { bvid: 'BV12X4y1c7pJ', title: '重入攻击｜藏在智能合约里的神秘漏洞', author: '创宇区块链安全实验室', duration: '2:44' },
+    { ...XIAO, page: 23, title: '北大公开课 第23讲：The DAO 事件（重入攻击）', duration: '43:38' },
+    { ...XIAO, page: 25, title: '北大公开课 第25讲：美链事件（整数溢出）', duration: '19:04' },
   ],
 }
 
@@ -176,12 +183,17 @@ watch(searchQuery, () => {
   searchResults.value = []
 })
 
-function getPlayerUrl(bvid: string): string {
-  return `https://player.bilibili.com/player.html?bvid=${bvid}&high_quality=1&danmaku=0&autoplay=1`
+function getPlayerUrl(v: VideoItem): string {
+  return `https://player.bilibili.com/player.html?bvid=${v.bvid}&p=${v.page || 1}&high_quality=1&danmaku=0&autoplay=1`
 }
 
 function play(vid: VideoItem) {
   activeVideo.value = vid
+}
+
+// 公开课的几集是同一个 BV 号，所以还要比较是第几集
+function isPlaying(vid: VideoItem) {
+  return activeVideo.value?.bvid === vid.bvid && (activeVideo.value?.page || 1) === (vid.page || 1)
 }
 
 function formatDuration(seconds: number): string {
@@ -191,14 +203,15 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
+const userStore = useUserStore()
+
+// 站内搜索：后端代为请求 B站；搜不到或被 B站拦截时，提示用户点「去 B站看更多」
 async function doSearch() {
   const kw = searchQuery.value.trim()
   if (!kw) return
-  searched.value = true
   searchResults.value = []
   try {
-    const resp = await fetch(`/api/bilibili/search?keyword=${encodeURIComponent(kw)}`)
-    const data = await resp.json()
+    const data = await userStore.api(`/api/bilibili/search?keyword=${encodeURIComponent(kw)}`)
     if (Array.isArray(data)) {
       searchResults.value = data.map((item: any) => ({
         bvid: item.bvid,
@@ -209,8 +222,9 @@ async function doSearch() {
       }))
     }
   } catch {
-    window.open(biliSearchUrl.value, '_blank')
+    // 失败时不自动弹新窗口（浏览器会拦截），交给下面的提示
   }
+  searched.value = true
 }
 </script>
 
