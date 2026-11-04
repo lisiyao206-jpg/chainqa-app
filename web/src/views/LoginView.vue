@@ -107,6 +107,7 @@ function switchMode(m: string) {
         <li><span>02</span><b>训练营</b>学 Solidity 与合约漏洞，学完一章打一场防御战</li>
         <li><span>03</span><b>实战任务</b>和漏洞怪兽对战：找出漏洞，选对修法</li>
         <li><span>04</span><b>AI 审计</b>用审计 Agent 检查真实合约，问题直通对应知识点</li>
+        <li><span>05</span><b>情报站</b>在此处可以与链友交换情报，讨论情报</li>
       </ol>
       <p class="aside">全程有 <b>白帽导师</b> 答疑（每句话都标注教材出处），笔记和错题存进 <b>案件档案</b>，在 <b>情报站</b> 和其他审计员交流</p>
     </section>

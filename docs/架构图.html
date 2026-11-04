@@ -1,0 +1,86 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>链知答 LIANZHIDA — 系统架构图</title>
+<style>
+  :root { --bg: #070414; --fg: #e8f6ff; --accent: #ff2bd6; --accent2: #00f0ff; --line: #ffffff14; }
+  body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  h1 { font-weight: 300; letter-spacing: 6px; margin: 0 0 8px; }
+  .sub { color: #789; font-size: 14px; margin-bottom: 24px; }
+  .diagram { display: flex; flex-direction: column; gap: 16px; align-items: stretch; }
+  .layer { background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .layer-title { font-size: 13px; letter-spacing: 2px; color: #9bb; font-weight: 600; margin-bottom: 10px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .card { background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+  .card b { color: var(--accent); }
+  .flow { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .step { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.04); border-radius: 6px; border: 1px solid var(--line); }
+  .step .arrow { color: var(--accent2); font-weight: 600; }
+  .step .label { flex: 1; font-size: 14px; font-weight: 500; }
+  .step .desc { font-size: 12px; color: #789; margin-top: 2px; }
+  .arrow-down { text-align: center; color: var(--accent2); font-size: 18px; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 20px; }
+  .metric { background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 8px; padding: 14px; text-align: center; }
+  .metric .value { font-size: 28px; font-weight: 700; color: var(--accent); }
+  .metric .label { font-size: 13px; color: #9bb; margin-top: 4px; }
+  .footer { text-align: center; color: #789; font-size: 13px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+</style>
+<div class="wrap">
+  <h1>链知答 LIANZHIDA — 系统架构图</h1>
+  <p class="sub">传智杯大赛 · RAG 问答方向 · 项目：链知答 LIANZHIDA</p>
+
+  <div class="diagram">
+    <div class="layer">
+      <div class="layer-title">LAYER 1 · 前端（Vue 3 + TS + Vite）</div>
+      <div class="grid2">
+        <div class="card"><b>大厅</b> 3D 背景、七入口、学习路线、个人档案</div>
+        <div class="card"><b>预备营</b> 7 章区块链基础导读</div>
+        <div class="card"><b>训练营</b> 教材阅读 + 选中文字问 AI</div>
+        <div class="card"><b>白帽导师</b> RAG 问答 · 每句带出处 · 流式输出</div>
+        <div class="card"><b>实战任务</b> 10 关 3D 怪兽 · 变种题 · 亲手修复</div>
+        <div class="card"><b>AI 审计</b> 审计 Agent + 截图识别 + 过程可视化</div>
+        <div class="card"><b>情报站</b> 好友/聊天/广场/收藏</div>
+        <div class="card"><b>管理后台</b> 用户管理、问答日志、反馈</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-title">LAYER 2 · 后端（Node.js 原生 http 无框架）</div>
+      <div class="grid2">
+        <div class="card"><b>server.mjs</b> 路由分发 + 认证</div>
+        <div class="card"><b>rag.mjs</b> 教材切片 · 向量化 · 相似度检索 · 流式生成</div>
+        <div class="card"><b>agent.mjs</b> 审计 Agent · 工具调用 scan/lookup/search</div>
+        <div class="card"><b>scanner.mjs</b> 规则扫描 + SWC 漏洞库（14 种）</div>
+        <div class="card"><b>variant.mjs</b> AI 出题 · 规则验题 · 缓存复用</div>
+        <div class="card"><b>data.mjs</b> 笔记/错题/关卡/审计记录</div>
+        <div class="card"><b>admin.mjs</b> 管理员：用户、登录记录、问答日志、反馈</div>
+        <div class="card"><b>safety.mjs</b> 注入检测 · 内容审核 · 私钥保护</div>
+        <div class="card"><b>social.mjs</b> 好友/聊天/广场/收藏</div>
+        <div class="card"><b>mcp-server.mjs</b> MCP 服务（JSON-RPC 2.0）</div>
+      </div>
+    </div>
+
+    <div class="layer">
+      <div class="layer-title">LAYER 3 · 外部依赖</div>
+      <div class="card"><b>智谱 AI</b> <span style="color:#789">glm-4-flash / glm-4v-flash / embedding-3</span></div>
+      <div class="card"><b>教材知识库</b> <span style="color:#789">WTF-Solidity / ethereum.org / FISCO-BCOS</span></div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="value">97</div>
+      <div class="label">有 RAG 时事实准确分（满分 100）</div>
+    </div>
+    <div class="metric">
+      <div class="value">85</div>
+      <div class="label">没 RAG 时事实准确分（满分 100）</div>
+    </div>
+    <div class="metric">
+      <div class="value">100%</div>
+      <div class="label">出处标注率（用户可核对原文）</div>
+    </div>
+  </div>
+
+  <div class="footer">链知答 LIANZHIDA · 传智杯大赛 RAG 问答方向 · 2026</div>
+</div>
