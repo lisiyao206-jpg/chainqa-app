@@ -51,7 +51,8 @@ export function newAccountNo() {
 }
 
 // ===== 注册 =====
-export function register(pwd, nickname) {
+// identity：'student' 学生 / 'teacher' 老师，选了老师注册完就能建班
+export function register(pwd, nickname, identity = "student") {
   pwd = String(pwd || "");
   nickname = moderate(String(nickname || "").trim()); // 昵称公开显示，也要过内容过滤
   if (!nickname || nickname.length > 12) throw new Error("昵称要 1~12 个字");
@@ -59,7 +60,7 @@ export function register(pwd, nickname) {
 
   const account = newAccountNo();
   // .env 里写的 ADMIN_ACCOUNT 对应的账号是管理员（只有开发者知道）
-  const role = account === process.env.ADMIN_ACCOUNT ? "admin" : "user";
+  const role = account === process.env.ADMIN_ACCOUNT ? "admin" : identity === "teacher" ? "teacher" : "user";
   db.prepare("INSERT INTO users (account, pwd, nickname, role) VALUES (?, ?, ?, ?)")
     .run(account, hashPassword(pwd), nickname, role);
   return login(account, pwd); // 返回的 user 里带着新账号，前端会大字显示给用户记下

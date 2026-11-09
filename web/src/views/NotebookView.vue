@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import { useMistakesStore } from '../stores/mistakes'
 import MistakesModal from '../components/MistakesModal.vue'
@@ -9,7 +10,16 @@ const notes = useNotesStore()
 
 // 错题本弹窗
 const mistakes = useMistakesStore()
-const showMistakes = ref(false)
+const route = useRoute()
+// 网址带 ?open=mistakes（顶栏下拉菜单「错题本」）时直接打开错题本；已经在这一页时也要跟着网址变
+const showMistakes = ref(route.query.open === 'mistakes')
+watch(() => route.query.open, (v) => v === 'mistakes' && (showMistakes.value = true))
+// 关掉错题本时把网址里的 ?open=mistakes 去掉，下次再从顶栏点「错题本」才能重新打开
+const router = useRouter()
+function closeMistakes() {
+  showMistakes.value = false
+  if (route.query.open) router.replace({ query: {} })
+}
 
 // 当前正在编辑的笔记 id
 const currentId = ref<number | null>(null)
@@ -127,7 +137,7 @@ function formatTime(t: string) {
     </section>
 
     <!-- 错题本弹窗 -->
-    <MistakesModal v-if="showMistakes" @close="showMistakes = false" />
+    <MistakesModal v-if="showMistakes" @close="closeMistakes" />
   </div>
 </template>
 

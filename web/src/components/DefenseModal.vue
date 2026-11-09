@@ -91,6 +91,7 @@ function settle(answer: number | null) {
       `【训练营防御战 · 第 ${props.chapter!.no} 讲】${q.value.question}${q.value.code ? '\n\n' + q.value.code : ''}\n\n${q.value.options.map((o, i) => 'ABCD'[i] + '. ' + o).join('\n')}`,
       `正确答案：${'ABCD'[q.value.answer]}. ${q.value.options[q.value.answer]}\n${q.value.explain}`,
       'game',
+      props.chapter!.id,
     ).catch(() => {})
   }
 }

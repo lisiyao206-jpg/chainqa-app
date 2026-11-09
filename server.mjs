@@ -1,25 +1,29 @@
 // server.mjs —— 网页版服务器（只用 Node 自带模块，不需要 npm install）
 // 用法:
 //   node server.mjs      然后浏览器打开 http://localhost:3000
+import * as lab from "./lab.mjs";
+import * as playground from "./playground.mjs";
 import { searchBilibili } from './bilibili-search.mjs'
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { answer } from "./rag.mjs";
 import { listChapters, readChapter, chapterFile } from "./chapters.mjs";
+import { listTracks, KNOWLEDGE_POINTS } from "./knowledge.mjs";
 import { getMindmap } from "./mindmap.mjs";
 import { getQuiz, getCampProgress, saveCampResult } from "./quiz.mjs";
 import { register, login, logout, userFromToken, getProfile, updateNickname, changePassword, setAvatar } from "./auth.mjs";
 import * as data from "./data.mjs";
 import * as admin from "./admin.mjs";
 import * as social from "./social.mjs";
+import * as classes from "./classes.mjs";
+import * as report from "./report.mjs";
 import * as feedback from "./feedback.mjs";
 import * as audits from "./audits.mjs";
 import * as phone from "./phone.mjs";
 import { runAudit } from "./agent.mjs";
 import { extractCode } from "./vision.mjs";
 import { checkInjection } from "./safety.mjs";
-import { generateVariant, getVariant, getVariantByLevel, listVariants, LEVEL_SWC, isGenerating, prewarmLevel, verifyUserFix } from "./variant.mjs";
 
 const PORT = process.env.PORT || 3000;
 // 前端打包（npm run build）后的网页放在 web/dist，由后端直接发给浏览器
@@ -159,67 +163,22 @@ async function handleVision(req, res) {
   }
 }
 
-// POST /api/variant/generate：出一道实战「变种挑战」题（AI 出题 + 扫描器验题 + 存库）
-// body: { baseLevel: 1~5, sample: 前端样例关卡数据(Level), force: 是否强制新出一题 }
-// force=false：同一关已有缓存题就直接复用，不重复花额度
-// force=true（再出一道）：AI 重新出一题并存库
-//
-// 其余变种接口（取题 / 列表）都在 routeVariant 里，登录即可用。
-async function handleVariantGenerate(req, res) {
+// ===== 链上实验场 =====
+// POST /api/lab/1/run：学生的代码 → 编译 → 部署到 FISCO BCOS → 正常业务检查 + 几种攻击，用 SSE 一步步推给前端
+async function handleLabRun(req, res, labId) {
   const user = userFromToken(getToken(req));
   if (!user) return sendJSON(res, 401, { error: "请先登录" });
-  const { baseLevel, sample, force } = await readJSON(req);
-  if (!LEVEL_SWC[Number(baseLevel)]) return sendJSON(res, 400, { error: "没有这一关，无法出变种题" });
-  if (isGenerating(user.userId)) return sendJSON(res, 429, { error: "正在出题，请稍等片刻" });
+  const { code } = await readJSON(req);
+  res.writeHead(200, { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache", Connection: "keep-alive" });
+  const send = (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   try {
-    const level = await generateVariant(user.userId, baseLevel, sample, { force: !!force });
-    sendJSON(res, 200, level);
+    await lab.runLab(user.userId, labId, code, send);
   } catch (err) {
-    sendJSON(res, 400, { error: err.message });
+    console.log("[链上实验场]", err.message);
+    send("error", err.message);
   }
-}
-
-// 亲手改代码：POST /api/variant/verify
-// body: { swc: "SWC-105", code: 用户改完的完整合约代码(string[] 或 string) }
-// 用规则扫描器判断目标 SWC 是否还存在，扫不出 = 修好了。
-async function handleVariantVerifyFix(req, res) {
-  const user = userFromToken(getToken(req));
-  if (!user) return sendJSON(res, 401, { error: "请先登录" });
-  try {
-    const { swc, code } = await readJSON(req);
-    const result = verifyUserFix(swc, code);
-    sendJSON(res, 200, result);
-  } catch (err) {
-    sendJSON(res, 400, { error: err.message });
-  }
-}
-
-// 变种关卡的路由：取题 / 列表（登录即可用）
-function routeVariant(req, res) {
-  const { method } = req;
-  const [pathname] = req.url.split("?");
-  if (!pathname.startsWith("/api/variant")) return null;
-  const user = userFromToken(getToken(req));
-  if (!user) return sendJSON(res, 401, { error: "请先登录" });
-
-  // GET /api/variant/level/{baseLevel}：这一关有没有已缓存 / 已存在的变种题（有就复用）
-  let m;
-  if ((m = pathname.match(/^\/api\/variant\/level\/(\d+)$/)) && method === "GET") {
-    const level = getVariantByLevel(user.userId, Number(m[1]));
-    return sendJSON(res, 200, level ? { level } : { level: null });
-  }
-  // GET /api/variant/level/{baseLevel}/list：这一关出过的全部变种题列表
-  if ((m = pathname.match(/^\/api\/variant\/level\/(\d+)\/list$/)) && method === "GET") {
-    return sendJSON(res, 200, listVariants(Number(m[1])));
-  }
-  // GET /api/variant/{id}：取某一道变种题
-  if ((m = pathname.match(/^\/api\/variant\/(\d+)$/)) && method === "GET") {
-    const level = getVariant(user.userId, Number(m[1]));
-    if (!level) return sendJSON(res, 404, { error: "没有这道变种题" });
-    return sendJSON(res, 200, level);
-  }
-  // 其它 /api/variant/*（如 POST /api/variant/generate）不归这里管：放行给后续路由，避免抢占
-  return null;
+  send("end", true);
+  res.end();
 }
 
 // 返回 JSON 的小工具
@@ -297,9 +256,9 @@ async function readJSON(req) {
 
 // POST /api/register：注册（成功后直接登录）
 async function handleRegister(req, res) {
-  const { pwd, nickname } = await readJSON(req);
+  const { pwd, nickname, identity } = await readJSON(req);
   try {
-    sendJSON(res, 200, register(pwd, nickname)); // 账号由系统分配（6 位数字）
+    sendJSON(res, 200, register(pwd, nickname, identity)); // 账号由系统分配（6 位数字）
   } catch (err) {
     sendJSON(res, 400, { error: err.message });
   }
@@ -387,15 +346,9 @@ function routeData(req, res) {
   if (m?.[1] === "audits" && method === "DELETE") return W((uid) => audits.deleteAudit(uid, id));
 
   if (url === "/api/progress" && method === "GET") return W((uid) => data.getProgress(uid));
-  // 记录通关：先存进度，再在后台给这一关预热变种题（fire-and-forget，不阻塞保存响应）
-  // 只对基础关卡(1~5)预热；变种关自身(levelId 是变种 id)不再触发，避免套娃。
+  // 记录通关：保存这一关的进度和星级
   if (url === "/api/progress" && method === "POST")
-    return W((uid, b) => {
-      const r = data.saveProgress(uid, b.levelId, b.star);
-      const lv = Number(b.levelId);
-      if (lv >= 1 && lv <= 10) prewarmLevel(lv).catch((e) => console.log(`[预热] 触发失败: ${e?.message}`));
-      return r;
-    });
+    return W((uid, b) => data.saveProgress(uid, b.levelId, b.star));
 
   // 意见反馈：提交、看我的反馈（带管理员回复）、有几条新回复
   if (url === "/api/feedback" && method === "POST") return W((uid, b) => feedback.addFeedback(uid, b));
@@ -405,6 +358,22 @@ function routeData(req, res) {
   // 训练营防御战：哪些章节守住了 / 记一次成绩
   if (url === "/api/camp" && method === "GET") return W((uid) => getCampProgress(uid));
   if (url === "/api/camp" && method === "POST") return W((uid, b) => saveCampResult(uid, b.chapterId, b.wall));
+
+  // 链上实验场：题目列表和我的进度 / 参考答案（上链失败 3 次或通关后才给）
+  if (url === "/api/lab" && method === "GET") return W((uid) => lab.listLabs(uid));
+  const am = url.match(/^\/api\/lab\/(\d+)\/answer$/);
+  if (am && method === "GET") return W((uid) => lab.answerOf(uid, Number(am[1])));
+
+  // 合约练习场（代替国外的 Remix）：编译 / 部署到联盟链 / 调用函数 / 取教材里的示例代码
+  if (url === "/api/playground/compile" && method === "POST") return W((uid, b) => playground.compile(b.code));
+  if (url === "/api/playground/deploy" && method === "POST") return W((uid, b) => playground.deploy(uid, b));
+  if (url === "/api/playground/invoke" && method === "POST") return W((uid, b) => playground.invoke(uid, b));
+  if (url.startsWith("/api/playground/sample?") && method === "GET")
+    return W(() => playground.sample(new URLSearchParams(url.split("?")[1]).get("chapter")));
+
+  // 学习报告：我的知识点掌握度 + 推荐下一步；AI 学习建议
+  if (url === "/api/report" && method === "GET") return W((uid) => report.studentReport(uid));
+  if (url === "/api/report/advice" && method === "POST") return W((uid) => report.adviceFor(uid));
 
   if (url === "/api/profile" && method === "GET") return W((uid) => getProfile(uid));
   if (url === "/api/profile" && method === "PUT") return W((uid, b) => updateNickname(uid, b.nickname));
@@ -442,6 +411,45 @@ function routeAdmin(req, res) {
   if (m && method === "PUT")
     return A((uid, b) => (b.status !== undefined ? admin.setUserStatus(uid, id, b.status) : admin.updateUser(uid, id, b)));
   if (m && method === "DELETE") return A((uid) => admin.deleteUser(uid, id));
+  return sendJSON(res, 404, { error: "没有这个接口" });
+}
+
+// ===== 我的班级（都要先登录）=====
+function routeClasses(req, res) {
+  const { method } = req;
+  const pathname = req.url.split("?")[0];
+  if (pathname !== "/api/classes" && !pathname.startsWith("/api/classes/")) return null;
+  const p = pathname.slice("/api/classes".length); // 例如 /3/tasks/5
+  const W = (fn) => withUser(req, res, fn);
+  let m;
+
+  if (p === "" && method === "GET") return W((uid) => classes.listClasses(uid));
+  if (p === "" && method === "POST") return W((uid, b) => classes.createClass(uid, b.name));
+  if (p === "/join" && method === "POST") return W((uid, b) => classes.joinClass(uid, b.code));
+  if ((m = p.match(/^\/(\d+)$/)) && method === "GET") return W((uid) => classes.classDetail(uid, Number(m[1])));
+  if ((m = p.match(/^\/(\d+)$/)) && method === "DELETE") return W((uid) => classes.deleteClass(uid, Number(m[1])));
+  if ((m = p.match(/^\/(\d+)\/leave$/)) && method === "POST") return W((uid) => classes.leaveClass(uid, Number(m[1])));
+  if ((m = p.match(/^\/(\d+)\/members\/(\d+)$/)) && method === "DELETE")
+    return W((uid) => classes.removeMember(uid, Number(m[1]), Number(m[2])));
+  // 任务：布置 / 删除 / 每个学生的完成情况 / 给某个学生写点评
+  if ((m = p.match(/^\/(\d+)\/tasks$/)) && method === "POST") return W((uid, b) => classes.addTask(uid, Number(m[1]), b));
+  if ((m = p.match(/^\/(\d+)\/tasks\/(\d+)$/)) && method === "GET")
+    return W((uid) => classes.taskProgress(uid, Number(m[1]), Number(m[2])));
+  if ((m = p.match(/^\/(\d+)\/tasks\/(\d+)$/)) && method === "DELETE")
+    return W((uid) => classes.deleteTask(uid, Number(m[1]), Number(m[2])));
+  if ((m = p.match(/^\/(\d+)\/tasks\/(\d+)\/review$/)) && method === "PUT")
+    return W((uid, b) => classes.reviewTask(uid, Number(m[1]), Number(m[2]), Number(b.userId), b.comment));
+  // 班级资料
+  if ((m = p.match(/^\/(\d+)\/materials$/)) && method === "POST") return W((uid, b) => classes.addMaterial(uid, Number(m[1]), b));
+  if ((m = p.match(/^\/(\d+)\/materials\/(\d+)$/)) && method === "DELETE")
+    return W((uid) => classes.deleteMaterial(uid, Number(m[1]), Number(m[2])));
+  // 班级学情（老师）：全班统计 / 某个学生的完整学习报告
+  if ((m = p.match(/^\/(\d+)\/stats$/)) && method === "GET") return W((uid) => report.classStats(uid, Number(m[1])));
+  if ((m = p.match(/^\/(\d+)\/students\/(\d+)\/report$/)) && method === "GET")
+    return W((uid) => report.memberReport(uid, Number(m[1]), Number(m[2])));
+  // 视频会议
+  if ((m = p.match(/^\/(\d+)\/meeting$/)) && method === "PUT") return W((uid, b) => classes.setMeeting(uid, Number(m[1]), b));
+  if ((m = p.match(/^\/(\d+)\/meeting$/)) && method === "DELETE") return W((uid) => classes.clearMeeting(uid, Number(m[1])));
   return sendJSON(res, 404, { error: "没有这个接口" });
 }
 
@@ -550,18 +558,18 @@ function handleStatic(req, res) {
 const server=http
   .createServer((req, res) => {
     const chapterMatch = req.url.match(/^\/api\/chapters\/([^/?]+)$/);
+    const labRunMatch = req.url.match(/^\/api\/lab\/(\d+)\/run$/);
     const fileMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/files\/([^?]+)/);
     const mindmapMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/mindmap$/);
     const quizMatch = req.url.match(/^\/api\/chapters\/([^/?]+)\/quiz$/);
     if (routeData(req, res) !== null) return; // 笔记、错题、关卡进度
     if (routeAdmin(req, res) !== null) return; // 管理员后台
     if (routeSocial(req, res) !== null) return; // 情报站
-    if (routeVariant(req, res) !== null) return; // 实战变种关卡
+    if (routeClasses(req, res) !== null) return; // 我的班级
     if (req.method === "POST" && req.url === "/api/ask") handleAsk(req, res);
     else if (req.method === "POST" && req.url === "/api/agent/audit") handleAudit(req, res);
     else if (req.method === "POST" && req.url === "/api/vision/code") handleVision(req, res);
-    else if (req.method === "POST" && req.url === "/api/variant/generate") handleVariantGenerate(req, res);
-    else if (req.method === "POST" && req.url === "/api/variant/verify") handleVariantVerifyFix(req, res);
+    else if (req.method === "POST" && labRunMatch) handleLabRun(req, res, Number(labRunMatch[1]));
     else if (req.method === "POST" && req.url === "/api/register") handleRegister(req, res);
     else if (req.method === "POST" && req.url === "/api/login") handleLogin(req, res);
     else if (req.method === "POST" && req.url === "/api/login/sms") handleSmsLogin(req, res);
@@ -578,6 +586,9 @@ const server=http
       searchBilibili(bKw).then(r => sendJSON(res, 200, r)).catch(e => sendJSON(res, 500, { error: e.message }));
     }
     else if (req.method === "GET" && req.url.split("?")[0] === "/api/chapters") handleChapters(req, res);
+    // 学习中心：五条学习路线（每章带知识点标签）；知识点列表
+    else if (req.method === "GET" && req.url === "/api/learn/tracks") sendJSON(res, 200, listTracks());
+    else if (req.method === "GET" && req.url === "/api/knowledge") sendJSON(res, 200, KNOWLEDGE_POINTS);
     else if (req.method === "GET" && chapterMatch) handleChapter(req, res, chapterMatch[1]);
     else if (req.method === "GET" && mindmapMatch) handleMindmap(req, res, mindmapMatch[1]);
     else if (req.method === "GET" && quizMatch) handleQuiz(req, res, quizMatch[1]);

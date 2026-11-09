@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
+import { OK_HOSTS, DEAD_LINKS } from '../data/linkPolicy'
 import { useAiStore } from '../stores/ai'
 import { useNotesStore } from '../stores/notes'
 import MindmapModal from '../components/MindmapModal.vue'
@@ -18,8 +19,9 @@ interface ChapterGroup {
 
 // 章节目录：[{ name: '入门篇', chapters: [{ id, no, title }] }]
 const route = useRoute() // 网址信息：从 AI 审计跳过来时会带上 ?chapter=
-// 读哪套教材：预备营（区块链基础）还是训练营（WTF-Solidity）
-const isPrep = route.meta.book === 'prep'
+// 读哪套教材：路由里写的 book（prep 区块链基础 / fisco 联盟链实战 / frontier 应用与前沿），没写就是训练营（WTF-Solidity）
+const book = String(route.meta.book || '')
+const isPrep = book === 'prep'
 const groups = ref<ChapterGroup[]>([])
 // 哪些分组是展开的，例如 { '入门篇': true }
 const openGroups = ref<Record<string, boolean>>({})
@@ -28,6 +30,7 @@ const current = ref<Chapter | null>(null)
 // 当前章节的正文（已经转换成 HTML）
 const content = ref('')
 const contentLoading = ref(false)
+const usesRemix = ref(false) // 这一章是否用到了 Remix 在线编辑器
 // 阅读区的 DOM 元素，用来换章时滚回顶部
 const readerEl = ref<HTMLElement | null>(null)
 // 加载状态和错误信息
@@ -63,7 +66,7 @@ function onDefenseDone(wall: number) {
 onMounted(async () => {
   userStore.api('/api/camp').then((d: Record<string, number>) => (defended.value = d)).catch(() => {})
   try {
-    const res = await fetch(isPrep ? '/api/chapters?book=prep' : '/api/chapters')
+    const res = await fetch(book ? `/api/chapters?book=${book}` : '/api/chapters')
     const data: ChapterGroup[] & { error?: string } = await res.json()
     if (!res.ok) throw new Error(data.error || '加载失败')
     groups.value = data
@@ -102,6 +105,25 @@ function fixImages(html: string, id: string) {
   )
 }
 
+// 教材里的外部链接：按 data/linkPolicy.ts 里的实测结果处理
+//   国内能打开的：在新标签页打开（不会把我们的页面替换掉），后面加个 ↗
+//   国内打不开的、已经失效的：改成不能点的灰色文字，鼠标移上去说明原因，出处信息保留
+function markExternal(html: string) {
+  return html.replace(/<a href="(https?:\/\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/g, (whole, href: string, text: string) => {
+    const url = href.replace(/&amp;/g, '&')
+    let host = ''
+    try {
+      host = new URL(url).host
+    } catch {
+      return text
+    }
+    if (host === location.host) return whole
+    if (DEAD_LINKS.has(url)) return `<span class="ext-off" title="原链接已失效：${href}">${text}（原链接已失效）</span>`
+    if (!OK_HOSTS.has(host)) return `<span class="ext-off" title="外部网站 ${host} 在国内无法访问，这里只保留出处">${text}</span>`
+    return `<a href="${href}" class="ext" target="_blank" rel="noopener noreferrer" title="外部网站（${host}）">${text}</a>`
+  })
+}
+
 // 点击某一章：向后端要这一章的原文，再把 Markdown 转成 HTML 显示
 async function openChapter(c: Chapter) {
   current.value = c
@@ -112,7 +134,9 @@ async function openChapter(c: Chapter) {
     const res = await fetch('/api/chapters/' + c.id)
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || '加载失败')
-    content.value = fixImages(marked.parse(data.text) as string, c.id)
+    content.value = markExternal(fixImages(marked.parse(data.text) as string, c.id))
+    // 这一章要用 Remix 在线编辑器：Remix 在国内经常打不开，开头提示一下可以去哪里动手
+    usesRemix.value = /remix\.ethereum\.org|Remix/.test(data.text)
   } catch (err) {
     content.value = `<p class="error">${(err as Error).message}</p>`
   }
@@ -219,7 +243,8 @@ function toggle(name: string) {
     <section class="reader glass" ref="readerEl" @scroll="onReaderScroll">
       <div v-if="!current" class="hint">
         <template v-if="isPrep">👈 从左边选一章，先认识区块链是什么</template>
-        <template v-else>👈 从左边选一章开始训练<p class="prep-tip">刚接触区块链？建议先去 <RouterLink to="/prep">预备营</RouterLink> 了解基础知识</p></template>
+        <template v-else-if="book">👈 从左边选一章开始学习</template>
+        <template v-else>👈 从左边选一章开始训练<p class="prep-tip">刚接触区块链？建议先去 <RouterLink to="/learn">学习中心</RouterLink> 从「区块链基础」学起</p></template>
       </div>
       <div v-else-if="contentLoading" class="hint">正在打开第 {{ current.no }} 讲…</div>
       <template v-else>
@@ -234,6 +259,20 @@ function toggle(name: string) {
           :chapter-title="videoChapterTitle"
           :chapter-no="current.no"
         />
+        <!-- 训练营（WTF 教材）每一讲开头的阅读说明：版本差别、灰色链接、Remix 的替代 -->
+        <div v-if="!book" class="read-note">
+          <b>📌 阅读说明</b>
+          <span>· 本教材按 Solidity 0.8 编写；平台使用的国产联盟链 FISCO BCOS v2 支持 Solidity 0.4.25～0.6.10，大部分基础语法两个版本相同。</span>
+          <span>· 带 ↗ 的蓝色链接可以打开；<span class="demo-off">灰色虚线</span>的网址所在网站国内无法访问，只作为出处保留。</span>
+          <span v-if="usesRemix">· 教程里提到的 Remix 在线编辑器国内打不开，本章代码可以在
+            <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink>
+            里运行，会自动载入示例代码并部署到我们的联盟链上。</span>
+        </div>
+        <!-- 自编教材里用到 Remix 的章节（目前没有，留着备用） -->
+        <p v-else-if="usesRemix" class="remix-tip">
+          💡 Remix 在线编辑器国内打不开，本章代码可以在
+          <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink> 里运行。
+        </p>
         <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
       </template>
     </section>
@@ -324,6 +363,22 @@ function toggle(name: string) {
 .article :deep(th) { background: rgba(0, 240, 255, 0.08); }
 .article :deep(img) { max-width: 100%; cursor: zoom-in; border-radius: var(--radius); }
 .article :deep(a) { color: var(--accent); }
+/* 外部链接：后面加个 ↗，提示会在新标签页打开 */
+.article :deep(a.ext)::after { content: ' ↗'; font-size: 0.8em; opacity: 0.7; }
+/* 国内打不开或已失效的链接：灰色文字，不能点 */
+.article :deep(.ext-off) { color: var(--text-dim); border-bottom: 1px dashed var(--text-faint); cursor: help; }
+.read-note {
+  display: flex; flex-direction: column; gap: 3px; margin: 0 0 16px; padding: 10px 14px; font-size: 13px; line-height: 1.7;
+  color: var(--text-dim); background: rgba(0, 240, 255, 0.04); border: 1px solid var(--line);
+}
+.read-note b { font-weight: 500; color: #fff; }
+.read-note a { color: var(--accent); }
+.read-note .demo-off { color: var(--text-dim); border-bottom: 1px dashed var(--text-faint); }
+.remix-tip {
+  margin: 0 0 16px; padding: 10px 14px; font-size: 13px; line-height: 1.7;
+  color: var(--gold); background: rgba(252, 238, 10, 0.06); border: 1px solid rgba(252, 238, 10, 0.3);
+}
+.remix-tip a { color: var(--accent); }
 .article :deep(strong) { color: #fff; }
 
 /* 放大查看：黑色半透明背景铺满全屏，图片居中 */

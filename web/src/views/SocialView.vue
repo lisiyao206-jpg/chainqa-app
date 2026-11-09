@@ -5,7 +5,7 @@
 //   好友圈：发动态、点赞、评论（MomentsFeed.vue）
 //   好友：按账号加好友、处理好友申请、好友列表
 //   情报收集文件夹：我点赞、收藏过的帖子，分「视频」和「笔记 / 文本」，随时复习（StudyStation.vue，原来的「学习站」）
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from '../stores/user'
 import ChatRoom from '../components/ChatRoom.vue'
 import MomentsFeed from '../components/MomentsFeed.vue'
@@ -40,6 +40,8 @@ const userStore = useUserStore()
 const TABS = ['square', 'chat', 'moments', 'friends', 'folder']
 const route = useRoute()
 const tab = ref(TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'square')
+// 已经在情报站时，从顶栏下拉菜单换一栏：网址变了，页面不会重新加载，所以要盯着它
+watch(() => route.query.tab, (t) => TABS.includes(t as string) && (tab.value = t as string))
 const rooms = ref<Room[]>([])
 const friends = ref<UserBrief[]>([])
 const requests = ref<FriendRequest[]>([])

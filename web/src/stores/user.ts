@@ -13,6 +13,7 @@ export const useUserStore = defineStore('user', {
   getters: {
     isLoggedIn: (state) => !!state.user,
     isAdmin: (state) => state.user?.role === 'admin',
+    isTeacher: (state) => state.user?.role === 'teacher',
   },
   actions: {
     // 发请求的小工具：自动带上 token，出错时把后端的提示抛出来
@@ -44,8 +45,9 @@ export const useUserStore = defineStore('user', {
       this.saveLogin(await this.api<LoginResult>('/api/login', { account, pwd }))
     },
     // 注册只填密码和昵称，账号由系统分配（6 位数字）；返回分配到的账号，页面上大字显示给用户记下
-    async register(pwd: string, nickname: string) {
-      const r = await this.api<LoginResult>('/api/register', { pwd, nickname })
+    // identity：'student' 学生 / 'teacher' 老师（老师要等管理员审核通过才生效）
+    async register(pwd: string, nickname: string, identity: 'student' | 'teacher' = 'student') {
+      const r = await this.api<LoginResult>('/api/register', { pwd, nickname, identity })
       this.saveLogin(r)
       return r.user.account
     },

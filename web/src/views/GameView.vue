@@ -14,12 +14,12 @@ import { levels } from '../data/levels'
 import { useGameStore } from '../stores/game'
 import { useMistakesStore } from '../stores/mistakes'
 import { useAiStore } from '../stores/ai'
-import { useUserStore } from '../stores/user'
 import MedalPopup from '../components/MedalPopup.vue'
 import MedalWall from '../components/MedalWall.vue'
 import CodeFrame from '../components/CodeFrame.vue'
 import ImgSlot from '../components/ImgSlot.vue'
 import Monster3D from '../components/Monster3D.vue'
+import { useUserStore } from '../stores/user'
 import { useThemeStore } from '../stores/theme'
 import type { Level, FixOption } from '../types'
 
@@ -40,6 +40,7 @@ const ai = useAiStore()
 const route = useRoute()
 const router = useRouter()
 onMounted(async () => {
+  loadChainLab()
   await game.load()
   const lv = levels.find((l) => l.id === Number(route.query.level))
   if (lv) start(lv)
@@ -245,7 +246,8 @@ function lose() {
   mistakes.add(
     `【漏洞猎人 · ${lv.title}】这份合约的漏洞在哪？怎么修补？\n\n${lv.code.join('\n')}`,
     `漏洞类型：${lv.type}（第 ${lv.bugLines.join('、')} 行）\n${lv.explanation}\n\n正确的修补：\n${right.code.join('\n')}\n${right.why}`,
-    'game'
+    'game',
+    `level:${lv.id}`,
   )
 }
 
@@ -271,59 +273,26 @@ const clearedCount = computed(() => levels.filter((l) => game.cleared[l.id]).len
 const totalStars = computed(() => levels.reduce((n, l) => n + (game.cleared[l.id] || 0), 0))
 
 const nextLevel = computed(() => levels.find((l) => l.id === (level.value?.id as number) + 1))
-const editMode = ref(false)          // true = 亲手改代码编辑器；false = 四选一
-const codeText = ref('')             // 编辑器里当前代码
-const verifyState = ref<'idle' | 'checking' | 'fixed' | 'fail'>('idle')
-const verifyMsg = ref('')            // 校验结果的提示
-let lastFixed: number[] | null = null // 记录上次成功修复的行，用于标记
-// 进入亲手改代码模式：把当前关卡的漏洞行代码预填进编辑器
-function enableEditor() {  
-editMode.value = true  
-verifyState.value = 'idle'  
-verifyMsg.value = ''  
-codeText.value = level.value!.code.join('\n')
+
+// ===== 链上实验场 =====
+// 打怪通关后，有对应链上实验的关卡显示跳转按钮：去实验场亲手改代码、部署上链接受攻击
+const userStore = useUserStore()
+const chainLevels = ref<{ level: number; lab: number }[]>([]) // 哪些关卡有链上实验
+const labSeen = ref(localStorage.getItem('chainlab-seen') === '1') // 点过一次以后，按钮不再呼吸发光
+async function loadChainLab() {
+  try {
+    const r = await userStore.api<{ labs: { id: number; level: number }[] }>('/api/lab')
+    chainLevels.value = r.labs.map((l) => ({ level: l.level, lab: l.id }))
+  } catch {
+    chainLevels.value = []
+  }
 }
-// 回到四选一
-function backToChoices() {  
-editMode.value = false  
-verifyState.value = 'idle'  
-verifyMsg.value = ''
+const labOfLevel = computed(() => chainLevels.value.find((c) => c.level === level.value?.id)?.lab)
+function openLab() {
+  labSeen.value = true
+  localStorage.setItem('chainlab-seen', '1')
+  router.push({ path: '/lab', query: { lab: String(labOfLevel.value) } })
 }
-// 提交亲手写好的代码，交给后端 /api/variant/verify 校验
-const user = useUserStore()
-async function submitFix() {  
-if (verifyState.value === 'checking' || !level.value) return  
-const lv = level.value  
-verifyState.value = 'checking'  
-verifyMsg.value = ''  
-try {    
-const res = await user.api<{ fixed: boolean; swc?: string; remaining?: { line: number }[]; note?: string }>(      
-'/api/variant/verify',      
-{ baseLevel: lv.id, swc: LEVEL_SWC_FRONT?.[lv.id] ?? swcFor(lv), codeLines: codeText.value.split('\n') },      
-'POST'    
-)    
-if (res?.fixed) {      
-verifyState.value = 'fixed'      
-verifyMsg.value = res.note || '漏洞已修复 🎉'      
-lastFixed = (res.remaining || []).map((r) => r.line)      
-damage(40, '亲手修复 -40')      
-win()    
-} else {      
-verifyState.value = 'fail'      
-verifyMsg.value = res?.note || '还没修好，再检查一下漏洞所在的行'      
-countered()    
-}  
-} catch {    
-verifyState.value = 'fail'    
-verifyMsg.value = '校验失败，请稍后重试'  
-}
-}
-// 前端也能查到关卡对应的 SWC（与后端 LEVEL_SWC 保持一致）
-const LEVEL_SWC_FRONT: Record<number, string> = {  
-1: 'SWC-105', 2: 'SWC-101', 3: 'SWC-107', 4: 'SWC-115', 5: 'SWC-120',  
-6: 'SWC-112', 7: 'SWC-104', 8: 'SWC-113', 9: 'SWC-116', 10: 'SWC-121',
-}
-function swcFor(lv: Level) { return LEVEL_SWC_FRONT[lv.id] || '' }
 </script>
 
 <template>
@@ -497,9 +466,13 @@ function swcFor(lv: Level) { return LEVEL_SWC_FRONT[lv.id] || '' }
           <button @click="askMentor">🧑‍💻 请白帽导师结合教材再讲讲</button>
           <button @click="start(level)">🔄 再战一次</button>
           <button @click="reviewWithAI">🤖 让 AI 审计复盘这份合约</button>
+          <button v-if="phase === 'win' && labOfLevel" :class="['chain-btn', { fresh: !labSeen }]" @click="openLab">⛓ 去链上实验场亲手修复</button>
           <button v-if="phase === 'win' && nextLevel" class="primary" @click="start(nextLevel)">下一只怪兽 →</button>
         </div>
+        <div v-if="phase === 'win' && labOfLevel && !labSeen" class="lab-tip">选对修法只是第一步：去区块链上亲手写代码修好它，接受攻击者的考验</div>
       </div>
+
+      <!-- 链上实验场 -->
 
       <!-- 胜利时弹出勋章 -->
       <MedalPopup
@@ -769,7 +742,12 @@ function swcFor(lv: Level) { return LEVEL_SWC_FRONT[lv.id] || '' }
   border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.04);
 }
 .result-actions button:hover { border-color: var(--accent); color: #fff; }
-.result-actions .primary { border: none; color: #05020f; }
+.result-actions .primary { border: none; color: #05020f; background: linear-gradient(90deg, var(--accent-strong), var(--accent)); }
+/* 链上实验场按钮：青色描边；第一次通关时边框慢慢呼吸发光，点过一次就不再提示 */
+.result-actions .chain-btn { border-color: var(--accent); color: var(--accent); }
+.result-actions .chain-btn.fresh { animation: glow 2.4s ease-in-out infinite; }
+@keyframes glow { 50% { box-shadow: 0 0 14px rgba(0, 240, 255, 0.45); } }
+.lab-tip { margin-top: 8px; font-size: 12.5px; color: var(--text-dim); }
 /* ===== 手机（屏幕窄于 760px） ===== */
 @media (max-width: 760px) {
   .cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }

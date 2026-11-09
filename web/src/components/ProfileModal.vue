@@ -178,7 +178,7 @@ async function bindPhone() {
               <span :class="{ dim: !profile.phone }">{{ profile.phone || '未绑定' }}</span>
               <button class="copy" type="button" @click="binding = !binding">{{ profile.phone ? '更换' : '绑定' }}</button>
             </dd>
-            <dt>身份</dt><dd>{{ profile.role === 'admin' ? '管理员' : '审计员' }}</dd>
+            <dt>身份</dt><dd>{{ { admin: '管理员', teacher: '🧑‍🏫 老师', user: '🎓 学生' }[profile.role] || '学生' }}</dd>
             <dt>入职时间</dt><dd>{{ profile.registerTime.slice(0, 10) }}</dd>
           </dl>
           <button class="my-avatar" title="更换头像" @click="showPicker = !showPicker">

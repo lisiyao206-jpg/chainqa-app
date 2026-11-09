@@ -1,8 +1,7 @@
 {
   "name": "chainqa",
   "version": "0.1.0",
-  "description":"链知答 LIANZHIDA — 以 AI 为核心的智能合约安全审计学习与实践平台",
- 
+  "description": "链知答 LIANZHIDA — 以 AI 为核心的智能合约安全审计学习与实践平台",
   "type": "module",
   "scripts": {
     "build": "node rag.mjs build",
@@ -11,5 +10,8 @@
   "engines": {
     "node": ">=22.5"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "solc": "0.6.10"
+  }
 }

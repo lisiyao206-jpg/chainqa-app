@@ -231,7 +231,8 @@ onMounted(loadUsers)
         <input v-model="form.nickname" maxlength="12" placeholder="昵称" />
         <input v-model="form.pwd" type="password" :placeholder="form.mode === 'create' ? '密码（至少 6 位）' : '重置密码（不填就不改）'" />
         <select v-model="form.role" :disabled="form.userId === userStore.user?.userId">
-          <option value="user">审计员</option>
+          <option value="user">学生</option>
+          <option value="teacher">老师</option>
           <option value="admin">管理员</option>
         </select>
         <button>保存</button>
@@ -250,6 +251,7 @@ onMounted(loadUsers)
             <td>
               {{ u.account }}
               <span v-if="u.role === 'admin'" class="tag admin">管理员</span>
+              <span v-else-if="u.role === 'teacher'" class="tag teacher">老师</span>
             </td>
             <td>{{ u.nickname }}</td>
             <td>{{ fmt(u.registerTime) }}</td>
@@ -465,6 +467,8 @@ tr.expand td { white-space: normal; background: rgba(0, 240, 255, 0.04); }
 /* 小标签：管理员 / 正常 / 已禁用 / 待温习 / 已掌握 */
 .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
 .tag.admin { background: rgba(0, 240, 255, 0.15); color: var(--accent); margin-left: 4px; }
+.tag.teacher { background: rgba(142, 230, 196, 0.15); color: var(--ok); margin-left: 4px; }
+
 .tag.active, .tag.mastered { background: rgba(142, 230, 196, 0.15); color: var(--ok); }
 .tag.disabled, .tag.todo { background: rgba(255, 107, 129, 0.15); color: var(--danger); }
 

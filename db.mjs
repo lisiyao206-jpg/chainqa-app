@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   account       TEXT NOT NULL UNIQUE,
   pwd           TEXT NOT NULL,                 -- 加密后的密码（盐:哈希），不存明文
   nickname      TEXT,
-  role          TEXT NOT NULL DEFAULT 'user',  -- 'user' 普通 / 'admin' 管理员
+  role          TEXT NOT NULL DEFAULT 'user',  -- 'user' 学生 / 'teacher' 老师 / 'admin' 管理员
   status        TEXT NOT NULL DEFAULT 'active', -- 'active' 正常 / 'disabled' 被管理员禁用
   register_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
@@ -150,6 +150,65 @@ CREATE TABLE IF NOT EXISTS post_comments (
   content     TEXT NOT NULL,
   create_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
+
+-- ===== 我的班级（老师建班、学生凭班级码加入）=====
+-- 视频会议用腾讯会议等现成平台：老师贴一个会议链接，班级里显示成会议卡片
+CREATE TABLE IF NOT EXISTS classes (
+  class_id      INTEGER PRIMARY KEY AUTOINCREMENT,
+  name          TEXT NOT NULL,
+  code          TEXT NOT NULL UNIQUE,          -- 6 位班级码，学生输入它加入
+  teacher_id    INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  meeting_title TEXT,
+  meeting_url   TEXT,
+  meeting_time  TEXT,
+  create_time   TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+CREATE TABLE IF NOT EXISTS class_members (
+  class_id  INTEGER NOT NULL REFERENCES classes(class_id) ON DELETE CASCADE,
+  user_id   INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  join_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  PRIMARY KEY (class_id, user_id)
+);
+-- 班级任务：kind = 'chapter' 读完一章并守住防御战 / 'level' 通关一关实战任务
+-- 完成情况不用学生手动交：直接看 camp_progress、game_progress 里有没有记录
+CREATE TABLE IF NOT EXISTS class_tasks (
+  task_id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  class_id    INTEGER NOT NULL REFERENCES classes(class_id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL,
+  target      TEXT NOT NULL,                   -- 章节 id（如 S01_ReentrancyAttack）或关卡编号（如 3）
+  title       TEXT NOT NULL,
+  note        TEXT NOT NULL DEFAULT '',        -- 老师的要求说明
+  deadline    TEXT,                            -- 截止时间，可以不设
+  create_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+-- 老师对某个学生某项任务的点评
+CREATE TABLE IF NOT EXISTS task_reviews (
+  task_id     INTEGER NOT NULL REFERENCES class_tasks(task_id) ON DELETE CASCADE,
+  user_id     INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  comment     TEXT NOT NULL,
+  create_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+  PRIMARY KEY (task_id, user_id)
+);
+-- 班级资料：只有本班老师和学生能看到、下载
+CREATE TABLE IF NOT EXISTS class_materials (
+  material_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  class_id    INTEGER NOT NULL REFERENCES classes(class_id) ON DELETE CASCADE,
+  file_id     TEXT NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
+  title       TEXT NOT NULL,
+  create_time TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
+-- 链上实验场：每人每道题一条记录（题目在 chainlab/labs.mjs）
+CREATE TABLE IF NOT EXISTS lab_progress (
+  user_id       INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  lab_id        INTEGER NOT NULL,
+  attempts      INTEGER NOT NULL DEFAULT 0,    -- 部署上链接受攻击的次数（编译失败不算）
+  passed        INTEGER NOT NULL DEFAULT 0,    -- 1 = 三种攻击都挡住、正常业务也能用
+  pass_time     TEXT,
+  pass_contract TEXT,                          -- 通关那次部署的合约地址，链上可查
+  pass_block    INTEGER,
+  PRIMARY KEY (user_id, lab_id)
+);
 `);
 
 // 给「已经建好的旧表」补上新加的列。
@@ -172,6 +231,10 @@ try {
 // 手机号：可以绑定一个手机号，用「手机号 + 密码」或「手机号 + 验证码」登录；一个手机号只能绑一个账号
 try {
   db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
+} catch {}
+// 错题出自哪里：章节 id（防御战答错）或 'level:3'（实战第 3 关失败），学习报告靠它把错题算到知识点上
+try {
+  db.exec("ALTER TABLE mistakes ADD COLUMN ref TEXT");
 } catch {}
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)");
 // 错题：同一道题错了好几次，不再重复记录，只记「错了几次」

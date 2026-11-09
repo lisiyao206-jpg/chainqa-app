@@ -4,6 +4,7 @@
 // 四个「发光点」就是四个功能入口：鼠标移上去，右侧淡入介绍；点击进入
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { NAV, NAV_MENUS } from '../data/navMenus'
 import ProfileModal from '../components/ProfileModal.vue'
 import UserAvatar from '../components/UserAvatar.vue'
 import { useUserStore } from '../stores/user'
@@ -14,27 +15,28 @@ const userStore = useUserStore()
 const theme = useThemeStore()
 const showProfile = ref(false)
 
-// 七个入口：x、y 是发光点在屏幕上的位置（百分比）
+// 八个入口：x、y 是发光点在屏幕上的位置（百分比）
 const isMobile = ref(window.innerWidth <= 760)
 window.addEventListener('resize', () => {
   isMobile.value = window.innerWidth <= 760
 })
 
 const spots = [
-  { no: '00', to: '/prep', title: '预备营', en: 'PREP', desc: '零基础入口：从"什么是区块链、什么是智能合约"讲起，配合教材和视频打地基，不需要任何基础就能看懂链上安全。', x: 13, y: 56, mobileX: 30, mobileY: 38, activeTitle: '进入预备营' },
-  { no: '01', to: '/camp', title: '训练营', en: 'CAMP', desc: '按章节系统学习智能合约安全问题，每章配知识点讲解和选择题闯关，边学边测，答错的题自动进错题本，方便考前复盘。', x: 30, y: 34, mobileX: 30, mobileY: 49, activeTitle: '进入训练营' },
+  { no: '00', to: '/learn', title: '学习中心', en: 'LEARN', desc: '五条学习路线：区块链基础、联盟链实战、合约开发、合约安全、应用与前沿。从零基础学起，每章标好知识点，学到哪一目了然。', x: 13, y: 56, mobileX: 30, mobileY: 38, activeTitle: '进入学习中心' },
+  { no: '01', to: '/class', title: '我的班级', en: 'CLASS', desc: '老师建班、布置学习任务、分享资料、发起视频会议；学生输入班级码加入，任务完成情况由学习记录自动统计。', x: 30, y: 34, mobileX: 30, mobileY: 49, activeTitle: '进入班级' },
   { no: '02', to: '/mentor', title: '白帽导师', en: 'MENTOR', desc: '一对一答疑。学习或做题卡住时，向白帽导师提问，它会结合知识库讲解原理、拆解代码，帮你订正错误理解。', x: 66, y: 28, mobileX: 70, mobileY: 38, activeTitle: '联系导师' },
   { no: '03', to: '/archive', title: '案件档案', en: 'ARCHIVE', desc: '经典漏洞案件复盘。还原历史上真实被攻击的智能合约案例（重入、整型溢出、权限漏洞等），看清攻击手法和防范措施。', x: 36, y: 70, mobileX: 30, mobileY: 60, activeTitle: '查看档案' },
-  { no: '04', to: '/mission', title: '实战任务', en: 'MISSION', desc: '动手实战闯关。在虚拟合约里实际找出漏洞、完成任务，把学到的知识用出来，练出真能挖洞的本事。', x: 60, y: 70, mobileX: 70, mobileY: 49, activeTitle: '接取任务' },
+  { no: '04', to: '/mission', title: '实战任务', en: 'MISSION', desc: '和漏洞怪兽对战，找出漏洞、选对修法。打完还可以去「链上实验场」亲手写代码修复合约，部署到真实的联盟链上接受攻击（顶栏「实战任务」里进入）。', x: 60, y: 70, mobileX: 70, mobileY: 49, activeTitle: '接取任务',
+  },
   { no: '05', to: '/social', title: '情报站', en: 'SOCIAL', desc: '链上安全情报中心。实时安全动态、行业资讯、社区讨论都在这，随时了解圈内在发生什么。', x: 52, y: 84, mobileX: 50, mobileY: 71, activeTitle: '进入情报站' },
+  { no: '07', to: '/report', title: '学习报告', en: 'REPORT', desc: '我的学习体检：每个知识点掌握了多少、哪里薄弱、下一步学什么，白帽导师还会根据你的数据写一份学习建议。', x: 82, y: 46, mobileX: 50, mobileY: 82, activeTitle: '查看报告' },
   { no: '06', to: '/audit', title: 'AI 审计', en: 'AUDIT', desc: '智能合约一键体检。把合约代码交给 AI，自动扫描潜在漏洞风险并给出提示，体验真实的审计工作流。', x: 84, y: 82, mobileX: 70, mobileY: 60, activeTitle: '开始审计' },
 ]
 
 // 当前「点亮」的入口：鼠标移到发光点或左侧目录上时设置，移开时清空
-// 学习路线：预备营 → 训练营 → 实战任务 → AI 审计
+// 学习路线：学习中心 → 实战任务 → AI 审计
 const ROUTE = [
-  { to: '/prep', title: '预备营' },
-  { to: '/camp', title: '训练营' },
+  { to: '/learn', title: '学习中心' },
   { to: '/mission', title: '实战任务' },
   { to: '/audit', title: 'AI 审计' },
 ]
@@ -71,11 +73,23 @@ function toggleSpot(s: { no: string; to: string; title: string; x: number; y: nu
     <header class="top">
       <nav class="links">
         <span class="brand">链上安全局</span>
-        <RouterLink v-for="s in spots" :key="s.no" :to="s.to">{{ s.title }}</RouterLink>
+        <template v-for="s in NAV" :key="s.to">
+          <span v-if="NAV_MENUS[s.to]" class="drop">
+            <RouterLink :to="s.to">{{ s.title }} ▾</RouterLink>
+            <span class="menu">
+              <span class="menu-box">
+                <RouterLink v-for="x in NAV_MENUS[s.to].subs" :key="x.to" :to="x.to">{{ x.title }}</RouterLink>
+              </span>
+            </span>
+          </span>
+          <RouterLink v-else :to="s.to">{{ s.title }}</RouterLink>
+        </template>
       </nav>
       <div class="me">
         <!-- 只有管理员看得到 -->
         <RouterLink v-if="userStore.isAdmin" to="/admin" class="admin">管理后台</RouterLink>
+        <!-- 身份标签：老师 -->
+        <span v-if="userStore.isTeacher" class="role-tag">老师</span>
         <a class="admin" @click="logout">退出</a>
         <button class="me-btn" title="我的档案" @click="showProfile = true">
           <UserAvatar :user="userStore.user" :size="34" />
@@ -146,6 +160,7 @@ function toggleSpot(s: { no: string; to: string; title: string; x: number; y: nu
 </template>
 
 <style scoped>
+.role-tag { padding: 1px 9px; font-size: 12px; letter-spacing: 1px; color: var(--ok); border: 1px solid rgba(142, 230, 196, 0.5); }
 .lobby {
   position: relative; min-height: 100vh; min-height: 100dvh; overflow: auto;
   color: #e9e6ff;
@@ -220,6 +235,17 @@ function toggleSpot(s: { no: string; to: string; title: string; x: number; y: nu
   transition: all 0.3s;
 }
 .spot.on .dot { transform: scale(1.5); }
+.drop { position: relative; }
+/* 有分支的导航（实战任务）：鼠标移上去，下面展开分支菜单；上面留一段透明空隙，鼠标往下移时菜单不会消失 */
+.menu { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 30; padding-top: 12px; display: none; }
+.drop:hover .menu { display: block; }
+.menu-box {
+  display: flex; flex-direction: column; padding: 6px 0; min-width: 140px;
+  background: rgba(6, 4, 20, 0.95); border: 1px solid var(--line-strong); box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
+}
+.menu-box a { padding: 9px 16px; white-space: nowrap; }
+.menu-box a:hover { background: rgba(0, 240, 255, 0.08); }
+.menu-box a.on::after { display: none; }
 .spot.on .label { color: #fff; left: 74px; font-size: 21px; text-shadow: 0 0 16px var(--accent), 0 2px 4px #000; }
 
 /* ===== 右侧介绍 ===== */

@@ -17,6 +17,7 @@ const account = ref('')
 const pwd = ref('')
 const nickname = ref('')
 const pwd2 = ref('')        // 注册时再输一次密码
+const identity = ref<'student' | 'teacher'>('student') // 注册身份
 const newAccount = ref('')  // 注册成功后系统分配的账号
 const copied = ref(false)
 const error = ref('')
@@ -59,7 +60,7 @@ async function submit() {
     } else {
       if (pwd.value !== pwd2.value) throw new Error('两次输入的密码不一样')
       // 注册成功：先停在这里，把分配到的账号大字显示出来，记下了再进大厅
-      newAccount.value = await userStore.register(pwd.value, nickname.value)
+      newAccount.value = await userStore.register(pwd.value, nickname.value, identity.value)
     }
   } catch (err) {
     error.value = (err as Error).message
@@ -103,8 +104,8 @@ function switchMode(m: string) {
       <p>从零认识区块链，一步步成长为智能合约安全审计员</p>
       <!-- 学习路线：四步，从「区块链是什么」一路走到「审计真实合约」 -->
       <ol class="route">
-        <li><span>01</span><b>预备营</b>认识区块链：区块、哈希、私钥、交易、共识</li>
-        <li><span>02</span><b>训练营</b>学 Solidity 与合约漏洞，学完一章打一场防御战</li>
+        <li><span>01</span><b>学习中心</b>五条路线，从区块链基础学到亲手上链</li>
+        <li><span>02</span><b>防御战</b>学完一章打一场防御战，答错的题自动进错题本</li>
         <li><span>03</span><b>实战任务</b>和漏洞怪兽对战：找出漏洞，选对修法</li>
         <li><span>04</span><b>AI 审计</b>用审计 Agent 检查真实合约，问题直通对应知识点</li>
         <li><span>05</span><b>情报站</b>在此处可以与链友交换情报，讨论情报</li>
@@ -143,7 +144,15 @@ function switchMode(m: string) {
         <input v-model="account" class="input" placeholder="6 位数字账号或手机号" autocomplete="username" />
         <span v-if="accountHint" class="field-tip">{{ accountHint }}</span>
       </label>
-      <label v-else class="field">
+      <div v-if="mode === 'register'" class="field">
+        <span class="label">我是</span>
+        <div class="identity">
+          <button type="button" :class="{ on: identity === 'student' }" @click="identity = 'student'">🎓 学生</button>
+          <button type="button" :class="{ on: identity === 'teacher' }" @click="identity = 'teacher'">🧑‍🏫 老师</button>
+        </div>
+        <span v-if="identity === 'teacher'" class="field-tip">老师可以建班级、布置任务、分享资料、发起视频会议</span>
+      </div>
+      <label v-if="mode === 'register'" class="field">
         <span class="label">昵称</span>
         <input v-model="nickname" class="input" placeholder="你的昵称" maxlength="12" />
       </label>
@@ -173,6 +182,7 @@ function switchMode(m: string) {
         <h3>🎉 注册成功，这是你的审计员编号</h3>
         <div class="acc-no">{{ newAccount }}</div>
         <p>以后用这个 <b>6 位数字账号</b> + 密码登录。<br />请截图或记下来；登录后在「我的档案」里也能看到。</p>
+        <p v-if="identity === 'teacher'" class="pending">🧑‍🏫 进入大厅后，点「我的班级」就能建班。</p>
         <div class="issued-actions">
           <button class="btn" type="button" @click="copyAccount">{{ copied ? '✅ 已复制' : '📋 复制账号' }}</button>
           <button class="btn primary" type="button" @click="router.push('/')">记好了，进入大厅 →</button>
@@ -218,6 +228,13 @@ function switchMode(m: string) {
 .field { display: flex; flex-direction: column; gap: 2px; }
 .label { font-size: 14px; letter-spacing: 1px; color: #fff; }
 .field-tip { margin-top: 4px; font-size: 13px; color: var(--gold); }
+.identity { display: flex; gap: 10px; margin-top: 6px; }
+.identity button {
+  flex: 1; padding: 9px 0; cursor: pointer; font-family: var(--font); font-size: 15px; letter-spacing: 1px;
+  color: var(--text-dim); background: transparent; border: 1px solid var(--line); transition: all 0.2s;
+}
+.identity button.on { color: #fff; border-color: var(--accent); box-shadow: 0 0 10px rgba(0, 240, 255, 0.25); }
+.issued p.pending { margin-top: -10px; color: var(--gold); }
 /* 注册成功弹窗 */
 .mask { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.7); }
 .issued { width: min(440px, 92vw); padding: 32px 30px; text-align: center; background: rgba(8, 4, 22, 0.97); border: 1px solid var(--line-strong); }

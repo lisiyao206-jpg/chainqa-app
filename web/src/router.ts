@@ -7,6 +7,11 @@ import { useUserStore } from './stores/user'
 // 其他页面写成 () => import(...)，等用户真的点进去才下载，首页加载快很多
 // （比如实战任务里的 three.js 3D 引擎很大，不进实战就不用下载它）
 const TextbookView = () => import('./views/TextbookView.vue')
+const LearnView = () => import('./views/LearnView.vue')
+const ClassView = () => import('./views/ClassView.vue')
+const ReportView = () => import('./views/ReportView.vue')
+const LabView = () => import('./views/LabView.vue')
+const PlaygroundView = () => import('./views/PlaygroundView.vue')
 const MentorView = () => import('./views/MentorView.vue')
 const NotebookView = () => import('./views/NotebookView.vue')
 const GameView = () => import('./views/GameView.vue')
@@ -20,12 +25,24 @@ const router = createRouter({
     // title 是页面名字，顶栏会显示它
     { path: '/login', component: LoginView, meta: { title: '登录', public: true } },
     { path: '/', component: LobbyView, meta: { title: '大厅' } },
-    // 预备营和训练营共用同一个阅读页面，只是读的教材不同（book: 'prep' 读区块链基础）
-    { path: '/prep', component: TextbookView, meta: { title: '预备营', book: 'prep' } },
+    // 学习中心：五条学习路线的总目录，点哪一章就跳到对应的阅读页
+    { path: '/learn', component: LearnView, meta: { title: '学习中心' } },
+    // 我的班级：老师建班、布置任务；学生凭班级码加入
+    { path: '/class', component: ClassView, meta: { title: '我的班级' } },
+    // 学习报告：知识点掌握度、推荐下一步、AI 学习建议
+    { path: '/report', component: ReportView, meta: { title: '学习报告' } },
+    // 所有教材共用同一个阅读页面，只是读的教材不同（book: 'prep' 读区块链基础）
+    { path: '/prep', component: TextbookView, meta: { title: '区块链基础', book: 'prep' } },
+    { path: '/fisco', component: TextbookView, meta: { title: '联盟链实战', book: 'fisco' } },
+    { path: '/frontier', component: TextbookView, meta: { title: '应用与前沿', book: 'frontier' } },
     { path: '/camp', component: TextbookView, meta: { title: '训练营' } },
     { path: '/mentor', component: MentorView, meta: { title: '白帽导师' } },
     { path: '/archive', component: NotebookView, meta: { title: '案件档案' } },
     { path: '/mission', component: GameView, meta: { title: '实战任务' } },
+    // 链上实验场：亲手改合约，部署到联盟链上接受攻击
+    { path: '/lab', component: LabView, meta: { title: '链上实验场' } },
+    // 合约练习场：随便写合约、部署到联盟链、调用函数（代替国外的 Remix）
+    { path: '/playground', component: PlaygroundView, meta: { title: '合约练习场' } },
     { path: '/social', component: SocialView, meta: { title: '情报站' } },
     // 学习站已经并进情报站，改名「情报收集文件夹」；旧地址自动跳过去
     { path: '/study', redirect: '/social?tab=folder' },

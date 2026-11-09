@@ -179,7 +179,7 @@ export function roomMembers(uid, roomId) {
   return all("SELECT user_id FROM room_members WHERE room_id = ?", roomId).map((r) => userBrief(r.user_id));
 }
 
-function fileBrief(fileId) {
+export function fileBrief(fileId) {
   const f = fileId && one("SELECT * FROM files WHERE file_id = ?", fileId);
   const ext = f && path.extname(f.name).toLowerCase();
   return f ? { id: f.file_id, name: f.name, size: f.size, isImage: IMAGE_EXT.includes(ext), isVideo: VIDEO_EXT.includes(ext) } : null;
@@ -380,7 +380,11 @@ export function getFile(uid, fileId) {
     f.user_id === uid ||
     one("SELECT 1 FROM users WHERE avatar = ?", "file:" + f.file_id) ||
     one(`SELECT 1 FROM messages m JOIN room_members rm ON rm.room_id = m.room_id AND rm.user_id = ? WHERE m.file_id = ?`, uid, f.file_id) ||
-    all("SELECT * FROM posts WHERE file_id = ?", f.file_id).some((p) => canSeePost(uid, p));
+    all("SELECT * FROM posts WHERE file_id = ?", f.file_id).some((p) => canSeePost(uid, p)) ||
+    // 班级资料：本班的老师和学生都能下载
+    one(`SELECT 1 FROM class_materials cm JOIN classes c ON c.class_id = cm.class_id
+         WHERE cm.file_id = ? AND (c.teacher_id = ? OR EXISTS
+           (SELECT 1 FROM class_members WHERE class_id = c.class_id AND user_id = ?))`, f.file_id, uid, uid);
   if (!ok) return null;
   const ext = path.extname(f.name).toLowerCase();
   return { path: path.join(UPLOAD_DIR, f.file_id), name: f.name, isMedia: IMAGE_EXT.includes(ext) || VIDEO_EXT.includes(ext), ext };

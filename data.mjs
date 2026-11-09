@@ -62,18 +62,20 @@ tidyMistakes();
 export function listMistakes(userId) {
   return db.prepare("SELECT * FROM mistakes WHERE user_id = ? ORDER BY create_time DESC, mistake_id DESC").all(userId).map(mistakeRow);
 }
-export function addMistake(userId, { question, answer, analysis = null, source = "manual" }) {
+export function addMistake(userId, { question, answer, analysis = null, source = "manual", ref = null }) {
   if (!question || !answer) throw new Error("题目和答案不能为空");
+  // ref：错题出自哪一章（如 S01_ReentrancyAttack）或哪一关（如 level:3），格式不对就不记
+  ref = /^((\d{2}|S\d{2}|[PFA]\d{2})_[\w-]+|level:\d{1,2})$/.test(String(ref)) ? String(ref) : null;
   // 这道题以前就错过：不再新加一条，而是「错的次数 +1」，重新标成待温习，并挪到最上面
   const old = db.prepare("SELECT mistake_id FROM mistakes WHERE user_id = ? AND question = ?").get(userId, question);
   if (old) {
-    db.prepare(`UPDATE mistakes SET wrong_count = wrong_count + 1, status = 'todo', answer = ?,
-                create_time = datetime('now', 'localtime') WHERE mistake_id = ?`).run(answer, old.mistake_id);
+    db.prepare(`UPDATE mistakes SET wrong_count = wrong_count + 1, status = 'todo', answer = ?, ref = COALESCE(?, ref),
+                create_time = datetime('now', 'localtime') WHERE mistake_id = ?`).run(answer, ref, old.mistake_id);
     return mistakeRow(db.prepare("SELECT * FROM mistakes WHERE mistake_id = ?").get(old.mistake_id));
   }
   const { lastInsertRowid } = db
-    .prepare("INSERT INTO mistakes (user_id, question, answer, analysis, source) VALUES (?, ?, ?, ?, ?)")
-    .run(userId, question, answer, analysis, source === "game" ? "game" : "manual");
+    .prepare("INSERT INTO mistakes (user_id, question, answer, analysis, source, ref) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(userId, question, answer, analysis, source === "game" ? "game" : "manual", ref);
   return mistakeRow(db.prepare("SELECT * FROM mistakes WHERE mistake_id = ?").get(lastInsertRowid));
 }
 export function setMistakeStatus(userId, id, status) {

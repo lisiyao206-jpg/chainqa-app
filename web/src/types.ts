@@ -1,7 +1,7 @@
 // types.ts —— 前后端共用的数据「形状」
 // TypeScript 的好处：写错字段名（比如把 nickname 写成 nickName）时，编辑器当场标红，不用等运行才发现
 
-export type Role = 'admin' | 'user'
+export type Role = 'admin' | 'teacher' | 'user' // user 是学生
 
 export interface User {
   userId: number
@@ -107,3 +107,18 @@ export interface FileInfo {
 }
 
 export type Pulse = { kind: 'hurt' | 'win' | string; id: number }
+
+// 学习报告（ReportPanel 显示；/api/report 和老师查看学生报告都返回这个形状）
+export interface KpScore {
+  id: string; name: string; group: string
+  done: number; total: number; mistakes: number; mastery: number
+  state: 'untouched' | 'weak' | 'learning' | 'mastered'
+}
+export interface Report {
+  summary: {
+    chaptersDone: number; chaptersTotal: number; levelsDone: number; levelsTotal: number
+    mistakesOpen: number; mistakesMastered: number; notes: number
+  }
+  kps: KpScore[]
+  next: { kind: string; id: string; title: string; track: string; path: string; query: Record<string, string>; reason: string }[]
+}

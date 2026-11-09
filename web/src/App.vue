@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { NAV, NAV_MENUS } from './data/navMenus'
 import ChatPanel from './components/ChatPanel.vue'
 import VeilTransition from './components/VeilTransition.vue'
 import CyberOverlay from './components/CyberOverlay.vue'
@@ -36,16 +37,8 @@ const ai = useAiStore()
 const rain = ref<InstanceType<typeof VeilTransition> | null>(null)
 watch(() => route.path, () => rain.value?.play())
 
-// 顶栏的导航，和大厅保持一致
-const nav = [
-  { to: '/prep', title: '预备营' },
-  { to: '/camp', title: '训练营' },
-  { to: '/mentor', title: '白帽导师' },
-  { to: '/archive', title: '案件档案' },
-  { to: '/mission', title: '实战任务' },
-  { to: '/audit', title: 'AI 审计' },
-  { to: '/social', title: '情报站' },
-]
+// 顶栏的导航，和大厅共用同一份（data/navMenus.ts）
+const nav = NAV
 
 const userStore = useUserStore()
 const showProfile = ref(false)
@@ -83,7 +76,18 @@ async function logout() {
     <header class="topbar">
       <nav class="links">
         <RouterLink to="/" class="brand">链上安全局</RouterLink>
-        <RouterLink v-for="n in nav" :key="n.to" :to="n.to" active-class="on">{{ n.title }}</RouterLink>
+        <template v-for="n in nav" :key="n.to">
+          <!-- 有下拉菜单的栏目（学习中心、实战任务、案件档案、情报站）：鼠标移上去展开分支 -->
+          <span v-if="NAV_MENUS[n.to]" class="drop">
+            <RouterLink :to="n.to" :class="{ on: NAV_MENUS[n.to].match.includes(route.path) }">{{ n.title }} ▾</RouterLink>
+            <span class="menu">
+              <span class="menu-box">
+                <RouterLink v-for="x in NAV_MENUS[n.to].subs" :key="x.to" :to="x.to">{{ x.title }}</RouterLink>
+              </span>
+            </span>
+          </span>
+          <RouterLink v-else :to="n.to" active-class="on">{{ n.title }}</RouterLink>
+        </template>
       </nav>
       <div class="me">
         <RouterLink v-if="userStore.isAdmin" to="/admin" active-class="on">管理后台</RouterLink>
@@ -140,6 +144,17 @@ async function logout() {
   border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent);
 }
 .brand { color: #fff !important; letter-spacing: 3px; margin-right: 10px; }
+.drop { position: relative; }
+/* 有分支的导航（实战任务）：鼠标移上去，下面展开分支菜单；上面留一段透明空隙，鼠标往下移时菜单不会消失 */
+.menu { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 30; padding-top: 12px; display: none; }
+.drop:hover .menu { display: block; }
+.menu-box {
+  display: flex; flex-direction: column; padding: 6px 0; min-width: 140px;
+  background: rgba(6, 4, 20, 0.95); border: 1px solid var(--line-strong); box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
+}
+.menu-box a { padding: 9px 16px; white-space: nowrap; }
+.menu-box a:hover { background: rgba(0, 240, 255, 0.08); }
+.menu-box a.on::after { display: none; }
 .me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }
 .me-btn:hover { box-shadow: 0 0 12px rgba(0, 240, 255, 0.6); }
 

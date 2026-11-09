@@ -18,8 +18,9 @@ export const useMistakesStore = defineStore('mistakes', {
       this.list = await useUserStore().api('/api/mistakes')
     },
     // source：'manual' 自己加的 / 'game' 漏洞猎人答错自动加的
-    async add(question: string, answer: string, source = 'manual') {
-      const m = await useUserStore().api<Mistake>('/api/mistakes', { question, answer, source })
+    // ref：错题出自哪一章（章节 id）或哪一关（'level:3'），学习报告靠它把错题算到知识点上
+    async add(question: string, answer: string, source = 'manual', ref?: string) {
+      const m = await useUserStore().api<Mistake>('/api/mistakes', { question, answer, source, ref })
       // 同一道题又错了：后端返回的是原来那条（错的次数 +1），把旧的换掉、挪到最上面，不要重复显示
       this.list = [m, ...this.list.filter((x) => x.id !== m.id)]
     },

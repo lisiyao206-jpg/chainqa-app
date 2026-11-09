@@ -65,7 +65,7 @@ export function createUser({ account, pwd, nickname, role }) {
   if (pwd.length < 6) throw new Error("密码至少 6 位");
   if (db.prepare("SELECT 1 FROM users WHERE account = ?").get(account)) throw new Error("这个账号已经被注册了");
   nickname = String(nickname || account).trim().slice(0, 12) || account;
-  role = role === "admin" ? "admin" : "user";
+  role = ["admin", "teacher"].includes(role) ? role : "user";
   const { lastInsertRowid } = db
     .prepare("INSERT INTO users (account, pwd, nickname, role) VALUES (?, ?, ?, ?)")
     .run(account, hashPassword(pwd), nickname, role);
@@ -81,7 +81,7 @@ export function updateUser(adminId, id, { nickname, role, pwd }) {
     db.prepare("UPDATE users SET nickname = ? WHERE user_id = ?").run(nickname, id);
   }
   if (role !== undefined) {
-    if (!["user", "admin"].includes(role)) throw new Error("身份只能是 user 或 admin");
+    if (!["user", "teacher", "admin"].includes(role)) throw new Error("身份只能是学生、老师或管理员");
     if (id === adminId && role !== "admin") throw new Error("不能取消自己的管理员身份");
     db.prepare("UPDATE users SET role = ? WHERE user_id = ?").run(role, id);
   }
@@ -107,3 +107,4 @@ export function deleteUser(adminId, id) {
   if (id === adminId) throw new Error("不能删除自己");
   db.prepare("DELETE FROM users WHERE user_id = ?").run(id);
 }
+
