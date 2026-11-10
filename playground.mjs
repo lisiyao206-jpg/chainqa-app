@@ -57,10 +57,28 @@ export async function deploy(uid, { code, contract, params = [] }) {
   const c = built.contracts[contract];
   if (!c || !c.bin) throw new Error(`找不到可以部署的合约 ${contract}`);
   if (!Array.isArray(params) || params.length > 10) throw new Error("构造函数参数不对");
+  checkParams(c.abi.find((x) => x.type === "constructor")?.inputs || [], params);
   return guarded(uid, async () => {
     const user = await accountOf(uid);
     const d = await chain.deploy(user, contract, c.abi, c.bin, params.map(String));
     return { name: contract, address: d.address, block: d.block, abi: c.abi, from: user };
+  });
+}
+
+// ===== 检查参数：先在这里用中文说清楚哪一个填错了，不把链节点的英文报错直接丢给学生 =====
+function checkParams(inputs, params) {
+  inputs.forEach((p, i) => {
+    const v = String(params[i] ?? "").trim(), label = `第 ${i + 1} 个参数 ${p.name || ""}（${p.type}）`;
+    if (!v) throw new Error(`${label}还没填`);
+    const t = p.type;
+    if (/\[\d*\]$/.test(t) || t === "tuple") return; // 数组和结构体交给节点去检查
+    if (/^u?int\d*$/.test(t) && !(t.startsWith("u") ? /^\d+$/ : /^-?\d+$/).test(v))
+      throw new Error(`${label}要填${t.startsWith("u") ? "非负" : ""}整数，比如 0`);
+    if (t === "address" && !/^0x[0-9a-fA-F]{40}$/.test(v)) throw new Error(`${label}要填 0x 开头的 42 位地址`);
+    if (t === "bool" && !/^(true|false)$/.test(v)) throw new Error(`${label}只能填 true 或 false`);
+    const b = t.match(/^bytes(\d+)$/);
+    if (b && !new RegExp(`^0x[0-9a-fA-F]{${Number(b[1]) * 2}}$`).test(v)) throw new Error(`${label}要填 0x 开头、${Number(b[1]) * 2} 位十六进制`);
+    if (t === "bytes" && !/^0x([0-9a-fA-F]{2})*$/.test(v)) throw new Error(`${label}要填 0x 开头的十六进制，空的就填 0x`);
   });
 }
 
@@ -71,7 +89,8 @@ export async function invoke(uid, { address, name, abi, fn, params = [] }) {
   if (!Array.isArray(abi) || JSON.stringify(abi).length > 100_000) throw new Error("合约 ABI 不对");
   const f = abi.find((x) => x.type === "function" && x.name === fn && (x.inputs || []).length === params.length);
   if (!f) throw new Error(`合约里没有函数 ${fn}`);
-  const args = params.map(String);
+  checkParams(f.inputs || [], params);
+  const args = params.map((v) => String(v).trim());
   const read = f.stateMutability === "view" || f.stateMutability === "pure" || !!f.constant;
   return guarded(uid, async () => {
     const user = await accountOf(uid);
