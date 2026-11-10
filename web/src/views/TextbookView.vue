@@ -31,6 +31,7 @@ const current = ref<Chapter | null>(null)
 const content = ref('')
 const contentLoading = ref(false)
 const usesRemix = ref(false) // 这一章是否用到了 Remix 在线编辑器
+const hasCode = ref(false) // 这一章正文里有没有 Solidity 代码
 // 阅读区的 DOM 元素，用来换章时滚回顶部
 const readerEl = ref<HTMLElement | null>(null)
 // 加载状态和错误信息
@@ -137,6 +138,7 @@ async function openChapter(c: Chapter) {
     content.value = markExternal(fixImages(marked.parse(data.text) as string, c.id))
     // 这一章要用 Remix 在线编辑器：Remix 在国内经常打不开，开头提示一下可以去哪里动手
     usesRemix.value = /remix\.ethereum\.org|Remix/.test(data.text)
+    hasCode.value = /```solidity/.test(data.text) // 自编教材里有合约代码：提示可以去练习场运行
   } catch (err) {
     content.value = `<p class="error">${(err as Error).message}</p>`
   }
@@ -268,10 +270,10 @@ function toggle(name: string) {
             <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink>
             里运行，会自动载入示例代码并部署到我们的联盟链上。</span>
         </div>
-        <!-- 自编教材里用到 Remix 的章节（目前没有，留着备用） -->
-        <p v-else-if="usesRemix" class="remix-tip">
-          💡 Remix 在线编辑器国内打不开，本章代码可以在
-          <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink> 里运行。
+        <!-- 自编教材里有合约代码的章节：提示去练习场动手 -->
+        <p v-else-if="usesRemix || hasCode" class="remix-tip">
+          💡 本章的合约代码可以在
+          <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink> 里运行，会自动载入并部署到我们的 FISCO BCOS 联盟链上。
         </p>
         <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
       </template>

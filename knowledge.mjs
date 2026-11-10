@@ -36,6 +36,7 @@ const CHAPTER_KPS = {
   P07_WhySecurityMatters: ["access-control", "reentrancy"],
   "23_Delegatecall": ["solidity", "delegatecall"],
   "37_Signature": ["solidity", "crypto"],
+  F02_TimeOnFisco: ["consortium", "timestamp"],
   S01_ReentrancyAttack: ["reentrancy"],
   S02_SelectorClash: ["access-control"],
   S03_Centralization: ["access-control"],
