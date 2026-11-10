@@ -9,16 +9,18 @@ import { readChapter, chapterSolFiles } from "./chapters.mjs";
 const MAX_CODE = 20000;
 const accountOf = (uid) => chain.account(`playground_${uid}`);
 
-// 同一个人同时只能有一个链上操作；每分钟最多 20 次，防止有人刷链
+// 同一个人同时只能有一个链上操作；部署和发交易每分钟最多 20 次，防止有人刷链
+// 只读查询不产生交易、不出块，单独计数，每分钟最多 120 次（「全部读取」一次会查十几个函数）
 const busy = new Set();
-const recent = new Map();
+const recent = { write: new Map(), read: new Map() };
+const LIMIT = { write: 20, read: 120 };
 // read = true：只读查询，不占「同一时间只能一个操作」的名额（等交易上链时也能先查数据）
 async function guarded(uid, fn, read = false) {
   if (!chain.chainEnabled()) throw new Error("合约练习场还没有连接区块链");
-  const now = Date.now();
-  const list = (recent.get(uid) || []).filter((t) => now - t < 60_000);
-  if (list.length >= 20) throw new Error("操作太频繁了，请稍等一分钟");
-  recent.set(uid, [...list, now]);
+  const kind = read ? "read" : "write", now = Date.now();
+  const list = (recent[kind].get(uid) || []).filter((t) => now - t < 60_000);
+  if (list.length >= LIMIT[kind]) throw new Error("操作太频繁了，请稍等一分钟");
+  recent[kind].set(uid, [...list, now]);
   if (read) return fn();
   if (busy.has(uid)) throw new Error("上一个操作还没完成，请稍等");
   busy.add(uid);
