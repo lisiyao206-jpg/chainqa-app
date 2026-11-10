@@ -15,7 +15,7 @@ const route = useRoute()
 const KEY = () => `playground-${userStore.user?.userId}`
 
 const DEFAULT = `// SPDX-License-Identifier: MIT
-pragma solidity >=0.4.24 <0.7.0;
+pragma solidity ^0.8.0;
 
 // 一个最简单的合约：存一个数字，再把它读出来
 // 点「编译」→「部署到链上」，然后在右边调用 set 和 get 试试
@@ -33,7 +33,8 @@ contract SimpleStorage {
 `
 
 const code = ref('')
-const changes = ref<string[]>([])
+const compiler = ref('')
+const sampleNote = ref('')
 const errors = ref<{ line: number | null; message: string }[]>([])
 const contracts = ref<{ name: string; abi: AbiItem[] }[]>([])
 const picked = ref('')
@@ -50,9 +51,9 @@ onMounted(async () => {
   const ch = route.query.chapter as string
   if (ch) {
     try {
-      const r = await userStore.api<{ code: string; changes: string[] }>(`/api/playground/sample?chapter=${encodeURIComponent(ch)}`)
+      const r = await userStore.api<{ code: string; files?: number; entry?: string }>(`/api/playground/sample?chapter=${encodeURIComponent(ch)}`)
       code.value = r.code
-      changes.value = r.changes
+      if (r.files && r.files > 1) sampleNote.value = `这一讲有 ${r.files} 个合约文件，已合并成一个（主文件 ${r.entry}）`
       fromChapter.value = ch
       return
     } catch (err) {
@@ -93,8 +94,7 @@ async function compile() {
   errors.value = []
   try {
     const r = await userStore.api<any>('/api/playground/compile', { code: code.value })
-    changes.value = r.changes
-    if (r.changes.length) code.value = r.code // 自动转换过写法：把转换后的代码放回编辑器，学生能看到改了哪里
+    compiler.value = r.compiler || ''
     if (!r.ok) {
       errors.value = r.errors
       contracts.value = []
@@ -179,10 +179,10 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
       <!-- 左：编辑器 -->
       <section class="work glass">
         <div v-if="fromChapter" class="from">📖 已载入教材 {{ fromChapter }} 的示例代码</div>
-        <div v-if="changes.length" class="changes">
-          <b>为了在 FISCO BCOS v2 上运行，自动调整了写法：</b>
-          <span v-for="c in changes" :key="c">· {{ c }}</span>
-          <em>FISCO BCOS v2 支持 Solidity 0.4.25～0.6.10；教材按 0.8 写，大部分基础语法两个版本是一样的。</em>
+        <div v-if="sampleNote || compiler" class="changes">
+          <span v-if="sampleNote">· {{ sampleNote }}</span>
+          <span v-if="compiler">· 编译器：{{ compiler }}</span>
+          <em>支持 Solidity 0.8（教材版本）和 0.4.25～0.6.10；可以 import OpenZeppelin 库和教材其他章节的合约。</em>
         </div>
         <div class="editor">
           <div ref="gutter" class="gutter"><div v-for="n in lineCount" :key="n" :class="{ bad: errorLines.has(n) }">{{ n }}</div></div>

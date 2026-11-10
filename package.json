@@ -12,6 +12,8 @@
   },
   "license": "MIT",
   "dependencies": {
-    "solc": "0.6.10"
+    "@openzeppelin/contracts": "5.0.2",
+    "solc": "0.6.10",
+    "solc8": "npm:solc@0.8.38"
   }
 }

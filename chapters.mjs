@@ -112,3 +112,13 @@ export function chapterFile(id, relPath) {
   if (!file.startsWith(chapterDir + path.sep)) return null;
   return fs.existsSync(file) && fs.statSync(file).isFile() ? file : null;
 }
+
+// 某一章文件夹里附带的 Solidity 源文件：{ 文件名: 源码 }（合约练习场用）
+export function chapterSolFiles(id) {
+  if (!ID_RE.test(id)) return {};
+  const dir = path.join(dirOf(id), id);
+  if (!fs.existsSync(dir)) return {};
+  const files = {};
+  for (const f of fs.readdirSync(dir)) if (f.endsWith(".sol")) files[f] = fs.readFileSync(path.join(dir, f), "utf-8");
+  return files;
+}

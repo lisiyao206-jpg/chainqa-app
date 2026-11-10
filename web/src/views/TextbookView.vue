@@ -262,7 +262,7 @@ function toggle(name: string) {
         <!-- 训练营（WTF 教材）每一讲开头的阅读说明：版本差别、灰色链接、Remix 的替代 -->
         <div v-if="!book" class="read-note">
           <b>📌 阅读说明</b>
-          <span>· 本教材按 Solidity 0.8 编写；平台使用的国产联盟链 FISCO BCOS v2 支持 Solidity 0.4.25～0.6.10，大部分基础语法两个版本相同。</span>
+          <span>· 本教材按 Solidity 0.8 编写；点「在合约练习场打开」可以直接把示例代码部署到平台的 FISCO BCOS 联盟链上运行（少数用到新版虚拟机特性的章节除外）。</span>
           <span>· 带 ↗ 的蓝色链接可以打开；<span class="demo-off">灰色虚线</span>的网址所在网站国内无法访问，只作为出处保留。</span>
           <span v-if="usesRemix">· 教程里提到的 Remix 在线编辑器国内打不开，本章代码可以在
             <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink>

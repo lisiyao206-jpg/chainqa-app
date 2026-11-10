@@ -3,8 +3,8 @@
 // 每个学生用自己的链上账号（私钥保管在 WeBASE-Front 里），所以合约里的 msg.sender 是学生自己
 
 import * as chain from "./chain.mjs";
-import { adapt06, compileSource } from "./solidity.mjs";
-import { readChapter } from "./chapters.mjs";
+import { compileSource } from "./solidity.mjs";
+import { readChapter, chapterSolFiles } from "./chapters.mjs";
 
 const MAX_CODE = 20000;
 const accountOf = (uid) => chain.account(`playground_${uid}`);
@@ -33,24 +33,25 @@ function prepare(code) {
   code = String(code || "");
   if (!code.trim()) throw new Error("代码是空的");
   if (code.length > MAX_CODE) throw new Error(`代码太长了（最多 ${MAX_CODE} 个字符）`);
-  return adapt06(code);
+  return code;
 }
 
 // ===== 编译：只编译不上链，返回每个合约的函数列表 =====
 export function compile(code) {
-  const { code: src, changes } = prepare(code);
+  const src = prepare(code);
   const built = compileSource(src);
-  if (built.errors) return { ok: false, errors: built.errors, changes, code: src };
+  const compiler = built.compiler;
+  if (built.errors) return { ok: false, errors: built.errors, compiler };
   const contracts = Object.entries(built.contracts)
     .filter(([, c]) => c.bin) // 接口、抽象合约没有字节码，不能部署
     .map(([name, c]) => ({ name, abi: c.abi }));
-  if (!contracts.length) return { ok: false, errors: [{ line: null, message: "没有可以部署的合约（接口和抽象合约不能直接部署）" }], changes, code: src };
-  return { ok: true, contracts, changes, code: src };
+  if (!contracts.length) return { ok: false, errors: [{ line: null, message: "没有可以部署的合约（接口和抽象合约不能直接部署）" }], compiler };
+  return { ok: true, contracts, compiler };
 }
 
 // ===== 部署 =====
 export async function deploy(uid, { code, contract, params = [] }) {
-  const { code: src } = prepare(code);
+  const src = prepare(code);
   const built = compileSource(src);
   if (built.errors) throw new Error("编译失败，请先点「编译」看看错误");
   const c = built.contracts[contract];
@@ -84,13 +85,45 @@ export async function invoke(uid, { address, name, abi, fn, params = [] }) {
 }
 
 // ===== 从教材某一讲里取出示例代码 =====
-// 取第一段带 contract 的 solidity 代码块，自动转成 0.6 的写法
+// 优先用这一讲文件夹里附带的 .sol 文件：找出「没有被别的文件引用」的主文件，
+// 把它 import 的同目录文件按依赖顺序合并成一个文件（练习场只有一个编辑器）。
+// 没有 .sol 文件时，退回到正文里第一段完整的合约代码
+// 只合并同一个文件夹里的文件（./A.sol 或 A.sol）；别的章节和 OpenZeppelin 的 import 原样保留，编译时由 solidity.mjs 去找
+const IMPORT_RE = /^\s*import\s+(?:[^'"]*from\s+)?["'](?:\.\/)?([\w-]+\.sol)["']\s*;\s*$/gm;
+
+function flatten(files, entry) {
+  const done = new Set(), parts = [];
+  const visit = (name) => {
+    if (done.has(name) || !files[name]) return;
+    done.add(name);
+    for (const m of files[name].matchAll(IMPORT_RE)) visit(m[1]);
+    parts.push(`// ===== ${name} =====\n` + files[name]
+      .replace(IMPORT_RE, (line, dep) => (files[dep] ? "" : line)) // 同目录的 import 已合并
+      .replace(/^\s*\/\/\s*SPDX-License-Identifier:.*$/gm, "")
+      .replace(/^\s*pragma\s+solidity[^;]*;/gm, "")
+      .trim());
+  };
+  visit(entry);
+  const pragma = files[entry].match(/pragma\s+solidity[^;]*;/)?.[0] || "pragma solidity ^0.8.0;";
+  return `// SPDX-License-Identifier: MIT\n${pragma}\n\n${parts.join("\n\n")}\n`;
+}
+
 export function sample(chapterId) {
-  const text = readChapter(String(chapterId || ""));
+  const id = String(chapterId || "");
+  const files = chapterSolFiles(id);
+  const names = Object.keys(files);
+  if (names.length) {
+    const imported = new Set(names.flatMap((n) => [...files[n].matchAll(IMPORT_RE)].map((m) => m[1])));
+    // 主文件：没被别人引用的里面，挑合约最多、最长的那个
+    const roots = names.filter((n) => !imported.has(n) && /\bcontract\s+\w+/.test(files[n]));
+    const entry = (roots.length ? roots : names).sort((a, b) => files[b].length - files[a].length)[0];
+    const code = flatten(files, entry);
+    return { code, files: names.length, entry };
+  }
+  const text = readChapter(id);
   if (!text) throw new Error("没有这一讲");
   const blocks = [...text.matchAll(/```(?:solidity|sol)\s*\n([\s\S]*?)```/g)].map((m) => m[1]);
   const code = blocks.find((b) => /contract\s+\w+/.test(b) && /pragma/.test(b)) || blocks.find((b) => /contract\s+\w+/.test(b));
   if (!code) throw new Error("这一讲没有完整的合约代码");
-  const { code: src, changes } = adapt06(code);
-  return { code: src, changes };
+  return { code };
 }
