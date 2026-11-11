@@ -15,13 +15,18 @@ import type { User, FileInfo } from '../types'
 type UserBrief = Pick<User, 'userId' | 'account' | 'nickname' | 'avatar'>
 interface Comment {
   id: number
-  from: UserBrief
+  from: UserBrief & { anonymous?: boolean }
+  realFrom?: UserBrief // 只有管理员能看到：匿名评论的真实作者
+  anonymous?: boolean
   text: string
   mine: boolean
   canDelete: boolean
 }
 interface Post {
   id: number
+  anonymous?: boolean
+  topic?: string | null
+  realAuthor?: UserBrief // 只有管理员能看到：匿名帖子的真实作者
   author: UserBrief
   title: string | null
   text: string
@@ -48,12 +53,20 @@ const tip = ref('')
 const drafts = ref<Record<number, string>>({})     // 每条帖子下面评论框里正在写的字：{ 帖子id: 文字 }
 const fileInput = ref<HTMLInputElement | null>(null)
 const sort = ref('new')    // 广场的排序：new 最新 / hot 最热
+// 学术论坛：话题分类 + 匿名
+const TOPICS = ['合约安全', 'Solidity', '联盟链', '区块链原理', '课程讨论', '其他']
+const topicFilter = ref('')   // 只看某个话题；空 = 全部
+const topic = ref('合约安全') // 发帖时选的话题
+const anonymous = ref(false)  // 匿名发帖
+const anonComment = ref(false) // 匿名评论（对所有帖子的评论框生效）
 const maxLen = computed(() => (props.square ? 2000 : 500))
 let timer: ReturnType<typeof setInterval> | undefined
 
 async function load() {
   try {
-    posts.value = await userStore.api<Post[]>(props.square ? `/api/social/square?sort=${sort.value}` : '/api/social/posts')
+    posts.value = await userStore.api<Post[]>(
+      props.square ? `/api/social/square?sort=${sort.value}&topic=${encodeURIComponent(topicFilter.value)}` : '/api/social/posts',
+    )
   } catch (e) {
     error.value = (e as Error).message
   }
@@ -66,6 +79,10 @@ onUnmounted(() => clearInterval(timer))
 
 function changeSort(s: string) {
   sort.value = s
+  load()
+}
+function changeTopic(t: string) {
+  topicFilter.value = t
   load()
 }
 
@@ -123,6 +140,8 @@ function publish() {
       fileId: attached.value?.id,
       title: title.value,
       visibility: props.square ? 'public' : 'friends',
+      anonymous: props.square && anonymous.value,
+      topic: topic.value,
     })
     title.value = text.value = ''
     attached.value = null
@@ -137,7 +156,7 @@ function comment(p: Post) {
   const t = (drafts.value[p.id] || '').trim()
   if (!t) return
   return act(async () => {
-    await userStore.api(`/api/social/posts/${p.id}/comments`, { text: t })
+    await userStore.api(`/api/social/posts/${p.id}/comments`, { text: t, anonymous: props.square && anonComment.value })
     drafts.value[p.id] = ''
   })
 }
@@ -172,6 +191,11 @@ function jumpTo(id: number) {
 <template>
   <div :class="['feed-wrap', { square: props.square }]">
   <div ref="feedEl" class="feed">
+    <!-- 学术论坛说明 -->
+    <div v-if="props.square" class="forum-note">
+      <b>🏛 学术论坛</b>
+      <span>自由讨论区：可以匿名发帖和评论，老师和同学都看不到匿名的人是谁（只有平台管理员处理违规内容时能看到）。这里的发言<b>不计入学习统计</b>，放心提问、放心说错。</span>
+    </div>
     <!-- 发帖 -->
     <div class="composer glass">
       <input v-if="props.square" v-model="title" class="title-input" maxlength="40" placeholder="帖子标题，例如：一文看懂重入攻击（附视频讲解）" />
@@ -182,6 +206,15 @@ function jumpTo(id: number) {
         :placeholder="props.square ? '写下你的心得、问题或经验，所有审计员都能看到并参与讨论……（截图后 Ctrl + V 可以直接贴图）' : '分享今天学到的知识、遇到的难题……（截图后 Ctrl + V 可以直接贴图）'"
         @paste="onPaste"
       ></textarea>
+      <div v-if="props.square" class="opts">
+        <label>话题
+          <select v-model="topic" class="topic-sel">
+            <option v-for="t in TOPICS" :key="t" :value="t">{{ t }}</option>
+          </select>
+        </label>
+        <label class="anon"><input v-model="anonymous" type="checkbox" /> 🎭 匿名发布</label>
+        <span v-if="anonymous" class="anon-tip">别人只会看到「匿名同学 XXXX」</span>
+      </div>
       <div class="bar">
         <button class="btn" :disabled="busy" @click="fileInput!.click()">📎 {{ busy ? '上传中…' : '图片 / 视频 / 资料' }}</button>
         <input ref="fileInput" type="file" hidden @change="pickFile" />
@@ -195,6 +228,10 @@ function jumpTo(id: number) {
     <div v-if="props.square" class="sorts">
       <button :class="{ on: sort === 'new' }" @click="changeSort('new')">最新</button>
       <button :class="{ on: sort === 'hot' }" @click="changeSort('hot')">最热</button>
+      <span class="sep"></span>
+      <button :class="['tp', { on: !topicFilter }]" @click="changeTopic('')">全部话题</button>
+      <button v-for="t in TOPICS" :key="t" :class="['tp', { on: topicFilter === t }]" @click="changeTopic(t)">{{ t }}</button>
+      <label class="anon small"><input v-model="anonComment" type="checkbox" /> 🎭 匿名评论</label>
     </div>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-if="tip" class="ok">{{ tip }}</div>
@@ -207,9 +244,10 @@ function jumpTo(id: number) {
       <header>
         <UserAvatar :user="p.author" :size="38" />
         <div>
-          <b>{{ p.author.nickname }}</b>
-          <div class="time">{{ shortTime(p.time) }}</div>
+          <b :class="{ masked: p.anonymous }">{{ p.anonymous ? '🎭 ' : '' }}{{ p.author.nickname }}<small v-if="p.anonymous && p.mine" class="me">（我）</small></b>
+          <div class="time">{{ shortTime(p.time) }}<span v-if="p.realAuthor" class="real"> · 实际作者：{{ p.realAuthor.nickname }}（{{ p.realAuthor.account }}）</span></div>
         </div>
+        <span v-if="p.topic" class="topic-tag">#{{ p.topic }}</span>
         <button v-if="props.square && !p.mine && !p.friend" class="btn add" @click="addFriend(p)">+ 加好友</button>
         <a v-if="p.canDelete" class="del" @click="remove(p)">{{ p.mine ? '删除' : '管理员删除' }}</a>
       </header>
@@ -229,11 +267,12 @@ function jumpTo(id: number) {
 
       <div class="comments">
         <div v-for="c in p.comments" :key="c.id" class="comment">
-          <b>{{ c.from.nickname }}：</b>{{ c.text }}
+          <b :class="{ masked: c.anonymous }">{{ c.from.nickname }}<small v-if="c.anonymous && c.mine" class="me">（我）</small>：</b>{{ c.text }}
+          <span v-if="c.realFrom" class="real">（实际：{{ c.realFrom.nickname }}）</span>
           <a v-if="c.canDelete" class="del" @click="removeComment(c)">删除</a>
         </div>
         <form class="comment-box" @submit.prevent="comment(p)">
-          <input v-model="drafts[p.id]" class="input" maxlength="200" :placeholder="props.square ? '参与讨论…' : '写评论…'" />
+          <input v-model="drafts[p.id]" class="input" maxlength="200" :placeholder="props.square ? (anonComment ? '匿名参与讨论…' : '参与讨论…') : '写评论…'" />
           <button class="btn">评论</button>
         </form>
       </div>
@@ -293,6 +332,23 @@ function jumpTo(id: number) {
 @media (max-width: 1000px) { .feed-wrap.square { grid-template-columns: 1fr; } .side { position: static; } }
 .feed { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 30px; }
 .composer { padding: 14px 16px; }
+.forum-note { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; font-size: 13px; line-height: 1.7; color: var(--text-dim); border: 1px solid rgba(252, 238, 10, 0.35); background: rgba(252, 238, 10, 0.05); }
+.forum-note > b { flex-shrink: 0; color: var(--gold); font-weight: 500; letter-spacing: 1px; }
+.forum-note span b { color: var(--gold); font-weight: 500; }
+.opts { display: flex; align-items: center; gap: 18px; margin-top: 10px; font-size: 13px; color: var(--text-dim); }
+.topic-sel { margin-left: 6px; padding: 4px 8px; font-size: 13px; color: var(--text); background: rgba(6, 4, 20, 0.85); border: 1px solid var(--line-strong); outline: none; }
+.anon { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; color: var(--text-dim); }
+.anon input { accent-color: var(--accent-strong); }
+.anon-tip { font-size: 12px; color: var(--accent-strong); }
+.sorts { flex-wrap: wrap; align-items: center; }
+.sorts .sep { width: 1px; height: 14px; background: var(--line); }
+.sorts .tp { letter-spacing: 0; }
+.anon.small { margin-left: auto; font-size: 12px; }
+.topic-tag { margin-left: auto; padding: 1px 10px; font-size: 12px; color: var(--accent); border: 1px solid var(--line-strong); border-radius: 999px; white-space: nowrap; }
+.topic-tag + .btn.add, .topic-tag + .del { margin-left: 8px; }
+.masked { color: var(--accent-strong); }
+.me { margin-left: 4px; font-size: 11px; font-weight: normal; color: var(--text-faint); }
+.real { font-size: 11px; color: var(--gold); }
 .title-input, .composer textarea {
   width: 100%; padding: 8px 10px; font-size: 14px; font-family: var(--font); line-height: 1.6;
   color: var(--text); background: rgba(6, 4, 20, 0.6); border: 1px solid var(--line-strong); outline: none;

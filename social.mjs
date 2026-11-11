@@ -19,6 +19,21 @@ function userBrief(id) {
 }
 const isFriend = (uid, fid) => !!one("SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?", uid, fid);
 const isAdmin = (uid) => one("SELECT role FROM users WHERE user_id = ?", uid)?.role === "admin";
+// ===== 匿名（广场 = 学术论坛）=====
+// 匿名的帖子和评论，别人只看到「匿名同学 3F9A」这样的代号，老师和同学都看不到是谁
+// 代号 = 用服务器密钥对「帖子 id + 用户 id」做 HMAC：同一个帖子里同一个人的代号固定（能看出是不是同一个人在回复），
+// 换一个帖子代号就变了（没法跨帖子拼出一个人的全部发言）；没有密钥也没法倒推出是谁
+// 只有平台管理员（处理违规内容时）能看到真实作者
+let ANON_KEY = one("SELECT value FROM app_secrets WHERE name = 'anon'")?.value;
+if (!ANON_KEY) {
+  ANON_KEY = crypto.randomBytes(32).toString("hex");
+  run("INSERT OR IGNORE INTO app_secrets (name, value) VALUES ('anon', ?)", ANON_KEY);
+  ANON_KEY = one("SELECT value FROM app_secrets WHERE name = 'anon'").value;
+}
+const anonCode = (postId, uid) => crypto.createHmac("sha256", ANON_KEY).update(`${postId}:${uid}`).digest("hex").slice(0, 4).toUpperCase();
+const anonBrief = (nickname) => ({ userId: 0, account: "", nickname, avatar: null, anonymous: true });
+export const TOPICS = ["合约安全", "Solidity", "联盟链", "区块链原理", "课程讨论", "其他"];
+
 const isMember = (uid, roomId) => !!one("SELECT 1 FROM room_members WHERE room_id = ? AND user_id = ?", roomId, uid);
 
 // 文字检查：去掉首尾空格，不能太长
@@ -221,10 +236,19 @@ function canSeePost(uid, post) {
   return post && (post.visibility === "public" || post.user_id === uid || isFriend(uid, post.user_id));
 }
 function postRow(uid, p) {
+  const admin = isAdmin(uid);
+  // 评论者显示成什么：匿名评论显示代号；匿名帖子的作者自己来回复，显示「楼主」
+  const commenter = (c) => {
+    if (!c.anonymous) return userBrief(c.user_id);
+    return anonBrief(p.anonymous && c.user_id === p.user_id ? "楼主（匿名）" : `匿名同学 ${anonCode(p.post_id, c.user_id)}`);
+  };
   return {
-    id: p.post_id, author: userBrief(p.user_id), title: p.title, text: p.content, file: fileBrief(p.file_id), time: toISO(p.create_time),
+    id: p.post_id, title: p.title, text: p.content, file: fileBrief(p.file_id), time: toISO(p.create_time),
+    author: p.anonymous ? anonBrief(`匿名同学 ${anonCode(p.post_id, p.user_id)}`) : userBrief(p.user_id),
+    anonymous: !!p.anonymous, topic: p.topic || null,
+    realAuthor: p.anonymous && admin ? userBrief(p.user_id) : undefined, // 只有管理员能看到匿名帖子的真实作者
     mine: p.user_id === uid,
-    friend: isFriend(uid, p.user_id), // 广场上看到不认识的人，可以直接加好友
+    friend: p.anonymous ? true : isFriend(uid, p.user_id), // 广场上看到不认识的人，可以直接加好友（匿名帖子不显示「加好友」）
     canDelete: p.user_id === uid || isAdmin(uid), // 管理员可以删掉广场上不合适的帖子
     likes: all("SELECT user_id FROM post_likes WHERE post_id = ?", p.post_id).map((r) => userBrief(r.user_id).nickname),
     liked: !!one("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?", p.post_id, uid),
@@ -232,7 +256,10 @@ function postRow(uid, p) {
     // 好友圈：评论只显示「我能看到的人」写的，和微信朋友圈一样；广场：所有评论都公开
     comments: all("SELECT * FROM post_comments WHERE post_id = ? ORDER BY comment_id", p.post_id)
       .filter((c) => p.visibility === "public" || c.user_id === uid || isFriend(uid, c.user_id))
-      .map((c) => ({ id: c.comment_id, from: userBrief(c.user_id), text: c.content, mine: c.user_id === uid, canDelete: c.user_id === uid || isAdmin(uid) })),
+      .map((c) => ({
+        id: c.comment_id, from: commenter(c), text: c.content, anonymous: !!c.anonymous, mine: c.user_id === uid, canDelete: c.user_id === uid || admin,
+        realFrom: c.anonymous && admin ? userBrief(c.user_id) : undefined,
+      })),
   };
 }
 
@@ -244,15 +271,17 @@ export function listPosts(uid) {
 }
 
 // 广场：所有人的公开帖子。sort = 'new' 最新 / 'hot' 最热（按点赞数 + 评论数排）
-export function listSquare(uid, sort = "new") {
+export function listSquare(uid, sort = "new", topic = "") {
   const order = sort === "hot"
     ? `(SELECT COUNT(*) FROM post_likes l WHERE l.post_id = p.post_id)
        + (SELECT COUNT(*) FROM post_comments c WHERE c.post_id = p.post_id) DESC, p.post_id DESC`
     : "p.post_id DESC";
-  return all(`SELECT * FROM posts p WHERE visibility = 'public' ORDER BY ${order} LIMIT 50`).map((p) => postRow(uid, p));
+  const byTopic = TOPICS.includes(topic) ? topic : null;
+  return all(`SELECT * FROM posts p WHERE visibility = 'public' ${byTopic ? "AND topic = ?" : ""} ORDER BY ${order} LIMIT 50`, ...(byTopic ? [byTopic] : []))
+    .map((p) => postRow(uid, p));
 }
 
-export function createPost(uid, { text, fileId, title, visibility }) {
+export function createPost(uid, { text, fileId, title, visibility, anonymous, topic }) {
   const isPublic = visibility === "public";
   text = cleanText(text, isPublic ? 2000 : 500, isPublic ? "帖子正文" : "一条动态");
   text = moderate(text);
@@ -261,8 +290,10 @@ export function createPost(uid, { text, fileId, title, visibility }) {
   if (fileId && !one("SELECT 1 FROM files WHERE file_id = ? AND user_id = ?", fileId, uid)) throw new Error("文件不存在");
   if (!text && !fileId) throw new Error("写点什么再发吧");
   rateLimit(uid);
-  const { lastInsertRowid } = run("INSERT INTO posts (user_id, content, file_id, title, visibility) VALUES (?, ?, ?, ?, ?)",
-    uid, text, fileId || null, title, isPublic ? "public" : "friends");
+  const anon = isPublic && !!anonymous ? 1 : 0;
+  topic = isPublic ? (TOPICS.includes(topic) ? topic : "其他") : null;
+  const { lastInsertRowid } = run("INSERT INTO posts (user_id, content, file_id, title, visibility, anonymous, topic) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    uid, text, fileId || null, title, isPublic ? "public" : "friends", anon, topic);
   return postRow(uid, one("SELECT * FROM posts WHERE post_id = ?", lastInsertRowid));
 }
 
@@ -304,12 +335,14 @@ export function removeFromStudy(uid, postId) {
   run("DELETE FROM post_favorites WHERE post_id = ? AND user_id = ?", postId, uid);
 }
 
-export function addComment(uid, postId, text) {
-  if (!canSeePost(uid, one("SELECT * FROM posts WHERE post_id = ?", postId))) throw new Error("这条动态不存在");
+export function addComment(uid, postId, text, anonymous = false) {
+  const post = one("SELECT * FROM posts WHERE post_id = ?", postId);
+  if (!canSeePost(uid, post)) throw new Error("这条动态不存在");
   text = moderate(cleanText(text, 200, "一条评论"));
   if (!text) throw new Error("评论不能为空");
   rateLimit(uid);
-  run("INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)", postId, uid, text);
+  // 只有广场（学术论坛）上的评论可以匿名
+  run("INSERT INTO post_comments (post_id, user_id, content, anonymous) VALUES (?, ?, ?, ?)", postId, uid, text, post.visibility === "public" && anonymous ? 1 : 0);
 }
 
 export function deleteComment(uid, commentId) {

@@ -487,7 +487,7 @@ function routeSocial(req, res) {
 
   // 好友圈
   if (p === "/posts" && method === "GET") return W((uid) => social.listPosts(uid));
-  if (p === "/square" && method === "GET") return W((uid) => social.listSquare(uid, q.get("sort")));
+  if (p === "/square" && method === "GET") return W((uid) => social.listSquare(uid, q.get("sort"), q.get("topic") || ""));
   if (p === "/posts" && method === "POST") return W((uid, b) => social.createPost(uid, b));
   if ((m = p.match(/^\/posts\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deletePost(uid, Number(m[1])));
   if ((m = p.match(/^\/posts\/(\d+)\/like$/)) && method === "POST") return W((uid) => social.toggleLike(uid, Number(m[1])));
@@ -496,7 +496,7 @@ function routeSocial(req, res) {
   // 学习站
   if (p === "/study" && method === "GET") return W((uid) => social.listStudy(uid, q.get("kind")));
   if ((m = p.match(/^\/study\/(\d+)$/)) && method === "DELETE") return W((uid) => social.removeFromStudy(uid, Number(m[1])));
-  if ((m = p.match(/^\/posts\/(\d+)\/comments$/)) && method === "POST") return W((uid, b) => social.addComment(uid, Number(m[1]), b.text));
+  if ((m = p.match(/^\/posts\/(\d+)\/comments$/)) && method === "POST") return W((uid, b) => social.addComment(uid, Number(m[1]), b.text, !!b.anonymous));
   if ((m = p.match(/^\/comments\/(\d+)$/)) && method === "DELETE") return W((uid) => social.deleteComment(uid, Number(m[1])));
 
   // 文件：上传的请求体是文件本身，不能交给 withUser（它会当成 JSON 来读），所以单独处理

@@ -228,6 +228,18 @@ try {
 try {
   db.exec("ALTER TABLE posts ADD COLUMN title TEXT");
 } catch {}
+// 广场 = 学术论坛：可以匿名发帖、匿名评论；帖子按话题分类
+try {
+  db.exec("ALTER TABLE posts ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0");
+} catch {}
+try {
+  db.exec("ALTER TABLE posts ADD COLUMN topic TEXT");
+} catch {}
+try {
+  db.exec("ALTER TABLE post_comments ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0");
+} catch {}
+// 服务器自己的随机密钥（比如匿名代号用它打散），第一次启动时生成，存在数据库里
+db.exec("CREATE TABLE IF NOT EXISTS app_secrets (name TEXT PRIMARY KEY, value TEXT NOT NULL)");
 // 手机号：可以绑定一个手机号，用「手机号 + 密码」或「手机号 + 验证码」登录；一个手机号只能绑一个账号
 try {
   db.exec("ALTER TABLE users ADD COLUMN phone TEXT");
