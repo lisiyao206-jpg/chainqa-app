@@ -226,6 +226,18 @@ async function copyCode() {
   await navigator.clipboard?.writeText(cur.value!.code!).catch(() => {})
   alert(`班级码 ${cur.value!.code} 已复制，发给学生就能加入`)
 }
+
+// 还没选班级时，右边显示「三步走」引导
+const TEACHER_STEPS = [
+  { title: '建班', text: '在左边写好班级名称，点「建班」，系统会生成一个 6 位班级码' },
+  { title: '发班级码', text: '把班级码发给学生，学生在「我的班级」里输入就能加入' },
+  { title: '布置与跟进', text: '布置学习章节和实战关卡、上传资料、开视频会议，在「学情」里看每个人的掌握情况' },
+]
+const STUDENT_STEPS = [
+  { title: '拿到班级码', text: '向老师要 6 位班级码' },
+  { title: '加入班级', text: '在左边输入班级码，点「加入」' },
+  { title: '完成任务', text: '老师布置的章节和关卡会出现在「任务」里，完成后老师能看到你的进度' },
+]
 </script>
 
 <template>
@@ -257,8 +269,15 @@ async function copyCode() {
     <section class="main glass">
       <p v-if="error" class="error">{{ error }}</p>
       <div v-if="!cur" class="placeholder">
-        <p v-if="canTeach">👈 新建一个班级，把班级码发给学生，就可以布置任务、分享资料、开视频会议了</p>
-        <p v-else>👈 输入老师给你的班级码，加入班级后就能看到老师布置的任务和资料</p>
+        <h3 class="glitch" :data-text="canTeach ? '三步开好一个班' : '三步加入班级'">{{ canTeach ? '三步开好一个班' : '三步加入班级' }}</h3>
+        <div class="steps">
+          <div v-for="(st, i) in (canTeach ? TEACHER_STEPS : STUDENT_STEPS)" :key="i" class="step">
+            <span class="step-no">0{{ i + 1 }}</span>
+            <b>{{ st.title }}</b>
+            <span>{{ st.text }}</span>
+          </div>
+        </div>
+        <p class="ph-tip">👈 {{ canTeach ? '在左边输入班级名称，点「建班」开始' : '在左边输入班级码，点「加入」开始' }}</p>
       </div>
 
       <template v-else>
@@ -450,10 +469,10 @@ async function copyCode() {
 </template>
 
 <style scoped>
-.class-page { display: grid; grid-template-columns: 300px 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; align-items: start; }
+.class-page { display: grid; grid-template-columns: 320px 1fr; gap: 20px; max-width: 1320px; margin: 0 auto; align-items: stretch; min-height: calc(100vh - 130px); }
 .glass { background: var(--glass-strong); border: 1px solid var(--line); }
 .side { padding: 22px 18px; display: flex; flex-direction: column; gap: 8px; }
-.side h2 { margin: 2px 0 10px; font-size: 24px; font-weight: 300; letter-spacing: 5px; color: #fff; }
+.side h2 { margin: 2px 0 10px; font-family: var(--font-cyber); font-size: 32px; font-weight: 400; letter-spacing: 6px; color: #fff; text-shadow: 0 0 8px rgba(0, 240, 255, 0.55), 0 0 20px rgba(255, 43, 214, 0.3); }
 .c-item {
   display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; text-align: left; cursor: pointer;
   color: var(--text); background: none; border: 1px solid transparent; font-family: var(--font); transition: all 0.2s;
@@ -468,7 +487,14 @@ async function copyCode() {
 .error { margin: 0 0 12px; color: var(--danger); }
 
 .main { padding: 22px 24px; min-height: 480px; }
-.placeholder { display: flex; align-items: center; justify-content: center; min-height: 400px; color: var(--text-dim); font-size: 15px; text-align: center; }
+.placeholder { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; min-height: 400px; color: var(--text-dim); text-align: center; }
+.placeholder h3 { margin: 0; font-family: var(--font-cyber); font-size: 30px; font-weight: 400; letter-spacing: 6px; color: #fff; text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+.steps { width: 100%; max-width: 860px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.step { display: flex; flex-direction: column; gap: 8px; padding: 20px 18px; text-align: left; border: 1px solid var(--line); background: rgba(0, 240, 255, 0.03); }
+.step-no { font-family: "Orbitron", var(--font-code); font-size: 28px; font-weight: 700; color: var(--accent); text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+.step b { font-size: 16px; font-weight: 500; color: #fff; }
+.step span:last-child { font-size: 13px; line-height: 1.7; color: var(--text-dim); }
+.ph-tip { margin: 0; font-size: 14px; color: var(--text-faint); }
 .c-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .c-head h3 { margin: 0 0 4px; font-size: 22px; font-weight: 400; letter-spacing: 3px; color: #fff; }
 .c-head p { margin: 0; font-size: 13px; color: var(--text-dim); }
@@ -553,7 +579,8 @@ input[type='datetime-local'] { color-scheme: dark; }
 .m-head h3 { margin: 0; font-size: 20px; font-weight: 400; letter-spacing: 2px; color: #fff; }
 
 @media (max-width: 760px) {
-  .class-page { grid-template-columns: 1fr; }
+  .class-page { grid-template-columns: 1fr; min-height: 0; }
+  .steps { grid-template-columns: 1fr; }
   .c-head { flex-direction: column; }
   .t-row { flex-wrap: wrap; }
   .stu { flex-wrap: wrap; }

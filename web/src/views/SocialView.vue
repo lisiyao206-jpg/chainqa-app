@@ -247,7 +247,7 @@ async function onLeft() {
 </template>
 
 <style scoped>
-.social { max-width: 1100px; margin: 0 auto; color: var(--text); }
+.social { max-width: 1320px; margin: 0 auto; color: var(--text); }
 .head { text-align: center; margin-bottom: 18px; }
 .head h2 { margin: 6px 0 14px; font-size: 30px; font-weight: 300; letter-spacing: 10px; color: #fff; }
 .tabs { display: inline-flex; gap: 6px; }

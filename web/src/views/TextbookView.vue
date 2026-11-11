@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CodeFrame from '../components/CodeFrame.vue'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
@@ -32,6 +33,15 @@ const content = ref('')
 const contentLoading = ref(false)
 const usesRemix = ref(false) // 这一章是否用到了 Remix 在线编辑器
 const hasCode = ref(false) // 这一章正文里有没有 Solidity 代码
+// 边框上流动的代码：这一章正文里第一段代码，压成一行；没有代码就用默认的一段
+const DEFAULT_FRAME = 'contract Ledger { mapping(address => uint256) public balanceOf; function transfer(address to, uint256 amount) external { require(balanceOf[msg.sender] >= amount); balanceOf[msg.sender] -= amount; balanceOf[to] += amount; } }'
+const frameText = computed(() => {
+  const m = content.value.match(/<pre[^>]*>([\s\S]*?)<\/pre>/)
+  if (!m) return DEFAULT_FRAME
+  const txt = new DOMParser().parseFromString(m[1], 'text/html').body.textContent || ''
+  const flat = txt.replace(/\/\/[^\n]*/g, '').replace(/\s+/g, ' ').trim()
+  return flat.length > 40 ? flat.slice(0, 400) : DEFAULT_FRAME
+})
 // 阅读区的 DOM 元素，用来换章时滚回顶部
 const readerEl = ref<HTMLElement | null>(null)
 // 加载状态和错误信息
@@ -242,6 +252,9 @@ function toggle(name: string) {
     </aside>
 
     <!-- 右侧：阅读区 -->
+    <div class="reader-wrap">
+    <!-- 边框上一圈流动的代码：取这一章正文里的第一段代码，没有代码的章节用一段默认的合约代码 -->
+    <CodeFrame v-if="current" :key="current.id" :text="frameText" :chamfer="0" :size="10" :inset="8" :duration="60" />
     <section class="reader glass" ref="readerEl" @scroll="onReaderScroll">
       <div v-if="!current" class="hint">
         <template v-if="isPrep">👈 从左边选一章，先认识区块链是什么</template>
@@ -278,6 +291,7 @@ function toggle(name: string) {
         <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
       </template>
     </section>
+    </div>
 
     <!-- 思维导图弹窗：换一章时 :key 变化，弹窗会重新生成 -->
     <MindmapModal v-if="showMindmap" :key="current!.id" :chapter="current!" @close="showMindmap = false" />
@@ -344,7 +358,8 @@ function toggle(name: string) {
 /* 当前章节：左边一条霓虹青竖线 */
 .chapters li.active { background: rgba(0, 240, 255, 0.12); color: #fff; font-weight: bold; border-left-color: var(--accent); }
 .no { flex-shrink: 0; width: 32px; color: var(--text-faint); font-size: 12px; font-family: var(--font-code); }
-.reader { flex: 1; overflow-y: auto; padding: 24px 32px; }
+.reader-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
+.reader { flex: 1; overflow-y: auto; padding: 30px 40px; }
 
 /* ===== 教材正文的排版 ===== */
 /* v-html 塞进来的内容不受 scoped 管，所以要用 :deep() 才能给它们写样式 */
@@ -442,7 +457,7 @@ function toggle(name: string) {
 @media (max-width: 760px) {
   .camp { flex-direction: column; gap: 12px; }
   .toc { width: auto; max-height: 34vh; }
-  .reader { padding: 16px; }
+  .reader { padding: 22px 20px; }
   .article { font-size: 14px; }
   .alarm { white-space: normal; width: calc(100vw - 32px); bottom: 20px; }
 }

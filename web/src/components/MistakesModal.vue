@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import { useMistakesStore } from '../stores/mistakes'
 import type { MistakeStatus } from '../types'
 
+// inline = true：直接嵌在页面里（案件档案页右半边），不是弹窗
+const props = defineProps<{ inline?: boolean }>()
 const emit = defineEmits(['close'])
 const mistakes = useMistakesStore()
 
@@ -48,14 +50,14 @@ function removeMistake(m) {
 </script>
 
 <template>
-  <div class="mask" @click.self="emit('close')">
+  <div :class="props.inline ? 'inline' : 'mask'" @click.self="!props.inline && emit('close')">
     <div class="card">
       <header>
         <div class="tabs">
           <button :class="{ on: tab === 'redo' }" @click="tab = 'redo'; restart()">🔄 重做模式</button>
           <button :class="{ on: tab === 'book' }" @click="tab = 'book'">📒 我的错题集（{{ mistakes.list.length }}）</button>
         </div>
-        <button class="close" @click="emit('close')">✕</button>
+        <button v-if="!props.inline" class="close" @click="emit('close')">✕</button>
       </header>
 
       <!-- ===== 重做模式：先作答，再揭晓 ===== -->
@@ -123,6 +125,9 @@ function removeMistake(m) {
   border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 16px 20px;
   box-shadow: 0 0 40px rgba(0, 240, 255, 0.15);
 }
+/* 嵌在页面里：铺满父元素，不要遮罩和阴影 */
+.inline { height: 100%; display: flex; }
+.inline .card { width: 100%; height: 100%; box-shadow: none; border-color: var(--line); }
 header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .tabs { display: flex; gap: 6px; }
 .tabs button {

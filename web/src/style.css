@@ -26,7 +26,32 @@
   /* 字体：标题细、正文常规、代码等宽 */
   --font: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
   --font-code: Consolas, Menlo, monospace;
+  /* 赛博朋克艺术字：中文用站酷庆科黄油体，英文和数字用 Orbitron（都是 SIL OFL 开源免费字体）
+     字体文件放在 web/public/fonts，只保留了标题里用到的字，所以很小；没收录的字会自动退回普通字体 */
+  --font-cyber: "Orbitron", "CyberZH", var(--font);
 }
+
+@font-face { font-family: "CyberZH"; src: url("/fonts/cyber-zh.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Orbitron"; src: url("/fonts/orbitron.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+
+/* 霓虹故障字：标题加上 class="glitch" 和 data-text="同样的文字"，会偶尔闪一下品红 / 青色的错位残影 */
+.glitch { position: relative; display: inline-block; }
+.glitch::before, .glitch::after {
+  content: attr(data-text); position: absolute; inset: 0; pointer-events: none; opacity: 0;
+}
+.glitch::before { color: var(--accent-strong); animation: glitch-a 4s infinite steps(1); }
+.glitch::after { color: var(--accent); animation: glitch-b 4s infinite steps(1); }
+@keyframes glitch-a {
+  0%, 88%, 100% { opacity: 0; transform: none; }
+  90% { opacity: 0.8; transform: translate(-3px, 1px); clip-path: inset(10% 0 55% 0); }
+  93% { opacity: 0.8; transform: translate(3px, -1px); clip-path: inset(60% 0 8% 0); }
+}
+@keyframes glitch-b {
+  0%, 89%, 100% { opacity: 0; transform: none; }
+  91% { opacity: 0.8; transform: translate(3px, 0); clip-path: inset(40% 0 30% 0); }
+  94% { opacity: 0.8; transform: translate(-2px, 1px); clip-path: inset(5% 0 75% 0); }
+}
+@media (prefers-reduced-motion: reduce) { .glitch::before, .glitch::after { animation: none; } }
 
 * { box-sizing: border-box; }
 /* 底色只能写在 html 上，不能写在 body 上：

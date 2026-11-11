@@ -319,7 +319,7 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
 .changes { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; font-size: 13px; color: var(--gold); background: rgba(252, 238, 10, 0.05); border: 1px solid rgba(252, 238, 10, 0.3); }
 .changes b { font-weight: 500; }
 .changes em { font-style: normal; font-size: 12px; color: var(--text-faint); margin-top: 2px; }
-.editor { display: flex; height: 460px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.45); }
+.editor { display: flex; height: calc(100vh - 360px); min-height: 420px; border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.45); }
 .gutter { flex-shrink: 0; width: 40px; padding: 10px 0; overflow: hidden; text-align: right; user-select: none; font-family: var(--font-code); font-size: 13px; line-height: 21px; color: var(--text-faint); border-right: 1px solid var(--line); }
 .gutter div { padding-right: 8px; }
 .gutter div.bad { color: #fff; background: rgba(255, 107, 129, 0.5); }

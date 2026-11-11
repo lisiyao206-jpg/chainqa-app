@@ -66,7 +66,7 @@ function read(t: Track, c: LearnChapter) {
     <header class="head">
       <div>
         <div class="eyebrow">Learning Center</div>
-        <h2>学习中心</h2>
+        <h2 class="glitch" data-text="学习中心">学习中心</h2>
         <p>五条路线，从零基础到亲手上链。每读完一章，守住章末的防御战就算掌握。</p>
       </div>
       <div v-if="totalChapters" class="overall">
@@ -110,7 +110,8 @@ function read(t: Track, c: LearnChapter) {
 <style scoped>
 .learn { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 6px; }
-.head h2 { margin: 4px 0 6px; font-size: 28px; font-weight: 300; letter-spacing: 6px; color: #fff; }
+.head h2 { margin: 4px 0 6px; font-family: var(--font-cyber); font-size: 40px; font-weight: 400; letter-spacing: 8px; color: #fff; text-shadow: 0 0 8px rgba(0, 240, 255, 0.6), 0 0 22px rgba(255, 43, 214, 0.35); }
+.eyebrow { font-family: "Orbitron", var(--font-code); }
 .head p { margin: 0; font-size: 14px; color: var(--text-dim); }
 .overall { flex-shrink: 0; font-family: var(--font-code); color: var(--text-dim); }
 .overall b { font-size: 34px; font-weight: 400; color: var(--gold); text-shadow: 0 0 12px rgba(252, 238, 10, 0.4); }
@@ -122,10 +123,11 @@ function read(t: Track, c: LearnChapter) {
   width: 100%; display: flex; align-items: center; gap: 18px; padding: 18px 22px;
   cursor: pointer; text-align: left; color: var(--text); background: none; border: none; font-family: var(--font);
 }
-.t-no { font-family: var(--font-code); font-size: 26px; color: var(--accent); text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
+.t-no { font-family: "Orbitron", var(--font-code); font-size: 30px; font-weight: 700; color: var(--accent); text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); }
 .track.empty .t-no { color: var(--text-faint); text-shadow: none; }
 .t-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.t-name { font-size: 18px; letter-spacing: 2px; color: #fff; }
+.t-name { font-family: var(--font-cyber); font-size: 24px; letter-spacing: 3px; color: #fff; text-shadow: 0 0 10px rgba(0, 240, 255, 0.45); }
+.track.open .t-name, .t-head:hover .t-name { color: var(--accent); text-shadow: 0 0 6px var(--accent), 0 0 18px rgba(255, 43, 214, 0.5); }
 .t-desc { font-size: 13px; color: var(--text-dim); }
 .t-progress { flex-shrink: 0; display: flex; align-items: center; gap: 10px; }
 .bar { position: relative; width: 140px; height: 6px; border-radius: 3px; overflow: hidden; background: rgba(255, 255, 255, 0.08); }
@@ -168,8 +170,9 @@ function read(t: Track, c: LearnChapter) {
   border: none; border-bottom: 1px solid rgba(0, 240, 255, 0.08); font-family: var(--font); transition: background 0.2s;
 }
 .chapter:hover { background: rgba(0, 240, 255, 0.06); }
-.c-no { width: 38px; flex-shrink: 0; font-family: var(--font-code); font-size: 13px; color: var(--text-faint); }
-.c-title { flex: 1; min-width: 0; font-size: 14px; }
+.c-no { width: 38px; flex-shrink: 0; font-family: "Orbitron", var(--font-code); font-size: 13px; color: var(--text-faint); }
+.c-title { flex: 1; min-width: 0; font-family: "CyberZH", var(--font); font-size: 16px; letter-spacing: 1px; }
+.chapter:hover .c-title { color: var(--accent); text-shadow: 0 0 8px rgba(0, 240, 255, 0.5); }
 .kps { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .kp { padding: 1px 8px; font-size: 12px; color: var(--accent); background: rgba(0, 240, 255, 0.08); border-radius: 999px; white-space: nowrap; }
 .c-state { width: 84px; flex-shrink: 0; text-align: right; font-size: 13px; color: var(--text-faint); }

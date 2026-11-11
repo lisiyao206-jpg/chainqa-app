@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import { useMistakesStore } from '../stores/mistakes'
 import MistakesModal from '../components/MistakesModal.vue'
@@ -8,18 +8,18 @@ import { useUserStore } from '../stores/user'
 
 const notes = useNotesStore()
 
-// 错题本弹窗
+// 错题本：页面右半边一直显示
 const mistakes = useMistakesStore()
 const route = useRoute()
-// 网址带 ?open=mistakes（顶栏下拉菜单「错题本」）时直接打开错题本；已经在这一页时也要跟着网址变
-const showMistakes = ref(route.query.open === 'mistakes')
-watch(() => route.query.open, (v) => v === 'mistakes' && (showMistakes.value = true))
-// 关掉错题本时把网址里的 ?open=mistakes 去掉，下次再从顶栏点「错题本」才能重新打开
-const router = useRouter()
-function closeMistakes() {
-  showMistakes.value = false
-  if (route.query.open) router.replace({ query: {} })
+// 网址带 ?open=mistakes（顶栏下拉菜单「错题本」）时，让右半边的错题本闪一下，提示在这里；手机上滚动到错题本
+const flash = ref(false)
+const mistakesEl = ref<HTMLElement | null>(null)
+function focusMistakes() {
+  flash.value = true
+  mistakesEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  setTimeout(() => (flash.value = false), 1200)
 }
+watch(() => route.query.open, (v) => v === 'mistakes' && focusMistakes())
 
 // 当前正在编辑的笔记 id
 const currentId = ref<number | null>(null)
@@ -29,6 +29,7 @@ const current = computed(() => notes.list.find((n) => n.id === currentId.value))
 onMounted(async () => {
   await Promise.all([notes.load(), mistakes.load()])
   currentId.value = notes.list[0]?.id ?? null
+  if (route.query.open === 'mistakes') focusMistakes()
 })
 
 async function newNote() {
@@ -78,12 +79,14 @@ function formatTime(t: string) {
 
 <template>
   <div class="archive">
-    <!-- 左侧：笔记列表 -->
+    <!-- 左半边：我的笔记（笔记列表 + 编辑区） -->
+    <div class="half">
+    <div class="half-head">
+      <h3 class="glitch" data-text="我的笔记">我的笔记</h3>
+      <span class="sub">{{ notes.list.length }} 条 · 自动保存</span>
+    </div>
+    <div class="notes">
     <aside class="list">
-      <button class="mistakes-btn" @click="showMistakes = true">
-        🎯 错题本
-        <span v-if="mistakes.todo.length" class="badge">{{ mistakes.todo.length }} 题待温习</span>
-      </button>
       <button class="new-btn" @click="newNote">＋ 新建笔记</button>
       <div v-if="notes.list.length === 0" class="hint">还没有笔记，点上面新建一条吧</div>
       <div
@@ -135,27 +138,37 @@ function formatTime(t: string) {
         </div>
       </template>
     </section>
+    </div>
+    </div>
 
-    <!-- 错题本弹窗 -->
-    <MistakesModal v-if="showMistakes" @close="closeMistakes" />
+    <!-- 右半边：错题本 -->
+    <div ref="mistakesEl" :class="['half', { flash }]">
+      <div class="half-head">
+        <h3 class="glitch" data-text="错题本">错题本</h3>
+        <span v-if="mistakes.todo.length" class="badge">{{ mistakes.todo.length }} 题待温习</span>
+      </div>
+      <div class="mistakes"><MistakesModal inline /></div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 /* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
-.archive { display: flex; gap: 20px; height: 100%; color: var(--text); }
+.archive { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%; color: var(--text); }
+/* 左右各占一半：上面是标题，下面是内容 */
+.half { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; transition: filter 0.3s; }
+.half.flash { filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.8)); }
+.half-head { display: flex; align-items: baseline; gap: 12px; }
+.half-head h3 { margin: 0; font-family: var(--font-cyber); font-size: 26px; font-weight: 400; letter-spacing: 4px; color: #fff; text-shadow: 0 0 8px rgba(0, 240, 255, 0.55), 0 0 20px rgba(255, 43, 214, 0.3); }
+.sub { font-size: 12px; color: var(--text-faint); }
+.notes { flex: 1; min-height: 0; display: flex; gap: 12px; }
+.mistakes { flex: 1; min-height: 0; }
 .list {
-  width: 240px; flex-shrink: 0; overflow-y: auto; padding: 12px;
+  width: 180px; flex-shrink: 0; overflow-y: auto; padding: 12px;
   background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--line); border-radius: var(--radius);
 }
-.mistakes-btn {
-  width: 100%; padding: 10px; margin-bottom: 8px;
-  display: flex; justify-content: space-between; align-items: center;
-  border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600; color: #05020f;
-  background: linear-gradient(90deg, var(--accent-strong), var(--accent));
-}
-.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #05020f; color: var(--gold); }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; color: var(--gold); border: 1px solid rgba(252, 238, 10, 0.4); }
 .new-btn {
   width: 100%; padding: 10px; margin-bottom: 10px; color: var(--text-dim);
   border: 1px dashed var(--line-strong); border-radius: 4px;
@@ -168,7 +181,7 @@ function formatTime(t: string) {
 .item-title { font-size: 14px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
 .item-time { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
 .editor {
-  flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 16px 20px;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px 20px;
   background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--line); border-radius: var(--radius);
 }
@@ -201,7 +214,9 @@ function formatTime(t: string) {
 /* ===== 手机（屏幕窄于 760px） ===== */
 @media (max-width: 760px) {
   /* 笔记列表放上面，编辑区在下面 */
-  .archive { flex-direction: column; gap: 12px; }
+  .archive { grid-template-columns: 1fr; height: auto; gap: 24px; }
+  .notes { flex-direction: column; min-height: 70vh; }
+  .mistakes { height: 70vh; flex: none; }
   .list { width: auto; max-height: 30vh; }
   .publish { margin-right: 56px; }
   .foot { flex-wrap: wrap; }

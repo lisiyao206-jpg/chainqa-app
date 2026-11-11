@@ -148,10 +148,30 @@ const addFriend = (p: Post) =>
   })
 
 const shortTime = (t: string) => t.slice(5, 16).replace('T', ' ')
+
+// ===== 广场右边栏：热门讨论 + 广场数据 =====
+// 热度 = 点赞数 + 评论数 × 2（评论比点赞更能说明大家在讨论）
+const hotPosts = computed(() =>
+  [...posts.value]
+    .map((p) => ({ p, heat: p.likes.length + p.comments.length * 2 }))
+    .filter((x) => x.heat > 0)
+    .sort((a, b) => b.heat - a.heat)
+    .slice(0, 5),
+)
+const stats = computed(() => ({
+  posts: posts.value.length,
+  comments: posts.value.reduce((n, p) => n + p.comments.length, 0),
+  people: new Set(posts.value.map((p) => p.author.account)).size,
+}))
+const feedEl = ref<HTMLElement | null>(null)
+function jumpTo(id: number) {
+  feedEl.value?.querySelector(`[data-post="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
 </script>
 
 <template>
-  <div class="feed">
+  <div :class="['feed-wrap', { square: props.square }]">
+  <div ref="feedEl" class="feed">
     <!-- 发帖 -->
     <div class="composer glass">
       <input v-if="props.square" v-model="title" class="title-input" maxlength="40" placeholder="帖子标题，例如：一文看懂重入攻击（附视频讲解）" />
@@ -183,7 +203,7 @@ const shortTime = (t: string) => t.slice(5, 16).replace('T', ' ')
       {{ props.square ? '广场上还没有帖子，来发第一帖吧' : '还没有动态。加几个好友，或者先发一条吧' }}
     </div>
 
-    <article v-for="p in posts" :key="p.id" class="post glass">
+    <article v-for="p in posts" :key="p.id" class="post glass" :data-post="p.id">
       <header>
         <UserAvatar :user="p.author" :size="38" />
         <div>
@@ -219,9 +239,58 @@ const shortTime = (t: string) => t.slice(5, 16).replace('T', ' ')
       </div>
     </article>
   </div>
+
+  <!-- 广场右边栏 -->
+  <aside v-if="props.square" class="side">
+    <section class="glass panel">
+      <h4>🔥 热门讨论</h4>
+      <p v-if="!hotPosts.length" class="muted">还没有热门帖子，点赞和评论多的帖子会出现在这里</p>
+      <button v-for="(x, i) in hotPosts" :key="x.p.id" class="hot" @click="jumpTo(x.p.id)">
+        <span :class="['rank', { top: i < 3 }]">{{ i + 1 }}</span>
+        <span class="hot-title">{{ x.p.title || x.p.text.slice(0, 24) }}</span>
+        <span class="heat">{{ x.p.comments.length }} 评</span>
+      </button>
+    </section>
+    <section class="glass panel">
+      <h4>📊 广场数据</h4>
+      <div class="stats">
+        <div><b>{{ stats.posts }}</b><span>帖子</span></div>
+        <div><b>{{ stats.comments }}</b><span>讨论</span></div>
+        <div><b>{{ stats.people }}</b><span>发帖人</span></div>
+      </div>
+    </section>
+    <section class="glass panel">
+      <h4>📌 发帖小贴士</h4>
+      <ul class="tips">
+        <li>提问时贴上代码和报错，写明 Solidity 版本</li>
+        <li>分享漏洞分析时，说清楚原理和修复方法</li>
+        <li>引用别人的文章或视频，请注明出处</li>
+        <li>就事论事，欢迎不同观点</li>
+      </ul>
+    </section>
+  </aside>
+  </div>
 </template>
 
 <style scoped>
+/* 广场：左边帖子，右边栏（热门讨论、数据、小贴士），把宽屏两边的空白用起来 */
+.feed-wrap.square { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+.feed-wrap.square .feed { max-width: none; margin: 0; } /* 网格里的 margin: auto 会让帖子列缩成内容宽度，这里去掉 */
+.side { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; }
+.panel { padding: 14px 16px; }
+.panel h4 { margin: 0 0 10px; font-size: 14px; font-weight: 500; letter-spacing: 2px; color: #fff; }
+.muted { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-faint); }
+.hot { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; text-align: left; background: none; border: none; border-bottom: 1px solid rgba(0, 240, 255, 0.08); color: var(--text); font-family: var(--font); }
+.hot:hover .hot-title { color: var(--accent); }
+.rank { width: 20px; height: 20px; flex-shrink: 0; display: grid; place-items: center; font-family: "Orbitron", var(--font-code); font-size: 11px; color: var(--text-dim); background: rgba(255, 255, 255, 0.06); }
+.rank.top { color: #05020f; background: linear-gradient(135deg, var(--accent-strong), var(--accent)); }
+.hot-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.heat { flex-shrink: 0; font-size: 11px; color: var(--text-faint); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+.stats b { display: block; font-family: var(--font-code); font-size: 22px; font-weight: 500; color: var(--accent); text-shadow: 0 0 10px rgba(0, 240, 255, 0.4); }
+.stats span { font-size: 12px; color: var(--text-faint); }
+.tips { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.9; color: var(--text-dim); }
+@media (max-width: 1000px) { .feed-wrap.square { grid-template-columns: 1fr; } .side { position: static; } }
 .feed { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 30px; }
 .composer { padding: 14px 16px; }
 .title-input, .composer textarea {
