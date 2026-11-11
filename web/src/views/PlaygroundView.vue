@@ -238,6 +238,7 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
       <!-- 右：已部署的合约 -->
       <section class="side glass">
         <h4>已部署的合约</h4>
+        <div class="side-body">
         <p v-if="!deployed.length" class="empty">编译、部署之后，合约会出现在这里，可以直接调用它的函数。</p>
         <div v-for="(d, i) in deployed" :key="d.address" :class="['contract', { shut: collapsed.has(d.address) }]">
           <div class="c-head" @click="toggle(d.address)">
@@ -300,6 +301,7 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
             </template>
           </template>
         </div>
+        </div>
         <p class="note">蓝色是只读函数（不上链、不花时间），橙色会发一笔交易写到链上。联盟链没有以太币，带 payable 的函数只能不带金额调用。</p>
       </section>
     </div>
@@ -311,7 +313,7 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
 .glass { background: var(--glass-strong); border: 1px solid var(--line); }
 .head h2 { margin: 4px 0 6px; font-size: 28px; font-weight: 300; letter-spacing: 6px; color: #fff; }
 .head p { margin: 0; font-size: 14px; color: var(--text-dim); }
-.layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
 .work, .side { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
 .from { font-size: 13px; color: var(--accent); }
 .changes { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; font-size: 13px; color: var(--gold); background: rgba(252, 238, 10, 0.05); border: 1px solid rgba(252, 238, 10, 0.3); }
@@ -333,8 +335,13 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
 .status.bad { color: var(--danger); }
 .side h4 { margin: 0; font-size: 16px; font-weight: 500; letter-spacing: 2px; color: #fff; }
 .empty, .note { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-faint); }
-.side { position: sticky; top: 70px; max-height: calc(100vh - 90px); overflow-y: auto; }
-.contract { border: 1px solid var(--line); background: rgba(0, 0, 0, 0.2); }
+/* 右边和左边一样高：右边不参与撑高（contain: size），内容多了在 side-body 里滚动 */
+.side { contain: size; }
+.side-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 6px; }
+.side-body::-webkit-scrollbar { width: 6px; }
+.side-body::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.35); }
+.side-body::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.04); }
+.contract { flex-shrink: 0; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.2); }
 .contract > *:not(.c-head) { margin: 0 12px 12px; }
 .c-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 12px; cursor: pointer; user-select: none; }
 .c-head:hover { background: rgba(0, 240, 255, 0.04); }
@@ -380,5 +387,5 @@ const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
 .result.bad { color: var(--danger); background: rgba(255, 107, 129, 0.06); border-color: rgba(255, 107, 129, 0.3); }
 .tx { display: block; margin-top: 2px; color: var(--text-faint); }
 .link { padding: 0; cursor: pointer; background: none; border: none; color: var(--text-faint); }
-@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } .editor { height: 360px; } .side { position: static; max-height: none; } }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } .editor { height: 360px; } .side { contain: none; height: 70vh; } }
 </style>
