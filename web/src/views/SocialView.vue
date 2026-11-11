@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// 情报站：审计员之间交流的地方，分五栏
+// 情报站：审计员之间交流的地方，分四栏（原来的「好友圈」和广场重复，2026-11-11 去掉了）
 //   广场：外圈，所有人都能看、都能讨论，可以发帖、发视频分享心得（MomentsFeed.vue，square 模式）
 //   聊天：和好友私聊、建讨论组一起讨论题目，可以互相传文件（ChatRoom.vue）
-//   好友圈：发动态、点赞、评论（MomentsFeed.vue）
 //   好友：按账号加好友、处理好友申请、好友列表
 //   情报收集文件夹：我点赞、收藏过的帖子，分「视频」和「笔记 / 文本」，随时复习（StudyStation.vue，原来的「学习站」）
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
@@ -37,7 +36,7 @@ interface SearchUser extends UserBrief {
 
 const userStore = useUserStore()
 // 网址带 ?tab=folder 时直接打开那一栏（旧的 /study 地址会自动跳到这里）
-const TABS = ['square', 'chat', 'moments', 'friends', 'folder']
+const TABS = ['square', 'chat', 'friends', 'folder']
 const route = useRoute()
 const tab = ref(TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'square')
 // 已经在情报站时，从顶栏下拉菜单换一栏：网址变了，页面不会重新加载，所以要盯着它
@@ -154,7 +153,6 @@ async function onLeft() {
         <button :class="{ on: tab === 'chat' }" @click="tab = 'chat'">
           聊天 <i v-if="totalUnread" class="dot">{{ totalUnread }}</i>
         </button>
-        <button :class="{ on: tab === 'moments' }" @click="tab = 'moments'">好友圈</button>
         <button :class="{ on: tab === 'friends' }" @click="tab = 'friends'">
           好友 <i v-if="requests.length" class="dot">{{ requests.length }}</i>
         </button>
@@ -202,7 +200,6 @@ async function onLeft() {
       <div v-else class="placeholder">选一个聊天开始讨论</div>
     </div>
 
-    <MomentsFeed v-else-if="tab === 'moments'" key="moments" />
 
     <!-- 好友 -->
     <div v-else class="friends">

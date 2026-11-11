@@ -131,7 +131,7 @@ const shortTime = (t: string) => t.slice(0, 10)
       </div>
       <input v-model="keyword" class="input search" placeholder="🔍 记得几个字就行，视频和笔记一起搜" />
     </div>
-    <p class="intro">📁 在广场或好友圈里点 ♡ 赞 或 ☆ 收藏 的帖子，都会自动收进这个文件夹。</p>
+    <p class="intro">📁 在广场里点 ♡ 赞 或 ☆ 收藏 的帖子，都会自动收进这个文件夹。</p>
     <div v-if="error" class="error">{{ error }}</div>
 
     <div v-if="loading" class="empty">加载中…</div>
@@ -161,7 +161,7 @@ const shortTime = (t: string) => t.slice(0, 10)
     </section>
 
     <div v-else-if="!shown.length" class="empty">
-      {{ kind === 'video' ? '还没有收藏视频，去广场看看大家分享的讲解视频吧' : '还没有收藏笔记，去广场或好友圈收藏一些学习心得吧' }}
+      {{ kind === 'video' ? '还没有收藏视频，去广场看看大家分享的讲解视频吧' : '还没有收藏笔记，去广场收藏一些学习心得吧' }}
     </div>
 
     <!-- 视频：网格，每格一个视频卡片 -->

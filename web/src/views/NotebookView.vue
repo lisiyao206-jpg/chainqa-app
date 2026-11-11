@@ -42,24 +42,23 @@ async function removeNote() {
   currentId.value = notes.list[0]?.id ?? null
 }
 
-// ===== 发布讨论：把这条笔记发到情报站的广场或好友圈，和大家一起讨论 =====
+// ===== 发布讨论：把这条笔记发到情报站的广场，和大家一起讨论 =====
 const userStore = useUserStore()
-const target = ref('public') // public 广场（所有人能看）/ friends 好友圈（只有好友能看）
+const target = 'public' // 发到广场（所有人都能看到）
 const publishing = ref(false)
 const published = ref<{ ok: boolean; text: string } | null>(null)  // 发布结果提示：{ ok, text }
 
 async function publishNote() {
   const n = current.value!
   if (!n.content.trim()) return (published.value = { ok: false, text: '笔记还是空的，写点内容再发布吧' })
-  const where = target.value === 'public' ? '广场（所有人都能看到）' : '好友圈（只有好友能看到）'
-  if (!confirm(`把「${n.title || '无标题笔记'}」发布到${where}？`)) return
+  if (!confirm(`把「${n.title || '无标题笔记'}」发布到广场？所有人都能看到`)) return
   publishing.value = true
   published.value = null
   try {
     await userStore.api('/api/social/posts', {
       title: n.title.trim() || '我的学习笔记',
       text: n.content,
-      visibility: target.value,
+      visibility: target,
     })
     published.value = { ok: true, text: '已发布！' }
   } catch (err) {
@@ -127,12 +126,8 @@ function formatTime(t: string) {
             <RouterLink v-if="published.ok" to="/social">去情报站看看 →</RouterLink>
           </span>
           <div class="publish">
-            <select v-model="target" class="target">
-              <option value="public">发布到广场</option>
-              <option value="friends">发布到好友圈</option>
-            </select>
             <button class="btn primary" :disabled="publishing" @click="publishNote">
-              {{ publishing ? '发布中…' : '📤 发布讨论' }}
+              {{ publishing ? '发布中…' : '📤 发布到广场' }}
             </button>
           </div>
         </div>

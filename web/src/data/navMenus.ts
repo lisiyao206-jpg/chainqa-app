@@ -50,7 +50,6 @@ export const NAV_MENUS: Record<string, NavMenu> = {
     subs: [
       { to: '/social?tab=square', title: '🏛 广场' },
       { to: '/social?tab=chat', title: '💬 聊天' },
-      { to: '/social?tab=moments', title: '🌐 好友圈' },
       { to: '/social?tab=friends', title: '👥 好友' },
       { to: '/social?tab=folder', title: '📁 情报收集文件夹' },
     ],
