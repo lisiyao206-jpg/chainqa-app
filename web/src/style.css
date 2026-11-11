@@ -129,3 +129,7 @@ select, option { background: #0b0820; color: var(--text); }
   html, body { overflow-x: hidden; }
   img, video, canvas { max-width: 100%; }
 }
+
+/* 自动加在面板上的代码边框（utils/autoFrame.ts）：比专门设计的卡片淡一点，不抢内容 */
+.cf-host { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.cf-host svg.code-frame { opacity: 0.5; }
