@@ -40,7 +40,7 @@ function attach(el: HTMLElement) {
   const host = document.createElement('div')
   host.className = 'cf-host'
   el.appendChild(host)
-  render(h(CodeFrame, { text: pick(), chamfer: 0, size: 9, inset: 6, duration: Math.max(20, (2 * (r.width + r.height)) / SPEED) }), host)
+  render(h(CodeFrame, { text: pick(), rainbow: true, chamfer: 0, size: 9, inset: 6, duration: Math.max(20, (2 * (r.width + r.height)) / SPEED) }), host)
 }
 
 function scan() {

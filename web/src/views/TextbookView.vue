@@ -254,7 +254,7 @@ function toggle(name: string) {
     <!-- 右侧：阅读区 -->
     <div class="reader-wrap">
     <!-- 边框上一圈流动的代码：取这一章正文里的第一段代码，没有代码的章节用一段默认的合约代码 -->
-    <CodeFrame v-if="current" :key="current.id" :text="frameText" :chamfer="0" :size="10" :inset="8" :duration="60" />
+    <CodeFrame v-if="current" :key="current.id" :text="frameText" rainbow :chamfer="0" :size="10" :inset="8" :duration="60" />
     <section class="reader glass" ref="readerEl" @scroll="onReaderScroll">
       <div v-if="!current" class="hint">
         <template v-if="isPrep">👈 从左边选一章，先认识区块链是什么</template>

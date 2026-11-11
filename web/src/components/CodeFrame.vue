@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<{
   size?: number     // 字号
   inset?: number    // 文字离边缘多远
   chamfer?: number  // 右上角切角的大小，要和卡片的 clip-path 一样
+  rainbow?: boolean // 彩色：品红 → 紫 → 青 → 黄的渐变，颜色沿着边框缓缓流动
 }>(), {
   text: 'require(msg.sender == owner); ',
   shape: 'rect',
@@ -22,6 +23,7 @@ const props = withDefaults(defineProps<{
   size: 9,
   inset: 7,
   chamfer: 18,
+  rainbow: false,
 })
 
 const root = ref<SVGSVGElement | null>(null)
@@ -70,8 +72,18 @@ const repeated = computed(() => {
 <template>
   <svg ref="root" class="code-frame" aria-hidden="true">
     <template v-if="w && h">
-      <defs><path :id="id" :d="path.d" /></defs>
-      <text :fill="props.color" :font-size="props.size" :textLength="path.len * 2" lengthAdjust="spacing">
+      <defs>
+        <path :id="id" :d="path.d" />
+        <!-- 彩色渐变：每 260 像素换一轮颜色（来回反射），再让渐变本身平移一个周期，颜色就沿着边框不停流动 -->
+        <linearGradient v-if="props.rainbow" :id="id + 'g'" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="260" y2="260" spreadMethod="reflect">
+          <stop offset="0" stop-color="#ff2bd6" />
+          <stop offset="0.33" stop-color="#8a5cff" />
+          <stop offset="0.66" stop-color="#00f0ff" />
+          <stop offset="1" stop-color="#fcee0a" />
+          <animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="520 520" dur="8s" repeatCount="indefinite" />
+        </linearGradient>
+      </defs>
+      <text :fill="props.rainbow ? `url(#${id}g)` : props.color" :font-size="props.size" :textLength="path.len * 2" lengthAdjust="spacing">
         <textPath :href="'#' + id">
           {{ repeated }}
           <animate attributeName="startOffset" :from="-path.len" to="0" :dur="props.duration + 's'" repeatCount="indefinite" />
