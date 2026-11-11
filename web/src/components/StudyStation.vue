@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// 情报收集文件夹（放在情报站里，原来叫「学习站」）：我点赞过、收藏过的帖子都收在这里，方便随时复习
+// 情报收藏（放在案件档案的左栏，原来是情报站里的「情报收集文件夹」）：我点赞过、收藏过的帖子都收在这里
+// 每条都有「引用到笔记」：把这条帖子的要点插进中间正在写的笔记，边看边归纳
 // 分两栏：视频（带视频的帖子，排成网格）/ 笔记·文本（其余的帖子，排成列表，可以展开看全文）
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useUserStore } from '../stores/user'
@@ -30,6 +31,10 @@ interface Post {
   favorited: boolean
   comments: Comment[]
 }
+
+// compact：放在案件档案的窄栏里（单列、自己滚动）；cite：点「引用到笔记」时把帖子交给父页面
+const props = defineProps<{ compact?: boolean }>()
+const emit = defineEmits<{ cite: [post: Post] }>()
 
 const userStore = useUserStore()
 const kind = ref<'video' | 'text'>('video')
@@ -122,7 +127,7 @@ const shortTime = (t: string) => t.slice(0, 10)
 </script>
 
 <template>
-  <div class="study">
+  <div :class="['study', { compact: props.compact }]">
     <div class="toolbar">
       <div class="kinds">
         <!-- 搜索时两个栏目都不高亮（结果是两栏一起搜的）；点栏目会清空搜索，回到这一栏 -->
@@ -131,7 +136,7 @@ const shortTime = (t: string) => t.slice(0, 10)
       </div>
       <input v-model="keyword" class="input search" placeholder="🔍 记得几个字就行，视频和笔记一起搜" />
     </div>
-    <p class="intro">📁 在广场里点 ♡ 赞 或 ☆ 收藏 的帖子，都会自动收进这个文件夹。</p>
+    <p class="intro">⭐ 在情报站广场点 ♡ 赞 或 ☆ 收藏 的帖子，都会自动收进这里；点「✍ 引用」把要点放进正在写的笔记。</p>
     <div v-if="error" class="error">{{ error }}</div>
 
     <div v-if="loading" class="empty">加载中…</div>
@@ -151,7 +156,8 @@ const shortTime = (t: string) => t.slice(0, 10)
           <span :class="['badge', p.file?.isVideo ? 'v' : 't']">{{ p.file?.isVideo ? '🎬 视频' : '📝 笔记' }}</span>
           <UserAvatar :user="p.author" :size="22" />
           <span><template v-for="(s, i) in highlight(p.author.nickname)" :key="i"><mark v-if="s.hit">{{ s.t }}</mark><template v-else>{{ s.t }}</template></template> · {{ shortTime(p.time) }}</span>
-          <a class="jump" @click="jump(p)">跳转到{{ p.file?.isVideo ? '视频' : '笔记' }}栏 →</a>
+          <a class="jump" @click="jump(p)">跳转 →</a>
+          <a class="cite" @click="emit('cite', p)">✍ 引用</a>
           <a class="remove" @click="remove(p)">移出</a>
         </div>
         <h4 v-if="p.title"><template v-for="(s, i) in highlight(p.title)" :key="i"><mark v-if="s.hit">{{ s.t }}</mark><template v-else>{{ s.t }}</template></template></h4>
@@ -161,7 +167,7 @@ const shortTime = (t: string) => t.slice(0, 10)
     </section>
 
     <div v-else-if="!shown.length" class="empty">
-      {{ kind === 'video' ? '还没有收藏视频，去广场看看大家分享的讲解视频吧' : '还没有收藏笔记，去广场收藏一些学习心得吧' }}
+      {{ kind === 'video' ? '还没有收藏视频，去情报站广场看看大家分享的讲解视频吧' : '还没有收藏帖子，去情报站广场收藏一些学习心得吧' }}
     </div>
 
     <!-- 视频：网格，每格一个视频卡片 -->
@@ -174,6 +180,7 @@ const shortTime = (t: string) => t.slice(0, 10)
           <UserAvatar :user="p.author" :size="22" />
           <span>{{ p.author.nickname }} · {{ shortTime(p.time) }}</span>
           <span class="tags"><i v-if="p.favorited" class="fav">★</i><i v-if="p.liked" class="liked">♥</i></span>
+          <a class="cite" @click="emit('cite', p)">✍ 引用</a>
           <a class="remove" @click="remove(p)">移出</a>
         </div>
       </article>
@@ -186,6 +193,7 @@ const shortTime = (t: string) => t.slice(0, 10)
           <UserAvatar :user="p.author" :size="24" />
           <span>{{ p.author.nickname }} · {{ shortTime(p.time) }}</span>
           <span class="tags"><i v-if="p.favorited" class="fav">★ 收藏</i><i v-if="p.liked" class="liked">♥ 点赞</i></span>
+          <a class="cite" @click="emit('cite', p)">✍ 引用</a>
           <a class="remove" @click="remove(p)">移出</a>
         </div>
         <h4 v-if="p.title">{{ p.title }}</h4>
@@ -199,6 +207,16 @@ const shortTime = (t: string) => t.slice(0, 10)
 
 <style scoped>
 .study { max-width: 1000px; margin: 0 auto; padding-bottom: 30px; }
+/* 窄栏模式：铺满父元素，内容多了自己滚动；工具栏换行，视频单列 */
+.study.compact { max-width: none; height: 100%; overflow-y: auto; padding: 14px 14px 20px; }
+.study.compact .toolbar { flex-wrap: wrap; gap: 10px; }
+.study.compact .search { max-width: none; width: 100%; }
+.study.compact .grid { grid-template-columns: 1fr; gap: 12px; }
+.study.compact .kinds button { padding: 6px 12px; font-size: 13px; }
+.cite { cursor: pointer; color: var(--accent); white-space: nowrap; }
+.cite:hover { text-shadow: 0 0 8px var(--accent); }
+.tags + .cite, .meta > span + .cite { margin-left: auto; }
+.cite + .remove { margin-left: 10px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
 .kinds { display: flex; gap: 8px; }
 .kinds button {

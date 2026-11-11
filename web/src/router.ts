@@ -45,7 +45,7 @@ const router = createRouter({
     { path: '/playground', component: PlaygroundView, meta: { title: '合约练习场' } },
     { path: '/social', component: SocialView, meta: { title: '情报站' } },
     // 学习站已经并进情报站，改名「情报收集文件夹」；旧地址自动跳过去
-    { path: '/study', redirect: '/social?tab=folder' },
+    { path: '/study', redirect: '/archive?open=collect' }, // 旧地址：情报收集文件夹已并进案件档案
     { path: '/audit', component: AuditView, meta: { title: 'AI 审计' } },
     // admin: true 表示只有管理员能进
     { path: '/admin', component: AdminView, meta: { title: '管理后台', admin: true } },

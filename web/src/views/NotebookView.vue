@@ -4,22 +4,24 @@ import { useRoute } from 'vue-router'
 import { useNotesStore } from '../stores/notes'
 import { useMistakesStore } from '../stores/mistakes'
 import MistakesModal from '../components/MistakesModal.vue'
+import StudyStation from '../components/StudyStation.vue'
 import { useUserStore } from '../stores/user'
 
 const notes = useNotesStore()
 
-// 错题本：页面右半边一直显示
+// 案件档案分三栏：情报收藏 | 我的笔记 | 错题本
 const mistakes = useMistakesStore()
 const route = useRoute()
-// 网址带 ?open=mistakes（顶栏下拉菜单「错题本」）时，让右半边的错题本闪一下，提示在这里；手机上滚动到错题本
-const flash = ref(false)
-const mistakesEl = ref<HTMLElement | null>(null)
-function focusMistakes() {
-  flash.value = true
-  mistakesEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  setTimeout(() => (flash.value = false), 1200)
+// 网址带 ?open=collect / ?open=mistakes（顶栏下拉菜单）时，让对应的那一栏闪一下；手机上滚动过去
+const flash = ref('')
+const cols = ref<Record<string, HTMLElement | null>>({})
+function focusCol(name: string) {
+  if (!['collect', 'mistakes'].includes(name)) return
+  flash.value = name
+  cols.value[name]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  setTimeout(() => (flash.value = ''), 1200)
 }
-watch(() => route.query.open, (v) => v === 'mistakes' && focusMistakes())
+watch(() => route.query.open, (v) => focusCol(String(v || '')))
 
 // 当前正在编辑的笔记 id
 const currentId = ref<number | null>(null)
@@ -29,7 +31,8 @@ const current = computed(() => notes.list.find((n) => n.id === currentId.value))
 onMounted(async () => {
   await Promise.all([notes.load(), mistakes.load()])
   currentId.value = notes.list[0]?.id ?? null
-  if (route.query.open === 'mistakes') focusMistakes()
+  focusCol(String(route.query.open || ''))
+  loadFriends()
 })
 
 async function newNote() {
@@ -60,7 +63,58 @@ async function publishNote() {
       text: n.content,
       visibility: target,
     })
-    published.value = { ok: true, text: '已发布！' }
+    published.value = { ok: true, text: '已发布到广场！' }
+  } catch (err) {
+    published.value = { ok: false, text: (err as Error).message }
+  } finally {
+    publishing.value = false
+  }
+}
+
+// ===== 引用：把左栏收藏的帖子要点插进当前笔记，边看边归纳 =====
+interface CitedPost { title: string | null; text: string; author: { nickname: string }; file: { name: string } | null }
+const editorEl = ref<HTMLTextAreaElement | null>(null)
+async function cite(p: CitedPost) {
+  if (!current.value) await newNote()
+  const n = current.value!
+  const head = `> 【引用】${p.title || '收藏的帖子'}（作者：${p.author.nickname}）`
+  const excerpt = p.text ? '\n> ' + p.text.slice(0, 200).replace(/\n+/g, '\n> ') + (p.text.length > 200 ? '…' : '') : ''
+  const file = p.file ? `\n> 附件：${p.file.name}（在左边「情报收藏」里查看）` : ''
+  const block = `${head}${excerpt}${file}\n\n我的理解：\n`
+  notes.update(n.id, { content: (n.content.trim() ? n.content.replace(/\s*$/, '\n\n') : '') + block })
+  // 光标放到「我的理解：」后面，直接开始写
+  setTimeout(() => {
+    const el = editorEl.value
+    if (!el) return
+    el.focus()
+    el.selectionStart = el.selectionEnd = el.value.length
+    el.scrollTop = el.scrollHeight
+  }, 50)
+}
+
+// ===== 分享给好友：通过情报站的私聊发过去 =====
+const friends = ref<{ userId: number; nickname: string }[]>([])
+const shareTo = ref('')
+async function loadFriends() {
+  try {
+    friends.value = await userStore.api('/api/social/friends')
+  } catch {
+    friends.value = []
+  }
+}
+async function shareNote() {
+  const n = current.value!
+  const f = friends.value.find((x) => String(x.userId) === shareTo.value)
+  if (!f) return
+  if (!n.content.trim()) return (published.value = { ok: false, text: '笔记还是空的，写点内容再分享吧' })
+  publishing.value = true
+  published.value = null
+  try {
+    const { roomId } = await userStore.api<{ roomId: number }>('/api/social/rooms/dm', { friendId: f.userId })
+    const body = `📝 分享笔记《${n.title.trim() || '我的学习笔记'}》\n\n${n.content}`
+    await userStore.api(`/api/social/rooms/${roomId}/messages`, { text: body.length > 980 ? body.slice(0, 980) + '…' : body })
+    published.value = { ok: true, text: `已发给 ${f.nickname}` }
+    shareTo.value = ''
   } catch (err) {
     published.value = { ok: false, text: (err as Error).message }
   } finally {
@@ -78,7 +132,16 @@ function formatTime(t: string) {
 
 <template>
   <div class="archive">
-    <!-- 左半边：我的笔记（笔记列表 + 编辑区） -->
+    <!-- 左栏：情报收藏（点赞、收藏的帖子和视频） -->
+    <div :ref="(el) => (cols.collect = el as HTMLElement)" :class="['half', { flash: flash === 'collect' }]">
+      <div class="half-head">
+        <h3 class="glitch" data-text="情报收藏">情报收藏</h3>
+        <span class="sub">边看边记</span>
+      </div>
+      <div class="box" data-frame><StudyStation compact @cite="cite" /></div>
+    </div>
+
+    <!-- 中栏：我的笔记（笔记列表 + 编辑区） -->
     <div class="half">
     <div class="half-head">
       <h3 class="glitch" data-text="我的笔记">我的笔记</h3>
@@ -113,6 +176,7 @@ function formatTime(t: string) {
           <button class="del-btn" @click="removeNote">🗑 删除</button>
         </div>
         <textarea
+          ref="editorEl"
           class="content-input"
           :value="current.content"
           placeholder="在这里记下你的理解、疑问、代码片段……"
@@ -126,8 +190,13 @@ function formatTime(t: string) {
             <RouterLink v-if="published.ok" to="/social">去情报站看看 →</RouterLink>
           </span>
           <div class="publish">
+            <select v-model="shareTo" class="target" :disabled="publishing || !friends.length" :title="friends.length ? '' : '还没有好友，去情报站加好友'">
+              <option value="">{{ friends.length ? '💬 分享给好友…' : '💬 还没有好友' }}</option>
+              <option v-for="f in friends" :key="f.userId" :value="String(f.userId)">{{ f.nickname }}</option>
+            </select>
+            <button v-if="shareTo" class="btn" :disabled="publishing" @click="shareNote">发送</button>
             <button class="btn primary" :disabled="publishing" @click="publishNote">
-              {{ publishing ? '发布中…' : '📤 发布到广场' }}
+              {{ publishing ? '处理中…' : '📤 发布到广场' }}
             </button>
           </div>
         </div>
@@ -136,8 +205,8 @@ function formatTime(t: string) {
     </div>
     </div>
 
-    <!-- 右半边：错题本 -->
-    <div ref="mistakesEl" :class="['half', { flash }]">
+    <!-- 右栏：错题本 -->
+    <div :ref="(el) => (cols.mistakes = el as HTMLElement)" :class="['half', { flash: flash === 'mistakes' }]">
       <div class="half-head">
         <h3 class="glitch" data-text="错题本">错题本</h3>
         <span v-if="mistakes.todo.length" class="badge">{{ mistakes.todo.length }} 题待温习</span>
@@ -149,8 +218,8 @@ function formatTime(t: string) {
 
 <style scoped>
 /* 赛博朋克深色版：颜色都用 style.css 里的全站变量 */
-.archive { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; height: 100%; color: var(--text); }
-/* 左右各占一半：上面是标题，下面是内容 */
+.archive { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) minmax(0, 1fr); gap: 18px; height: 100%; color: var(--text); }
+/* 三栏：上面是标题，下面是内容 */
 .half { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; transition: filter 0.3s; }
 .half.flash { filter: drop-shadow(0 0 14px rgba(0, 240, 255, 0.8)); }
 .half-head { display: flex; align-items: baseline; gap: 12px; }
@@ -158,8 +227,9 @@ function formatTime(t: string) {
 .sub { font-size: 12px; color: var(--text-faint); }
 .notes { flex: 1; min-height: 0; display: flex; gap: 12px; }
 .mistakes { flex: 1; min-height: 0; }
+.box { flex: 1; min-height: 0; border: 1px solid var(--line); background: var(--glass); }
 .list {
-  width: 180px; flex-shrink: 0; overflow-y: auto; padding: 12px;
+  width: 150px; flex-shrink: 0; overflow-y: auto; padding: 12px;
   background: var(--glass); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
   border: 1px solid var(--line); border-radius: var(--radius);
 }
@@ -198,7 +268,8 @@ function formatTime(t: string) {
 .saved { font-size: 12px; color: var(--text-faint); }
 .ok { font-size: 13px; color: var(--ok); }
 .error { font-size: 13px; color: var(--danger); }
-.publish { margin-left: auto; margin-right: 64px; display: flex; gap: 10px; align-items: center; } /* 右边让出位置给 AI 悬浮按钮 */
+.publish { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; }
+.foot { flex-wrap: wrap; }
 .target {
   padding: 8px 10px; font-size: 13px; font-family: var(--font); cursor: pointer; outline: none;
   color: var(--text); background: rgba(6, 4, 20, 0.85); border: 1px solid var(--line-strong);
@@ -206,10 +277,16 @@ function formatTime(t: string) {
 .target:focus { border-color: var(--accent); }
 .hint { color: var(--text-faint); font-size: 14px; }
 .center { margin: auto; }
+/* 中等宽度（笔记本小屏）：情报收藏挪到下面一整行，笔记和错题本并排 */
+@media (max-width: 1280px) and (min-width: 761px) {
+  .archive { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 60vh; height: auto; min-height: 100%; }
+  .archive > .half:first-child { grid-column: 1 / -1; grid-row: 2; }
+}
 /* ===== 手机（屏幕窄于 760px） ===== */
 @media (max-width: 760px) {
   /* 笔记列表放上面，编辑区在下面 */
   .archive { grid-template-columns: 1fr; height: auto; gap: 24px; }
+  .box { height: 60vh; flex: none; }
   .notes { flex-direction: column; min-height: 70vh; }
   .mistakes { height: 70vh; flex: none; }
   .list { width: auto; max-height: 30vh; }

@@ -1,14 +1,13 @@
 <script setup lang="ts">
-// 情报站：审计员之间交流的地方，分四栏（原来的「好友圈」和广场重复，2026-11-11 去掉了）
+// 情报站：审计员之间交流的地方，分三栏
+// （2026-11-11：「好友圈」和广场重复，去掉了；「情报收集文件夹」并进了案件档案的「情报收藏」，方便边看边写笔记）
 //   广场：外圈，所有人都能看、都能讨论，可以发帖、发视频分享心得（MomentsFeed.vue，square 模式）
 //   聊天：和好友私聊、建讨论组一起讨论题目，可以互相传文件（ChatRoom.vue）
 //   好友：按账号加好友、处理好友申请、好友列表
-//   情报收集文件夹：我点赞、收藏过的帖子，分「视频」和「笔记 / 文本」，随时复习（StudyStation.vue，原来的「学习站」）
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from '../stores/user'
 import ChatRoom from '../components/ChatRoom.vue'
 import MomentsFeed from '../components/MomentsFeed.vue'
-import StudyStation from '../components/StudyStation.vue'
 import { useRoute } from 'vue-router'
 import UserAvatar from '../components/UserAvatar.vue'
 import type { User } from '../types'
@@ -35,8 +34,8 @@ interface SearchUser extends UserBrief {
 }
 
 const userStore = useUserStore()
-// 网址带 ?tab=folder 时直接打开那一栏（旧的 /study 地址会自动跳到这里）
-const TABS = ['square', 'chat', 'friends', 'folder']
+// 网址带 ?tab=chat 等参数时直接打开那一栏
+const TABS = ['square', 'chat', 'friends']
 const route = useRoute()
 const tab = ref(TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'square')
 // 已经在情报站时，从顶栏下拉菜单换一栏：网址变了，页面不会重新加载，所以要盯着它
@@ -156,16 +155,12 @@ async function onLeft() {
         <button :class="{ on: tab === 'friends' }" @click="tab = 'friends'">
           好友 <i v-if="requests.length" class="dot">{{ requests.length }}</i>
         </button>
-        <button :class="{ on: tab === 'folder' }" title="我点赞、收藏过的帖子都在这里" @click="tab = 'folder'">📁 情报收集文件夹</button>
       </nav>
     </div>
     <div v-if="error" class="error">{{ error }}</div>
 
-    <!-- 情报收集文件夹：点赞、收藏过的帖子 -->
-    <StudyStation v-if="tab === 'folder'" />
-
     <!-- 广场：外圈，不认识的人也能一起讨论 -->
-    <MomentsFeed v-else-if="tab === 'square'" key="square" square />
+    <MomentsFeed v-if="tab === 'square'" key="square" square />
 
     <!-- 聊天：左边聊天列表，右边聊天窗口 -->
     <div v-else-if="tab === 'chat'" class="chat glass">

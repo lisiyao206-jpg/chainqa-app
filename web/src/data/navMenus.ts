@@ -41,6 +41,7 @@ export const NAV_MENUS: Record<string, NavMenu> = {
   '/archive': {
     match: ['/archive'],
     subs: [
+      { to: '/archive?open=collect', title: '⭐ 情报收藏' },
       { to: '/archive', title: '📝 我的笔记' },
       { to: '/archive?open=mistakes', title: '📕 错题本' },
     ],
@@ -51,7 +52,6 @@ export const NAV_MENUS: Record<string, NavMenu> = {
       { to: '/social?tab=square', title: '🏛 广场' },
       { to: '/social?tab=chat', title: '💬 聊天' },
       { to: '/social?tab=friends', title: '👥 好友' },
-      { to: '/social?tab=folder', title: '📁 情报收集文件夹' },
     ],
   },
 }
