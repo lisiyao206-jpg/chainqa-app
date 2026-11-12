@@ -132,9 +132,9 @@ async function logout() {
 /* ===== 顶栏 ===== */
 .topbar {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 18px 36px; font-size: 16px;
+  padding: 18px 36px; font-size: 20px;
 }
-.links, .me { display: flex; align-items: center; gap: 30px; }
+.links, .me { display: flex; align-items: center; gap: 38px; }
 .topbar a { color: var(--text-dim); text-decoration: none; cursor: pointer; transition: color 0.3s; }
 .topbar a:hover, .topbar a.on { color: #fff; }
 /* 当前页面：下面一个小圆点 */
@@ -143,7 +143,7 @@ async function logout() {
   content: ''; position: absolute; left: 50%; bottom: -8px; width: 4px; height: 4px; margin-left: -2px;
   border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent);
 }
-.brand { color: #fff !important; font-size: 19px; letter-spacing: 3px; margin-right: 10px; }
+.brand { color: #fff !important; font-size: 24px; letter-spacing: 3px; margin-right: 14px; }
 .drop { position: relative; }
 /* 有分支的导航（实战任务）：鼠标移上去，下面展开分支菜单；上面留一段透明空隙，鼠标往下移时菜单不会消失 */
 .menu { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); z-index: 30; padding-top: 12px; display: none; }
@@ -152,7 +152,7 @@ async function logout() {
   display: flex; flex-direction: column; padding: 6px 0; min-width: 140px;
   background: rgba(6, 4, 20, 0.95); border: 1px solid var(--line-strong); box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
 }
-.menu-box a { padding: 10px 18px; font-size: 15px; white-space: nowrap; }
+.menu-box a { padding: 12px 22px; font-size: 18px; white-space: nowrap; }
 .menu-box a:hover { background: rgba(0, 240, 255, 0.08); }
 .menu-box a.on::after { display: none; }
 .me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }

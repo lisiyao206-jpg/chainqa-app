@@ -174,11 +174,11 @@ function toggleSpot(s: { no: string; to: string; title: string; x: number; y: nu
   display: flex; justify-content: space-between; align-items: center;
   padding: 22px 36px;
 }
-.links { display: flex; gap: 32px; align-items: center; font-size: 16px; }
+.links { display: flex; gap: 38px; align-items: center; font-size: 20px; }
 .links a { color: rgba(233, 230, 255, 0.7); text-decoration: none; transition: color 0.3s; }
 .links a:hover { color: #fff; }
-.brand { color: #fff; font-size: 19px; letter-spacing: 4px; margin-right: 12px; }
-.me { display: flex; align-items: center; gap: 20px; font-size: 16px; }
+.brand { color: #fff; font-size: 24px; letter-spacing: 4px; margin-right: 14px; }
+.me { display: flex; align-items: center; gap: 24px; font-size: 20px; }
 .admin { color: rgba(233, 230, 255, 0.7); text-decoration: none; cursor: pointer; }
 .admin:hover { color: #fff; }
 .me-btn { padding: 0; border: none; background: none; cursor: pointer; border-radius: 50%; }
@@ -243,7 +243,7 @@ function toggleSpot(s: { no: string; to: string; title: string; x: number; y: nu
   display: flex; flex-direction: column; padding: 6px 0; min-width: 140px;
   background: rgba(6, 4, 20, 0.95); border: 1px solid var(--line-strong); box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
 }
-.menu-box a { padding: 9px 16px; white-space: nowrap; }
+.menu-box a { padding: 12px 22px; font-size: 18px; white-space: nowrap; }
 .menu-box a:hover { background: rgba(0, 240, 255, 0.08); }
 .menu-box a.on::after { display: none; }
 .spot.on .label { color: #fff; left: 74px; font-size: 21px; text-shadow: 0 0 16px var(--accent), 0 2px 4px #000; }
