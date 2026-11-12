@@ -256,9 +256,9 @@ async function readJSON(req) {
 
 // POST /api/register：注册（成功后直接登录）
 async function handleRegister(req, res) {
-  const { pwd, nickname, identity } = await readJSON(req);
+  const { pwd, nickname, identity, phone } = await readJSON(req);
   try {
-    sendJSON(res, 200, register(pwd, nickname, identity)); // 账号由系统分配（6 位数字）
+    sendJSON(res, 200, register(pwd, nickname, identity, phone)); // 账号由系统分配（6 位数字）
   } catch (err) {
     sendJSON(res, 400, { error: err.message });
   }

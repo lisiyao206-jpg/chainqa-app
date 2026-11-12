@@ -26,6 +26,7 @@ const loading = ref(false)
 // 登录方式：'pwd' 账号 / 手机号 + 密码，'sms' 手机号 + 验证码
 const loginWay = ref<'pwd' | 'sms'>('pwd')
 const phone = ref('')
+const regPhone = ref('') // 注册时选填的手机号
 const code = ref('')
 const sms = useSmsCode('login')
 const smsEnabled = ref(false) // 后端没开验证码登录（.env 没写 SMS_MODE）就不显示这一栏
@@ -60,7 +61,7 @@ async function submit() {
     } else {
       if (pwd.value !== pwd2.value) throw new Error('两次输入的密码不一样')
       // 注册成功：先停在这里，把分配到的账号大字显示出来，记下了再进大厅
-      newAccount.value = await userStore.register(pwd.value, nickname.value, identity.value)
+      newAccount.value = await userStore.register(pwd.value, nickname.value, identity.value, regPhone.value.trim())
     }
   } catch (err) {
     error.value = (err as Error).message
@@ -157,6 +158,11 @@ function switchMode(m: string) {
         <span class="label">昵称</span>
         <input v-model="nickname" class="input" placeholder="你的昵称" maxlength="12" />
       </label>
+      <label v-if="mode === 'register'" class="field">
+        <span class="label">手机号 <small class="optional">（选填）</small></span>
+        <input v-model="regPhone" class="input" placeholder="11 位手机号" maxlength="11" inputmode="numeric" autocomplete="tel" />
+        <span class="field-tip">填了以后，忘记 6 位账号也能用「手机号 + 密码」登录</span>
+      </label>
       <label v-if="!(mode === 'login' && loginWay === 'sms')" class="field">
         <span class="label">密码</span>
         <input v-model="pwd" class="input" type="password" placeholder="密码（至少 6 位）" :autocomplete="mode === 'login' ? 'current-password' : 'new-password'" />
@@ -234,6 +240,7 @@ function switchMode(m: string) {
 .label { font-size: 14px; letter-spacing: 1px; color: #fff; }
 .field-tip { margin-top: 4px; font-size: 13px; color: var(--gold); }
 .identity { display: flex; gap: 10px; margin-top: 6px; }
+.optional { font-size: 12px; color: var(--text-faint); }
 .identity button {
   flex: 1; padding: 9px 0; cursor: pointer; font-family: var(--font); font-size: 15px; letter-spacing: 1px;
   color: var(--text-dim); background: transparent; border: 1px solid var(--line); transition: all 0.2s;

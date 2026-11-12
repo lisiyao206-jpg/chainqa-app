@@ -52,17 +52,23 @@ export function newAccountNo() {
 
 // ===== 注册 =====
 // identity：'student' 学生 / 'teacher' 老师，选了老师注册完就能建班
-export function register(pwd, nickname, identity = "student") {
+// phone 选填：填了以后可以用「手机号 + 密码」登录，忘了 6 位账号也不怕
+export function register(pwd, nickname, identity = "student", phone = "") {
   pwd = String(pwd || "");
   nickname = moderate(String(nickname || "").trim()); // 昵称公开显示，也要过内容过滤
   if (!nickname || nickname.length > 12) throw new Error("昵称要 1~12 个字");
   if (pwd.length < 6) throw new Error("密码至少 6 位");
+  phone = String(phone || "").trim();
+  if (phone) {
+    if (!/^1[3-9]\d{9}$/.test(phone)) throw new Error("手机号格式不对：要 11 位，以 1 开头");
+    if (db.prepare("SELECT 1 FROM users WHERE phone = ?").get(phone)) throw new Error("这个手机号已经注册过了，可以直接用手机号登录");
+  }
 
   const account = newAccountNo();
   // .env 里写的 ADMIN_ACCOUNT 对应的账号是管理员（只有开发者知道）
   const role = account === process.env.ADMIN_ACCOUNT ? "admin" : identity === "teacher" ? "teacher" : "user";
-  db.prepare("INSERT INTO users (account, pwd, nickname, role) VALUES (?, ?, ?, ?)")
-    .run(account, hashPassword(pwd), nickname, role);
+  db.prepare("INSERT INTO users (account, pwd, nickname, role, phone) VALUES (?, ?, ?, ?, ?)")
+    .run(account, hashPassword(pwd), nickname, role, phone || null);
   return login(account, pwd); // 返回的 user 里带着新账号，前端会大字显示给用户记下
 }
 

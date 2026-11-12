@@ -46,8 +46,8 @@ export const useUserStore = defineStore('user', {
     },
     // 注册只填密码和昵称，账号由系统分配（6 位数字）；返回分配到的账号，页面上大字显示给用户记下
     // identity：'student' 学生 / 'teacher' 老师（老师要等管理员审核通过才生效）
-    async register(pwd: string, nickname: string, identity: 'student' | 'teacher' = 'student') {
-      const r = await this.api<LoginResult>('/api/register', { pwd, nickname, identity })
+    async register(pwd: string, nickname: string, identity: 'student' | 'teacher' = 'student', phone = '') {
+      const r = await this.api<LoginResult>('/api/register', { pwd, nickname, identity, phone })
       this.saveLogin(r)
       return r.user.account
     },
