@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import CodeFrame from '../components/CodeFrame.vue'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
@@ -33,15 +32,6 @@ const content = ref('')
 const contentLoading = ref(false)
 const usesRemix = ref(false) // 这一章是否用到了 Remix 在线编辑器
 const hasCode = ref(false) // 这一章正文里有没有 Solidity 代码
-// 边框上流动的代码：这一章正文里第一段代码，压成一行；没有代码就用默认的一段
-const DEFAULT_FRAME = 'contract Ledger { mapping(address => uint256) public balanceOf; function transfer(address to, uint256 amount) external { require(balanceOf[msg.sender] >= amount); balanceOf[msg.sender] -= amount; balanceOf[to] += amount; } }'
-const frameText = computed(() => {
-  const m = content.value.match(/<pre[^>]*>([\s\S]*?)<\/pre>/)
-  if (!m) return DEFAULT_FRAME
-  const txt = new DOMParser().parseFromString(m[1], 'text/html').body.textContent || ''
-  const flat = txt.replace(/\/\/[^\n]*/g, '').replace(/\s+/g, ' ').trim()
-  return flat.length > 40 ? flat.slice(0, 400) : DEFAULT_FRAME
-})
 // 阅读区的 DOM 元素，用来换章时滚回顶部
 const readerEl = ref<HTMLElement | null>(null)
 // 加载状态和错误信息
@@ -253,8 +243,6 @@ function toggle(name: string) {
 
     <!-- 右侧：阅读区 -->
     <div class="reader-wrap">
-    <!-- 边框上一圈流动的代码：取这一章正文里的第一段代码，没有代码的章节用一段默认的合约代码 -->
-    <CodeFrame v-if="current" :key="current.id" :text="frameText" :chamfer="0" :size="10" :inset="8" :duration="60" />
     <section class="reader glass" ref="readerEl" @scroll="onReaderScroll">
       <div v-if="!current" class="hint">
         <template v-if="isPrep">👈 从左边选一章，先认识区块链是什么</template>
