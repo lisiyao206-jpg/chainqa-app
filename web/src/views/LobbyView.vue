@@ -22,15 +22,15 @@ window.addEventListener('resize', () => {
 })
 
 const spots = [
-  { no: '00', to: '/learn', title: '学习中心', en: 'LEARN', desc: '五条学习路线：区块链基础、联盟链实战、合约开发、合约安全、应用与前沿。从零基础学起，每章标好知识点，学到哪一目了然。', x: 13, y: 56, mobileX: 30, mobileY: 27, activeTitle: '进入学习中心' },
-  { no: '01', to: '/class', title: '我的班级', en: 'CLASS', desc: '老师建班、布置学习任务、分享资料、发起视频会议；学生输入班级码加入，任务完成情况由学习记录自动统计。', x: 30, y: 34, mobileX: 30, mobileY: 38, activeTitle: '进入班级' },
-  { no: '02', to: '/mentor', title: '白帽导师', en: 'MENTOR', desc: '一对一答疑。学习或做题卡住时，向白帽导师提问，它会结合知识库讲解原理、拆解代码，帮你订正错误理解。', x: 66, y: 28, mobileX: 70, mobileY: 27, activeTitle: '联系导师' },
-  { no: '03', to: '/archive', title: '案件档案', en: 'ARCHIVE', desc: '经典漏洞案件复盘。还原历史上真实被攻击的智能合约案例（重入、整型溢出、权限漏洞等），看清攻击手法和防范措施。', x: 36, y: 70, mobileX: 30, mobileY: 49, activeTitle: '查看档案' },
-  { no: '04', to: '/mission', title: '实战任务', en: 'MISSION', desc: '和漏洞怪兽对战，找出漏洞、选对修法。打完还可以去「链上实验场」亲手写代码修复合约，部署到真实的联盟链上接受攻击（顶栏「实战任务」里进入）。', x: 60, y: 70, mobileX: 70, mobileY: 38, activeTitle: '接取任务',
+  { no: '00', to: '/learn', title: '学习中心', en: 'LEARN', desc: '五条学习路线：区块链基础、联盟链实战、合约开发、合约安全、应用与前沿。从零基础学起，每章标好知识点，学到哪一目了然。', x: 13, y: 56, mobileX: 30, mobileY: 31, activeTitle: '进入学习中心' },
+  { no: '01', to: '/class', title: '我的班级', en: 'CLASS', desc: '老师建班、布置学习任务、分享资料、发起视频会议；学生输入班级码加入，任务完成情况由学习记录自动统计。', x: 30, y: 34, mobileX: 30, mobileY: 47, activeTitle: '进入班级' },
+  { no: '02', to: '/mentor', title: '白帽导师', en: 'MENTOR', desc: '一对一答疑。学习或做题卡住时，向白帽导师提问，它会结合知识库讲解原理、拆解代码，帮你订正错误理解。', x: 66, y: 28, mobileX: 70, mobileY: 31, activeTitle: '联系导师' },
+  { no: '03', to: '/archive', title: '案件档案', en: 'ARCHIVE', desc: '经典漏洞案件复盘。还原历史上真实被攻击的智能合约案例（重入、整型溢出、权限漏洞等），看清攻击手法和防范措施。', x: 36, y: 70, mobileX: 30, mobileY: 63, activeTitle: '查看档案' },
+  { no: '04', to: '/mission', title: '实战任务', en: 'MISSION', desc: '和漏洞怪兽对战，找出漏洞、选对修法。打完还可以去「链上实验场」亲手写代码修复合约，部署到真实的联盟链上接受攻击（顶栏「实战任务」里进入）。', x: 60, y: 70, mobileX: 70, mobileY: 47, activeTitle: '接取任务',
   },
-  { no: '05', to: '/social', title: '情报站', en: 'SOCIAL', desc: '链上安全情报中心。实时安全动态、行业资讯、社区讨论都在这，随时了解圈内在发生什么。', x: 52, y: 84, mobileX: 30, mobileY: 60, activeTitle: '进入情报站' },
-  { no: '07', to: '/report', title: '学习报告', en: 'REPORT', desc: '我的学习体检：每个知识点掌握了多少、哪里薄弱、下一步学什么，白帽导师还会根据你的数据写一份学习建议。', x: 82, y: 46, mobileX: 70, mobileY: 60, activeTitle: '查看报告' },
-  { no: '06', to: '/audit', title: 'AI 审计', en: 'AUDIT', desc: '智能合约一键体检。把合约代码交给 AI，自动扫描潜在漏洞风险并给出提示，体验真实的审计工作流。', x: 84, y: 82, mobileX: 70, mobileY: 49, activeTitle: '开始审计' },
+  { no: '05', to: '/social', title: '情报站', en: 'SOCIAL', desc: '链上安全情报中心。实时安全动态、行业资讯、社区讨论都在这，随时了解圈内在发生什么。', x: 52, y: 84, mobileX: 30, mobileY: 79, activeTitle: '进入情报站' },
+  { no: '07', to: '/report', title: '学习报告', en: 'REPORT', desc: '我的学习体检：每个知识点掌握了多少、哪里薄弱、下一步学什么，白帽导师还会根据你的数据写一份学习建议。', x: 82, y: 46, mobileX: 70, mobileY: 79, activeTitle: '查看报告' },
+  { no: '06', to: '/audit', title: 'AI 审计', en: 'AUDIT', desc: '智能合约一键体检。把合约代码交给 AI，自动扫描潜在漏洞风险并给出提示，体验真实的审计工作流。', x: 84, y: 82, mobileX: 70, mobileY: 63, activeTitle: '开始审计' },
 ]
 
 // 当前「点亮」的入口：鼠标移到发光点或左侧目录上时设置，移开时清空
@@ -141,7 +141,7 @@ function toggleSpot(s: { no: string; to: string; title: string; x: number; y: nu
     </Transition>
 
     <!-- 底部提示 -->
-    <div class="hint">{{ isMobile ? "点一下发光点，再点一次进入" : "移动鼠标，寻找发光点 · 点击进入" }}</div>
+    <div v-if="!isMobile" class="hint">移动鼠标，寻找发光点 · 点击进入</div>
 
     <!-- 左下角：换背景。点一下整个网站的背景马上跟着变，选好的会记住 -->
     <div class="bg-switch">
