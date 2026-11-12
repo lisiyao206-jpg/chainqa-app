@@ -114,10 +114,10 @@ select, option { background: #0b0820; color: var(--text); }
 /* ===== 页面切换动画：新页面从下面轻轻滑上来 =====
    只动位置，不动透明度：就算电脑很卡、动画没播完，页面也一直是看得见的，不会出现「页面空白」
    （换页时的光幕扫过，已经足够有转场感了） */
-.page-in { animation: page-in 0.4s ease-out; }
+.page-in { animation: page-in 0.45s ease-out; }
 @keyframes page-in {
-  from { transform: translateY(14px); }
-  to { transform: none; }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* ===== 手机适配（屏幕窄于 760px）：全站通用的规则 =====

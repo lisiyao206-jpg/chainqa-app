@@ -33,7 +33,7 @@ const inLobby = computed(() => route.path === '/' || route.path === '/login')
 // AI 面板的开关放在公告板里，这样训练营等页面也能打开它
 const ai = useAiStore()
 
-// 每次换页面，播放一次「光幕」转场
+// 每次换页面，播放一次柔和的淡入转场（原来的白色光幕扫过太晃眼，2026-11-12 换掉了）
 const rain = ref<InstanceType<typeof VeilTransition> | null>(null)
 watch(() => route.path, () => rain.value?.play())
 
@@ -56,14 +56,14 @@ async function logout() {
   <!-- 赛博朋克滤镜：扫描线、故障闪烁、暗角，叠在任何背景上面，让所有主题风格统一 -->
   <CyberOverlay />
 
-  <!-- 光幕转场：盖在最上层，播完自动消失 -->
+  <!-- 换页转场：深色蒙层慢慢褪去，盖在最上层，播完自动消失 -->
   <VeilTransition ref="rain" />
 
   <!-- 换页动画说明：
        以前用 <Transition mode="out-in">（先等旧页面淡出，再让新页面淡入），但旧页面的淡出偶尔会「卡住」，
        新页面就一直出不来，看起来像页面空白、关卡打不开。
        现在改成：旧页面直接消失，新页面用一段 CSS 动画淡入（style.css 里的 .page-in），不会卡住；
-       换页时还有光幕扫过，看不出旧页面是直接消失的 -->
+       换页时还有一层深色蒙层慢慢褪去，看不出旧页面是直接消失的 -->
 
   <!-- 大厅、登录：整屏显示，不要顶栏。:key 让每换一页都重新播放淡入动画 -->
   <RouterView v-if="inLobby" v-slot="{ Component }">
