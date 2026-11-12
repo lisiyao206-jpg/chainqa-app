@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
 import { OK_HOSTS, DEAD_LINKS } from '../data/linkPolicy'
@@ -27,6 +27,27 @@ const groups = ref<ChapterGroup[]>([])
 const openGroups = ref<Record<string, boolean>>({})
 // 当前选中的章节
 const current = ref<Chapter | null>(null)
+// ===== 每章末尾的教材纠错 =====
+const FIX_KINDS = ['内容有误', '讲得不清楚', '链接打不开', '代码跑不通', '建议补充', '其他']
+const fixKind = ref('')
+const fixText = ref('')
+const fixSending = ref(false)
+const fixMsg = ref<{ ok: boolean; text: string } | null>(null)
+watch(current, () => ((fixKind.value = ''), (fixText.value = ''), (fixMsg.value = null)))
+async function submitFix() {
+  fixSending.value = true
+  fixMsg.value = null
+  try {
+    await userStore.api('/api/feedback', { type: 'chapter', chapter: current.value!.id, kind: fixKind.value, content: fixText.value })
+    fixMsg.value = { ok: true, text: '已提交，谢谢！管理员核实后会修改教材' }
+    fixText.value = ''
+    fixKind.value = ''
+  } catch (err) {
+    fixMsg.value = { ok: false, text: (err as Error).message }
+  } finally {
+    fixSending.value = false
+  }
+}
 // 当前章节的正文（已经转换成 HTML）
 const content = ref('')
 const contentLoading = ref(false)
@@ -277,6 +298,19 @@ function toggle(name: string) {
           <RouterLink :to="{ path: '/playground', query: { chapter: current?.id } }">🧪 合约练习场</RouterLink> 里运行，会自动载入并部署到我们的 FISCO BCOS 联盟链上。
         </p>
         <article class="article" v-html="content" @mouseup="onMouseUp" @click="onArticleClick"></article>
+        <!-- 每章末尾：教材纠错 / 意见讨论。提交后管理员在「管理后台 → 反馈处理 → 教材纠错」里看到并修改 -->
+        <section v-if="!contentLoading && content" class="fix-box">
+          <h4>📝 这一章有问题？告诉我们</h4>
+          <p>发现内容有误、没讲清楚、链接打不开或代码跑不通，都可以在这里提出。管理员会核实并修改教材，回复会显示在右上角「意见反馈」里。</p>
+          <div class="kinds">
+            <button v-for="k in FIX_KINDS" :key="k" type="button" :class="{ on: fixKind === k }" @click="fixKind = k">{{ k }}</button>
+          </div>
+          <textarea v-model="fixText" rows="3" maxlength="1000" placeholder="具体是哪一段、哪里不对？如果知道正确的说法和出处，也请写上"></textarea>
+          <div class="fix-bar">
+            <span v-if="fixMsg" :class="fixMsg.ok ? 'ok' : 'bad'">{{ fixMsg.text }}</span>
+            <button class="btn primary" :disabled="fixSending || !fixKind || !fixText.trim()" @click="submitFix">{{ fixSending ? '提交中…' : '提交意见' }}</button>
+          </div>
+        </section>
       </template>
     </section>
     </div>
@@ -449,4 +483,16 @@ function toggle(name: string) {
   .article { font-size: 14px; }
   .alarm { white-space: normal; width: calc(100vw - 32px); bottom: 20px; }
 }
+/* ===== 每章末尾：教材纠错 ===== */
+.fix-box { max-width: 820px; margin: 40px 0 10px; padding: 18px 20px; border: 1px dashed var(--line-strong); background: rgba(0, 240, 255, 0.03); }
+.fix-box h4 { margin: 0 0 6px; font-size: 16px; font-weight: 500; color: #fff; }
+.fix-box p { margin: 0 0 12px; font-size: 13px; line-height: 1.7; color: var(--text-dim); }
+.fix-box .kinds { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.fix-box .kinds button { padding: 4px 12px; font-size: 13px; cursor: pointer; color: var(--text-dim); background: none; border: 1px solid var(--line); border-radius: 999px; }
+.fix-box .kinds button.on { color: #05020f; background: var(--accent); border-color: var(--accent); }
+.fix-box textarea { width: 100%; padding: 10px 12px; resize: vertical; font: inherit; font-size: 14px; color: var(--text); background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); outline: none; }
+.fix-box textarea:focus { border-color: var(--accent); }
+.fix-bar { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 10px; font-size: 13px; }
+.fix-bar .ok { color: var(--ok); }
+.fix-bar .bad { color: var(--danger); }
 </style>

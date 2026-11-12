@@ -38,6 +38,7 @@ const CHAPTER_KPS = {
   "37_Signature": ["solidity", "crypto"],
   F02_TimeOnFisco: ["consortium", "timestamp"],
   A01_EvidenceOnChain: ["chain-basics", "crypto"],
+  A02_SupplyChainFinance: ["chain-basics", "consortium"],
   S01_ReentrancyAttack: ["reentrancy"],
   S02_SelectorClash: ["access-control"],
   S03_Centralization: ["access-control"],

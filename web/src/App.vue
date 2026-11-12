@@ -37,6 +37,9 @@ const ai = useAiStore()
 const rain = ref<InstanceType<typeof VeilTransition> | null>(null)
 watch(() => route.path, () => rain.value?.play())
 
+// 手机上当前栏目的分支菜单
+const subNav = computed(() => Object.values(NAV_MENUS).find((m) => m.match.includes(route.path))?.subs || null)
+
 // 顶栏的导航，和大厅共用同一份（data/navMenus.ts）
 const nav = NAV
 
@@ -79,7 +82,7 @@ async function logout() {
         <template v-for="n in nav" :key="n.to">
           <!-- 有下拉菜单的栏目（学习中心、实战任务、案件档案、情报站）：鼠标移上去展开分支 -->
           <span v-if="NAV_MENUS[n.to]" class="drop">
-            <RouterLink :to="n.to" :class="{ on: NAV_MENUS[n.to].match.includes(route.path) }">{{ n.title }} ▾</RouterLink>
+            <RouterLink :to="n.to" :class="{ on: NAV_MENUS[n.to].match.includes(route.path) }">{{ n.title }}<span class="caret"> ▾</span></RouterLink>
             <span class="menu">
               <span class="menu-box">
                 <RouterLink v-for="x in NAV_MENUS[n.to].subs" :key="x.to" :to="x.to">{{ x.title }}</RouterLink>
@@ -97,6 +100,10 @@ async function logout() {
         </button>
       </div>
     </header>
+    <!-- 手机：没有下拉菜单，当前栏目的分支（比如实战任务下的打怪 / 实验场 / 练习场）排成一行小标签 -->
+    <nav v-if="subNav" class="subnav">
+      <RouterLink v-for="x in subNav" :key="x.to" :to="x.to" :class="{ on: route.fullPath === x.to }">{{ x.title }}</RouterLink>
+    </nav>
 
     <main class="content">
       <!-- 训练营 ↔ 案件档案 等页面之间切换：新页面淡入 -->
@@ -128,6 +135,7 @@ async function logout() {
 .global-bg.dim { opacity: 0.4; }
 
 .page { display: flex; flex-direction: column; height: 100vh; }
+.subnav { display: none; }
 
 /* ===== 顶栏 ===== */
 .topbar {
@@ -200,7 +208,17 @@ async function logout() {
   .topbar { flex-wrap: wrap; padding: 12px 14px 4px; row-gap: 10px; }
   .links { order: 3; width: 100%; gap: 20px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
   .links::-webkit-scrollbar { display: none; }
+  .topbar { font-size: 16px; }
+  .links { gap: 22px; }
   .links a { white-space: nowrap; flex-shrink: 0; }
+  /* 手机上不用下拉菜单：只显示栏目名，点进去在页面里切换 */
+  .drop .menu { display: none !important; }
+  .drop .caret { display: none; }
+  .brand { font-size: 19px; }
+  .subnav { display: flex; gap: 8px; overflow-x: auto; padding: 0 12px 8px; scrollbar-width: none; }
+  .subnav::-webkit-scrollbar { display: none; }
+  .subnav a { flex-shrink: 0; padding: 4px 12px; font-size: 13px; white-space: nowrap; text-decoration: none; color: var(--text-dim); border: 1px solid var(--line); border-radius: 999px; }
+  .subnav a.on { color: #05020f; background: var(--accent); border-color: var(--accent); }
   /* 站名单独放在第一行左边，不跟着导航一起滑走 */
   .brand { position: absolute; top: 18px; left: 14px; }
   .topbar { position: relative; justify-content: flex-end; min-height: 54px; }

@@ -16,6 +16,7 @@ interface FeedbackItem {
   content?: string | null
   reply?: string | null
   replyTime?: string | null
+  chapter?: string | null
 }
 
 const userStore = useUserStore()
@@ -67,7 +68,7 @@ const fmt = (t?: string | null) => (t ? t.slice(5, 16).replace('T', ' ') : '')
       <div v-if="!list.length" class="empty">还没有反馈过</div>
       <div v-for="f in list" :key="f.id" class="item">
         <div class="meta">
-          <span :class="['type', f.type]">{{ f.type === 'answer' ? (f.rating === 'up' ? '👍 评价回答' : '👎 评价回答') : '留言' }}</span>
+          <span :class="['type', f.type]">{{ f.type === 'answer' ? (f.rating === 'up' ? '👍 评价回答' : '👎 评价回答') : f.type === 'chapter' ? `📖 教材纠错 ${f.chapter?.slice(0, 3) || ''}` : '留言' }}</span>
           <span>{{ fmt(f.time) }}</span>
           <span :class="['status', f.status]">{{ f.status === 'replied' ? '已回复' : '待处理' }}</span>
           <i v-if="f.unread" class="new">新回复</i>

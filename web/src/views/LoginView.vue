@@ -101,16 +101,17 @@ function switchMode(m: string) {
     <section class="intro">
       <div class="eyebrow">On-chain Security Bureau</div>
       <h1>边读、边问、边破案</h1>
-      <p>从零认识区块链，一步步成长为智能合约安全审计员</p>
-      <!-- 学习路线：四步，从「区块链是什么」一路走到「审计真实合约」 -->
+      <!-- 一句话说清楚这是什么网站、给谁用 -->
+      <p class="what"><b>链知答</b> · 区块链安全 AI 教育平台</p>
+      <p>从零学区块链，在真实的国产联盟链 FISCO BCOS 上亲手写合约、抵御攻击，一步步成长为智能合约安全审计员</p>
       <ol class="route">
-        <li><span>01</span><b>学习中心</b>五条路线，从区块链基础学到亲手上链</li>
-        <li><span>02</span><b>防御战</b>学完一章打一场防御战，答错的题自动进错题本</li>
-        <li><span>03</span><b>实战任务</b>和漏洞怪兽对战：找出漏洞，选对修法</li>
-        <li><span>04</span><b>AI 审计</b>用审计 Agent 检查真实合约，问题直通对应知识点</li>
-        <li><span>05</span><b>情报站</b>在此处可以与链友交换情报，讨论情报</li>
+        <li><span>01</span><b>学习中心</b><i>五条路线、80 多章教材，每章都标注官方出处</i></li>
+        <li><span>02</span><b>白帽导师</b><i>AI 只依据教材回答，句句标出处，超出范围就拒答</i></li>
+        <li><span>03</span><b>实战任务</b><i>漏洞闯关、合约练习场、链上实验场，合约真的部署上链</i></li>
+        <li><span>04</span><b>我的班级</b><i>老师建班布置任务，自动生成每个人的学习报告</i></li>
+        <li><span>05</span><b>情报站</b><i>匿名学术论坛，放心提问、放心说错</i></li>
       </ol>
-      <p class="aside">全程有 <b>白帽导师</b> 答疑（每句话都标注教材出处），笔记和错题存进 <b>案件档案</b>，在 <b>情报站</b> 和其他审计员交流</p>
+      <p class="aside">适合：区块链、计算机相关专业的<b>学生</b>自学，以及想开设区块链安全课程的<b>老师</b>。注册时可以选择身份</p>
     </section>
 
     <!-- 右边：登录 / 注册 -->
@@ -206,7 +207,11 @@ function switchMode(m: string) {
 .intro p { margin: 0; font-size: 18px; letter-spacing: 2px; color: var(--text-dim); }
 .route { list-style: none; padding: 0; margin: 36px 0 0; font-size: 16px; line-height: 2.3; color: var(--text-dim); }
 .route li span { display: inline-block; width: 40px; color: var(--text-faint); }
-.route li b { display: inline-block; min-width: 88px; font-weight: 500; color: #fff; }
+.route li { display: flex; align-items: baseline; }
+.route li b { flex-shrink: 0; display: inline-block; min-width: 88px; font-weight: 500; color: #fff; }
+.route li i { font-style: normal; line-height: 1.6; }
+.intro .what { margin-bottom: 8px; font-size: 20px; color: #fff; }
+.intro .what b { color: var(--accent); font-weight: 500; }
 .intro .aside { margin-top: 22px; max-width: 520px; font-size: 14px; line-height: 1.8; letter-spacing: 1px; color: var(--text-faint); }
 .intro .aside b { font-weight: 500; color: var(--accent); }
 
@@ -273,6 +278,8 @@ function switchMode(m: string) {
   .intro h1 { font-size: 30px; letter-spacing: 3px; margin: 10px 0 8px; }
   .intro p { font-size: 14px; letter-spacing: 1px; }
   .route { margin-top: 16px; font-size: 13px; line-height: 1.9; }
+  .route li { margin-bottom: 6px; }
+  .intro .what { font-size: 16px; }
   .route li span { width: 26px; }
   .route li b { min-width: 64px; }
   .intro .aside { font-size: 12px; margin-top: 12px; }

@@ -57,9 +57,13 @@ interface Feedback {
   question?: string | null
   content?: string | null
   reply?: string | null
+  chapter?: string | null
+  kind?: string | null
 }
 
 const userStore = useUserStore()
+// 教材纠错：点章节号直接打开那一章（新标签页），对照着改
+const chapterLink = (id: string) => ({ path: ({ P: '/prep', F: '/fisco', A: '/frontier' } as Record<string, string>)[id[0]] || '/camp', query: { chapter: id } })
 
 // 当前标签页：'users' 用户管理 / 'logins' 登录记录 / 'qa' 问答日志 / 'feedback' 反馈处理
 const tab = ref('users')
@@ -147,11 +151,12 @@ async function loadQa() {
 // ===== 反馈处理 =====
 const feedbacks = ref<Feedback[]>([])
 const fbStatus = ref('')    // '' 全部 / pending 待处理 / replied 已回复
+const fbType = ref('')      // '' 全部 / chapter 教材纠错 / answer 对 AI 回答的评价 / message 留言
 const replies = ref<Record<number, string>>({})     // 每条反馈正在写的回复：{ 反馈id: 文字 }
 async function loadFeedback() {
   error.value = ''
   try {
-    feedbacks.value = await userStore.api('/api/admin/feedback?status=' + fbStatus.value)
+    feedbacks.value = await userStore.api(`/api/admin/feedback?status=${fbStatus.value}&type=${fbType.value}`)
   } catch (err) {
     error.value = (err as Error).message
   }
@@ -347,13 +352,20 @@ onMounted(loadUsers)
           <option value="pending">待处理</option>
           <option value="replied">已回复</option>
         </select>
+        <select v-model="fbType" @change="loadFeedback">
+          <option value="">全部类型</option>
+          <option value="chapter">📖 教材纠错</option>
+          <option value="answer">AI 回答评价</option>
+          <option value="message">留言</option>
+        </select>
         <span class="total">共 {{ feedbacks.length }} 条</span>
       </div>
       <div v-if="!feedbacks.length" class="empty">没有反馈</div>
       <div v-for="f in feedbacks" :key="f.id" class="fb">
         <div class="fb-meta">
           <b>{{ f.user.nickname }}</b><small>（{{ f.user.account }}）</small>
-          <span>{{ f.type === 'answer' ? (f.rating === 'up' ? '👍 觉得回答有帮助' : '👎 觉得回答没帮助') : '💬 留言' }}</span>
+          <span v-if="f.type === 'chapter'">📖 教材纠错 · <RouterLink :to="chapterLink(f.chapter!)" target="_blank">{{ f.chapter }}</RouterLink> · <b class="kind">{{ f.kind }}</b></span>
+          <span v-else>{{ f.type === 'answer' ? (f.rating === 'up' ? '👍 觉得回答有帮助' : '👎 觉得回答没帮助') : '💬 留言' }}</span>
           <span>{{ fmt(f.time) }}</span>
           <span :class="['tag', f.status === 'replied' ? 'active' : 'todo']">{{ f.status === 'replied' ? '已回复' : '待处理' }}</span>
           <button class="del" @click="removeFeedback(f)">删除</button>
@@ -454,6 +466,7 @@ tr.expand td { white-space: normal; background: rgba(0, 240, 255, 0.04); }
 .fb { padding: 14px 16px; margin-bottom: 10px; background: var(--glass-strong); border: 1px solid var(--line); }
 .fb-meta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--text-dim); }
 .fb-meta b { color: #fff; }
+.fb-meta .kind { color: var(--gold); font-weight: normal; }
 .fb-meta .del { margin-left: auto; border: none; background: none; color: var(--text-faint); cursor: pointer; }
 .fb-meta .del:hover { color: var(--danger); }
 .fb-q { margin-top: 6px; font-size: 13px; color: var(--text-dim); }

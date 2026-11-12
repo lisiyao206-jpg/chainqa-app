@@ -402,7 +402,7 @@ function routeAdmin(req, res) {
   // 问答日志 / 反馈处理
   const qs = new URLSearchParams(query);
   if (pathname === "/api/admin/qa" && method === "GET") return A(() => feedback.listQaLogs({ q: qs.get("q") || "", refusedOnly: qs.get("refused") === "1" }));
-  if (pathname === "/api/admin/feedback" && method === "GET") return A(() => feedback.listFeedback(qs.get("status") || ""));
+  if (pathname === "/api/admin/feedback" && method === "GET") return A(() => feedback.listFeedback(qs.get("status") || "", qs.get("type") || ""));
   const fm = pathname.match(/^\/api\/admin\/feedback\/(\d+)$/);
   if (fm && method === "PUT") return A((uid, b) => feedback.replyFeedback(Number(fm[1]), b.reply));
   if (fm && method === "DELETE") return A(() => feedback.deleteFeedback(Number(fm[1])));

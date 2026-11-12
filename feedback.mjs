@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 `);
 
+// 教材纠错：type = 'chapter'，chapter 记下是哪一章（如 A01_EvidenceOnChain），kind 是问题类型
+try { db.exec("ALTER TABLE feedback ADD COLUMN chapter TEXT"); } catch {}
+try { db.exec("ALTER TABLE feedback ADD COLUMN kind TEXT"); } catch {}
+const CHAPTER_KINDS = ["内容有误", "讲得不清楚", "链接打不开", "代码跑不通", "建议补充", "其他"];
+
 // ===== 问答日志 =====
 export function logAsk({ userId, question, answer, sources, refused, error }) {
   const { lastInsertRowid } = db
@@ -63,8 +68,19 @@ export function listQaLogs({ q = "", refusedOnly = false } = {}) {
 }
 
 // ===== 用户：提交反馈 =====
-export function addFeedback(uid, { type, logId, rating, content }) {
-  type = type === "answer" ? "answer" : "message";
+export function addFeedback(uid, { type, logId, rating, content, chapter, kind }) {
+  type = ["answer", "chapter"].includes(type) ? type : "message";
+  if (type === "chapter") {
+    chapter = String(chapter || "");
+    if (!/^(\d{2}|S\d{2}|[PFA]\d{2})_[\w-]+$/.test(chapter)) throw new Error("章节不对");
+    if (!CHAPTER_KINDS.includes(kind)) throw new Error("请选择问题类型");
+    content = moderate(String(content || "").trim());
+    if (!content) throw new Error("写一下具体是哪里有问题吧");
+    if (content.length > 1000) throw new Error("最多 1000 字");
+    const { lastInsertRowid } = db.prepare("INSERT INTO feedback (user_id, type, content, chapter, kind) VALUES (?, 'chapter', ?, ?, ?)")
+      .run(uid, content, chapter, kind);
+    return { id: Number(lastInsertRowid) };
+  }
   content = moderate(String(content || "").trim());
   if (content.length > 1000) throw new Error("反馈最多 1000 字");
   if (type === "message" && !content) throw new Error("写点什么再提交吧");
@@ -89,7 +105,7 @@ function feedbackRow(r) {
   return {
     id: r.feedback_id, type: r.type, rating: r.rating, content: r.content, status: r.status,
     reply: r.reply, replyTime: toISO(r.reply_time), time: toISO(r.create_time), unread: r.user_read === 0,
-    question: r.question ?? null, answer: r.answer ?? null,
+    question: r.question ?? null, answer: r.answer ?? null, chapter: r.chapter ?? null, kind: r.kind ?? null,
     user: r.account ? { account: r.account, nickname: r.nickname } : undefined,
   };
 }
@@ -106,15 +122,20 @@ export function unreadReplies(uid) {
 }
 
 // ===== 管理员：查看、回复、删除 =====
-export function listFeedback(status = "") {
+// type = 'chapter' 时只看教材纠错
+export function listFeedback(status = "", type = "") {
+  const where = [], args = [];
+  if (status === "pending" || status === "replied") (where.push("f.status = ?"), args.push(status));
+  if (["chapter", "answer", "message"].includes(type)) (where.push("f.type = ?"), args.push(type));
   return db.prepare(`
       SELECT f.*, u.account, u.nickname, l.question, l.answer
       FROM feedback f JOIN users u ON u.user_id = f.user_id LEFT JOIN qa_logs l ON l.log_id = f.log_id
-      ${status === "pending" || status === "replied" ? "WHERE f.status = ?" : ""}
+      ${where.length ? "WHERE " + where.join(" AND ") : ""}
       ORDER BY (f.status = 'pending') DESC, f.feedback_id DESC LIMIT 300`)
-    .all(...(status === "pending" || status === "replied" ? [status] : []))
+    .all(...args)
     .map(feedbackRow);
 }
+
 
 export function replyFeedback(id, reply) {
   reply = String(reply || "").trim();

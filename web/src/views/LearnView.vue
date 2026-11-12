@@ -186,5 +186,19 @@ function read(t: Track, c: LearnChapter) {
   .t-progress { order: 3; width: 100%; padding-left: 46px; }
   .t-body { padding: 0 14px 14px; }
   .kps { display: none; }
+  /* 手机：标题和说明可以换行，不要撑出框 */
+  .t-head, .chapter { white-space: normal; }
+  .t-main, .c-title { min-width: 0; overflow-wrap: anywhere; }
+  .t-name { font-size: 20px; letter-spacing: 1px; }
+  .t-no { font-size: 24px; }
+  .arrow { position: absolute; right: 14px; top: 16px; }
+  .track { position: relative; }
+  .t-body { padding: 0 10px 12px; }
+  .chapter { gap: 10px; padding: 10px 6px; }
+  .c-no { width: 32px; }
+  .c-title { font-size: 15px; line-height: 1.5; }
+  .c-state { width: auto; font-size: 12px; }
+  .chapter:not(.done) .c-state { display: none; } /* 手机上「开始学习 →」省掉，整行都可以点 */
+  .head h2 { font-size: 32px; }
 }
 </style>
