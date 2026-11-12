@@ -37,6 +37,7 @@ const CHAPTER_KPS = {
   "23_Delegatecall": ["solidity", "delegatecall"],
   "37_Signature": ["solidity", "crypto"],
   F02_TimeOnFisco: ["consortium", "timestamp"],
+  A01_EvidenceOnChain: ["chain-basics", "crypto"],
   S01_ReentrancyAttack: ["reentrancy"],
   S02_SelectorClash: ["access-control"],
   S03_Centralization: ["access-control"],

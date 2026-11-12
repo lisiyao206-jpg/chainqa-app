@@ -7,7 +7,7 @@
 
 export const OK_HOSTS = new Set([
   // 国内网站
-  'learnblockchain.cn', 'tool.chinaz.com', 'space.bilibili.com', 'www.bilibili.com', 'gitee.com',
+  'learnblockchain.cn', 'tool.chinaz.com', 'www.court.gov.cn', 'gongbao.court.gov.cn', 'space.bilibili.com', 'www.bilibili.com', 'gitee.com',
   // 实测能打开的国外网站
   'fisco-bcos-doc.readthedocs.io', 'fisco-bcos-documentation.readthedocs.io', 'solidity-cn.readthedocs.io',
   'docs.soliditylang.org', 'blog.soliditylang.org', 'rekt.news', 'book.getfoundry.sh', 'www.paradigm.xyz',
