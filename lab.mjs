@@ -99,7 +99,7 @@ export async function runLab(uid, labId, code, emit) {
       const read = (fn, params = []) => chain.call(acc.admin, lab.contract, built.abi, d.address, fn, params);
       const verdict = await check.judge({ steps, read, acc });
       results.push(verdict.pass);
-      emit("check", { check: check.key, pass: verdict.pass, text: verdict.text });
+      emit("check", { check: check.key, pass: verdict.pass, text: verdict.text, fix: verdict.pass ? "" : check.fix || "" });
     }
 
     // 4. 记录成绩

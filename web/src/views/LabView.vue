@@ -11,7 +11,7 @@ interface Lab {
   checks: Check[]; attempts: number; passed: boolean; passContract: string | null; passBlock: number | null; answerReady: boolean
 }
 interface Step { label: string; who: string; ok: boolean; tx?: string; block?: number; reason?: string }
-interface CheckState { status: 'idle' | 'running' | 'pass' | 'fail'; text: string; address?: string; deployBlock?: number; steps: Step[] }
+interface CheckState { status: 'idle' | 'running' | 'pass' | 'fail'; text: string; fix?: string; address?: string; deployBlock?: number; steps: Step[] }
 
 const userStore = useUserStore()
 const route = useRoute()
@@ -155,7 +155,7 @@ function onEvent(ev: string, d: any) {
     checks.value[d.check].steps.push(d)
     if (d.block && chainInfo.value) chainInfo.value.block = d.block
   } else if (ev === 'check') {
-    Object.assign(checks.value[d.check], { status: d.pass ? 'pass' : 'fail', text: d.text })
+    Object.assign(checks.value[d.check], { status: d.pass ? 'pass' : 'fail', text: d.text, fix: d.fix })
   } else if (ev === 'done') {
     result.value = d
     phase.value = 'done'
@@ -167,6 +167,18 @@ function onEvent(ev: string, d: any) {
 }
 
 const brokenCount = computed(() => Object.values(checks.value).filter((c) => c.status === 'fail').length)
+// 结果汇总：挡住了几种攻击、正常业务过没过、还差哪几项（每项附上「去哪里找问题」）
+const summary = computed(() => {
+  const list = cur.value?.checks || []
+  const attacks = list.filter((c) => c.kind === 'attack')
+  const blocked = attacks.filter((c) => checks.value[c.key]?.status === 'pass').length
+  const business = list.find((c) => c.kind === 'business')
+  return {
+    blocked, totalAttacks: attacks.length,
+    businessOk: !business || checks.value[business.key]?.status === 'pass',
+    missing: list.filter((c) => checks.value[c.key]?.status === 'fail').map((c) => ({ title: c.title, kind: c.kind, fix: checks.value[c.key].fix || checks.value[c.key].text })),
+  }
+})
 const short = (h?: string) => (h ? `${h.slice(0, 8)}…${h.slice(-4)}` : '')
 const WHO: Record<string, string> = { admin: '管理员', attacker: '攻击者' }
 </script>
@@ -279,8 +291,13 @@ const WHO: Record<string, string> = { admin: '管理员', attacker: '攻击者' 
               <span>通关合约已部署在链上：<code>{{ short(result.passContract || '') }}</code> · 区块 #{{ result.passBlock }}</span>
             </template>
             <template v-else>
-              <b>还有 {{ brokenCount }} 项没通过</b>
-              <span>看看是哪种攻击突破了你的墙，修改代码后再部署一次。</span>
+              <b>已挡住 {{ summary.blocked }}/{{ summary.totalAttacks }} 种攻击<template v-if="!summary.businessOk">，正常业务也没通过</template>，还差 {{ brokenCount }} 项：</b>
+              <ul class="missing">
+                <li v-for="m in summary.missing" :key="m.title">
+                  <em :class="m.kind">{{ m.kind === 'attack' ? '攻击' : '业务' }}</em><b>{{ m.title }}</b>：{{ m.fix }}
+                </li>
+              </ul>
+              <span>改好代码后再部署一次；还是想不出来，可以点「提示」。</span>
             </template>
           </div>
           <p v-if="runError" class="error">✗ {{ runError }}</p>
@@ -377,6 +394,10 @@ const WHO: Record<string, string> = { admin: '管理员', attacker: '攻击者' 
 .result b { font-size: 15px; color: #ffd0d8; }
 .result span { font-size: 13px; color: var(--text-dim); }
 .result.win { border-color: var(--ok); background: rgba(10, 40, 30, 0.6); }
+.missing { margin: 4px 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.7; color: var(--text); }
+.missing li b { color: #fff; font-size: 13px; }
+.missing em { margin-right: 6px; padding: 0 6px; font-style: normal; font-size: 11px; color: var(--danger); border: 1px solid var(--danger); }
+.missing em.business { color: var(--gold); border-color: var(--gold); }
 .result.win b { color: var(--ok); }
 .passed-note { margin: 0; font-size: 12px; color: var(--ok); }
 

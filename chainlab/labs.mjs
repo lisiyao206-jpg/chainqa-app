@@ -73,6 +73,8 @@ export const LABS = [
         kind: "business",
         title: "正常业务",
         desc: "管理员存入 100，再取出到自己账户；然后把管理员交接给新管理员",
+        // 没通过时告诉学生去哪里找问题（不直接给答案）
+        fix: "检查你加的限制条件：管理员自己调用 deposit、withdrawAll、setOwner 时，require 的判断能不能通过？",
         steps: [
           { who: "admin", fn: "deposit", args: () => ["100"], label: "管理员存入 100" },
           { who: "admin", fn: "withdrawAll", args: (a) => [a.admin], label: "管理员取出到自己账户" },
@@ -89,6 +91,7 @@ export const LABS = [
         kind: "attack",
         title: "伪造存款",
         desc: "攻击者假装管理员，往金库里凭空存入 100 万",
+        fix: "deposit 谁都能调用了：它原来的 onlyOwner 保护还在吗？",
         steps: [{ who: "attacker", fn: "deposit", args: () => ["1000000"], label: "攻击者调用 deposit(1000000)" }],
         judge: async (r) =>
           Number(await r.read("vault")) === 0
@@ -100,6 +103,7 @@ export const LABS = [
         kind: "attack",
         title: "直接搬空",
         desc: "管理员存入 100 后，攻击者直接调用 withdrawAll，把钱转给自己",
+        fix: "withdrawAll 没有检查调用者是谁：任何人都能把金库里的钱转走。",
         steps: [
           { who: "admin", fn: "deposit", args: () => ["100"], label: "管理员存入 100" },
           { who: "attacker", fn: "withdrawAll", args: (a) => [a.attacker], label: "攻击者调用 withdrawAll(攻击者)" },
@@ -116,6 +120,7 @@ export const LABS = [
         kind: "attack",
         title: "篡位夺权",
         desc: "管理员存入 100 后，攻击者先把自己设成管理员，再取钱",
+        fix: "setOwner 没有检查调用者是谁：攻击者先把自己设成管理员，之后所有的 onlyOwner 都拦不住他。",
         steps: [
           { who: "admin", fn: "deposit", args: () => ["100"], label: "管理员存入 100" },
           { who: "attacker", fn: "setOwner", args: (a) => [a.attacker], label: "攻击者调用 setOwner(攻击者)" },
