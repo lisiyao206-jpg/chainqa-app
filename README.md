@@ -1,99 +1,115 @@
 # 链知答 LIANZHIDA
 
-> 以 AI 为核心的智能合约安全审计学习与实践平台：读教材问 AI 导师、和漏洞怪兽对战、用 AI Agent 审计自己的合约——学、练、用一条龙。
+> 区块链安全 AI 教育平台：学生从零学区块链，在**真实的国产联盟链 FISCO BCOS** 上亲手写合约、抵御攻击；AI 白帽导师只依据教材回答、句句标出处；老师建班布置任务，系统自动统计学情。
 
-<!-- 截图：放 2~3 张，大厅 / 训练营 + AI 问答 / 漏洞猎人 -->
-<!-- ![大厅](docs/screenshots/lobby.png) -->
+**在线访问**：<http://43.136.20.150>（腾讯云服务器，注册即可使用，注册时可选择学生或老师身份）
+
 ---
 
-##  功能一览
+## 亮点
+
+| | 亮点 | 说明 |
+|---|---|---|
+| ⛓ | **真实上链，不是模拟** | 作者在腾讯云上用官方 `build_chain.sh` 搭建了 4 节点 FISCO BCOS v2.11.0 联盟链，通过 WeBASE-Front 接入。链上实验场和合约练习场里的每次部署、每笔交易都有真实的区块号和交易哈希 |
+| 🛡 | **链上实验场：在链上建安全墙** | 学生修改有漏洞的合约 → 部署上链 → 系统派攻击者发起多种真实攻击交易，同时检验正常业务不受影响；没挡住时写清「挡住了几种、还差哪一项、去哪里找问题」 |
+| 🧪 | **合约练习场：替代国内打不开的 Remix** | 浏览器里写合约、编译、部署、调用函数。支持 Solidity 0.8（编译到 byzantium 指令集以兼容 FISCO BCOS v2），可 import OpenZeppelin 5.0.2；教材 73 个带合约的章节中 64 个可一键载入运行 |
+| 🤖 | **AI 不乱答** | 白帽导师基于 RAG：只依据教材回答、每句标出处、相似度不够就拒答。对照评测：准确度 97 vs 85，超纲题拒答率 100% vs 30%（见 `eval/`） |
+| 📚 | **教材可核对** | 五条学习路线、84 章；自编章节的结论都附官方出处（最高人民法院、中国政府网、FISCO BCOS 官方文档等），每章末尾有纠错入口，后台可集中处理 |
+| 🧑‍🏫 | **教与学闭环** | 老师建班、布置章节和关卡任务、分享资料、发起视频会议；系统按 16 个知识点自动生成每个学生的学习报告和全班学情 |
+
+---
+
+## 功能一览
 
 | 模块 | 功能 |
 |---|---|
-| **登录注册** | 官方发号（系统分配 6 位数字账号）；账号 + 密码 / 手机号 + 密码 / 手机号 + 验证码三种登录方式 |
-| **大厅** | 3D 动态背景（三种可切换）、七个发光入口与「学习路线」引导、个人档案（头像、勋章墙、学习统计、绑定手机号、意见反馈） |
-| **预备营** | 新手从这里开始：7 章区块链基础导读（区块与哈希、私钥与签名、交易与共识、联盟链 FISCO BCOS、智能合约），内容对照 ethereum.org 与 FISCO BCOS 官方文档核实 |
-| **训练营** | 分组阅读教材；**选中文字一键问 AI 或存笔记**；**AI 生成本章思维导图**；读完一章触发**防御战**（AI 出题打小怪）；配套学习视频 |
-| **白帽导师** | 3D AI 导师形象；基于教材的 RAG 问答，**每句话带出处、查不到就拒答**；流式输出；语音提问 / 朗读 |
-| **实战任务** | **10 关**、10 只 3D 漏洞怪兽（权限缺失、整数溢出、重入、tx.origin、坏随机数、delegatecall、未检查返回值、拒绝服务、时间戳依赖、签名重放），两回合对战（锁定弱点 → 修补漏洞），倒计时、提示换星、怪兽反击、勋章；**AI 举一反三出变种题**（规则扫描器自动验题）；**亲手修复**模式：直接改代码，由后端校验 |
-| **AI 审计** | **审计 Agent** 自己规划步骤、调用规则扫描 / SWC 漏洞库 / 教材检索，过程可视化；**截图识别代码**；审计记录（同一合约不重复记录） |
-| **情报站** | 好友、私聊群聊（传文件、粘贴截图）、好友圈、公共广场（图文 / 视频）、情报收集文件夹 |
-| **案件档案** | 笔记自动保存、一键发布讨论；错题本（重做模式，同一道题只记一次并记录错误次数） |
-| **管理后台** | 用户管理、登录记录、问答日志（可筛选拒答）、反馈处理 |
+| **登录注册** | 系统分配 6 位数字账号；注册时选择学生 / 老师身份，可选填手机号；支持账号或手机号 + 密码登录 |
+| **大厅** | 3D 动态背景（三种可切换），八个入口；手机上自动改为两列布局 |
+| **学习中心** | 五条路线：① 区块链基础（7 章，自编）② 联盟链 FISCO BCOS 实战（自编）③ 智能合约开发 ④ 智能合约安全（③④ 来自开源教程 WTF-Solidity）⑤ 区块链应用与前沿（自编：电子存证、供应链金融）。每章标注知识点；选中文字问 AI / 存笔记；AI 生成本章思维导图；读完触发「防御战」小测；带合约代码的章节可一键在练习场打开 |
+| **白帽导师** | RAG 问答，流式输出，引用可展开核对原文；语音提问 / 朗读 |
+| **实战任务** | ① **漏洞猎人**：10 关、10 只 3D 漏洞怪兽（权限缺失、整数溢出、重入、tx.origin、坏随机数、delegatecall、未检查返回值、拒绝服务、时间戳依赖、签名重放），锁定弱点 → 选对修法，星级与勋章 ② **链上实验场** ③ **合约练习场** |
+| **AI 审计** | 审计 Agent 自主调用规则扫描、SWC 漏洞库、教材检索，过程可视化；截图识别代码；审计记录按代码指纹去重 |
+| **我的班级** | 老师：建班（6 位班级码）、布置任务、批阅、上传资料、视频会议链接、学情统计；学生：加入班级、查看任务和完成情况 |
+| **学习报告** | 按知识点统计掌握度（教材防御战、实战关卡、链上实验、错题），推荐下一步学什么，AI 生成学习建议 |
+| **案件档案** | 三栏：情报收藏（点赞 / 收藏的帖子和视频）、我的笔记（可引用收藏内容、发布到广场或分享给好友）、错题本（重做模式） |
+| **情报站** | 学术论坛（按话题分类，可匿名发帖和评论，发言不计入学习统计）、私聊与讨论组（传文件、粘贴截图）、好友 |
+| **管理后台** | 用户管理、登录记录、问答日志（可筛选拒答）、反馈处理（含教材纠错） |
 | **MCP 服务** | 把审计工具开放给 Claude、Cursor 等 AI 编程助手（见 `docs/MCP使用说明.md`） |
 
-> 📄 详细设计见 [`docs/技术文档.md`](docs/技术文档.md)；RAG 效果评测见 `eval/`（准确度 97 vs 85，超纲题拒答 100% vs 30%）。
+> 📄 详细设计见 [`docs/技术文档.md`](docs/技术文档.md)；RAG 效果评测见 [`docs/评测报告.md`](docs/评测报告.md) 和 `eval/`。
+
 ---
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|---|
-| 前端 | **Vue 3**（`<script setup lang="ts">` 组合式 API）、**TypeScript**（严格模式）、**Vue Router**（路由懒加载）、**Pinia**、Vite |
-| 后端 | **Node.js**（原生 `http` 模块，无框架） |
-| 数据库 | **SQLite**（Node 内置 `node:sqlite`，无需安装数据库服务） |
-| AI | 智谱 AI：`glm-4-flash`（问答、审计 Agent、出题、思维导图）、`glm-4v-flash`（截图识别代码）、`embedding-3`（文本向量化） |
-| 3D 与多媒体 | three.js（3D 背景、AI 导师、漏洞怪兽）、Web Speech（语音提问 / 朗读） |
-| 其他 | marked（Markdown 渲染）、markmap（思维导图）、MCP 协议（开放审计工具） |
+| 前端 | Vue 3（`<script setup lang="ts">`）、TypeScript、Vue Router（懒加载）、Pinia、Vite |
+| 后端 | Node.js 原生 `http` 模块（无 Web 框架） |
+| 数据库 | SQLite（Node 内置 `node:sqlite`），28 张表 |
+| AI | 智谱 AI：`glm-4-flash`（问答、审计 Agent、出题、思维导图、学习建议）、`glm-4v-flash`（截图识别代码）、`embedding-3`（向量化） |
+| 区块链 | FISCO BCOS v2.11.0（4 节点）、WeBASE-Front v1.5.5、Solidity 编译器 solc 0.6.10 / 0.8.38、OpenZeppelin Contracts 5.0.2 |
+| 部署 | 腾讯云轻量服务器（Ubuntu 22.04，2 核 4G）、systemd、nginx 反向代理 |
+| 其他 | three.js（3D）、Web Speech（语音）、marked、markmap、MCP 协议 |
 
 ---
 
-## 快速开始
+## 快速开始（本地运行）
 
 ### 1. 环境要求
 
-- **Node.js 22.5 及以上**（用到了内置的 `node:sqlite`）
-- 一个智谱 AI 的 API Key：<https://open.bigmodel.cn>
+- **Node.js 22.5 及以上**（用到内置 `node:sqlite`）
+- 智谱 AI 的 API Key：<https://open.bigmodel.cn>
+- （可选）FISCO BCOS + WeBASE-Front：不配置也能运行，只是链上实验场和合约练习场不可用
 
-### 2. 准备教材
+### 2. 安装依赖
 
-把 [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity) 下载到 `knowledge/WTF-Solidity/`：
+```bash
+npm install            # 后端：solc 编译器、OpenZeppelin（见 package.json）
+cd web && npm install  # 前端
+```
+
+### 3. 准备教材
 
 ```bash
 git clone https://github.com/AmazingAng/WTF-Solidity.git knowledge/WTF-Solidity
 ```
 
-预备营的参考资料（可选，让白帽导师也能回答区块链基础问题）：
+自编教材（`prep/`、`fisco/`、`frontier/`）已在仓库中。`knowledge/` 不上传仓库（开源语料，体积大）。
 
-- ethereum.org 中文文档：<https://github.com/ethereum/ethereum-org-website>（`public/content/translations/zh/developers/docs/` 下的相关章节）
-- FISCO BCOS 官方文档：<https://github.com/FISCO-BCOS/FISCO-BCOS-DOC>（`3.x/zh_CN/docs/` 下的相关章节）
+### 4. 配置环境
 
-整理成 Markdown 后分别放到 `knowledge/ethereum-org/` 和 `knowledge/FISCO-BCOS-DOC/`。不放也能正常运行，只是白帽导师回答区块链基础问题时依据会少一些。
+复制 `.env.example` 为 `.env`，按注释填写（`.env` 已加入 `.gitignore`）：
 
-### 3. 配置环境
+| 变量 | 说明 |
+|---|---|
+| `ZHIPU_API_KEY` | 必填，智谱 AI 的 API Key |
+| `ADMIN_ACCOUNT` | 必填，先注册一个账号，把 6 位账号填在这里，重启后即为管理员 |
+| `WEBASE_URL` | 可选，WeBASE-Front 地址，如 `http://127.0.0.1:5002/WeBASE-Front`；不填则关闭链上功能 |
+| `PORT`、`SMS_MODE` | 可选，见 `.env.example` |
 
-复制 `.env.example` 为 `.env`，按文件里的注释填写（`.env` 已加入 `.gitignore`，不会被上传）：
-
-- `ZHIPU_API_KEY`（必填）：智谱 AI 的 API Key
-- `ADMIN_ACCOUNT`（必填）：先在网页上注册一个账号，把系统分配的 6 位数字账号填在这里，重启后端后它就是管理员
-- `PORT`、`SMS_MODE`（可选）：端口、验证码登录演示模式，说明见 `.env.example`
-
-依赖清单：
-
-- 后端：只使用 Node.js 内置模块，无第三方依赖，见根目录 `package.json`（要求 Node.js ≥ 22.5）
-- 前端：见 `web/package.json`，在 `web` 目录运行 `npm install` 安装
-
-### 4. 构建知识库（只需一次）
+### 5. 构建知识库（只需一次）
 
 ```bash
 node rag.mjs build
 ```
 
-把 `knowledge/` 里的教材和 `prep/` 预备营切成片段并向量化，生成 `vectors.json`。只会处理新增或变更的片段，不重复花钱；教材有变化时重新运行即可。
+把教材切片并向量化，生成 `vectors.json`；只处理新增或变更的片段。
 
-### 5. 启动（需要两个终端）
+### 6. 启动
 
 ```bash
-# 终端 ①：后端（项目根目录）
-node server.mjs
+# 开发：两个终端
+node server.mjs              # 后端，默认 3000 端口
+cd web && npm run dev        # 前端，http://localhost:5173
 
-# 终端 ②：前端
-cd web
-npm install
-npm run dev
+# 生产：前端打包后由后端直接提供
+cd web && npm run build && cd .. && node server.mjs
 ```
 
-浏览器打开 <http://localhost:5173>，注册账号即可使用。
+### 7. 搭建联盟链（可选）
+
+服务器上的部署步骤（搭链、WeBASE、systemd、nginx）见 [`docs/技术文档.md`](docs/技术文档.md) 的「部署」一节；搭链过程也写成了教材第 02 路线的章节。
 
 ---
 
@@ -102,108 +118,42 @@ npm run dev
 ```
 chainqa-app/
 ├── server.mjs        后端入口：按「请求方式 + 网址」分发请求
-├── rag.mjs           RAG：构建知识库、检索、流式生成回答
-├── chapters.mjs      教材目录、章节原文、插图
-├── mindmap.mjs       AI 生成思维导图（带文件缓存）
 ├── db.mjs            建库建表 + 表结构迁移
-├── auth.mjs          注册、登录、token 认证、个人资料、改密码
-├── data.mjs          笔记 / 错题 / 关卡进度的增删改查
-├── admin.mjs         管理后台的查询与操作
-├── agent.mjs         AI 审计 Agent（函数调用 + 兜底流程）
+├── auth.mjs          注册、登录、token、个人资料、改密码
+├── rag.mjs           RAG：切片、向量化、检索、流式回答
+├── chapters.mjs      五条路线的教材目录、章节原文、插图
+├── knowledge.mjs     知识点体系、章节 / 关卡 → 知识点映射、学习路线
+├── chain.mjs         FISCO BCOS 接入（WeBASE-Front HTTP 接口）：部署、交易、查询
+├── solidity.mjs      现场编译：按 pragma 选 solc 0.6.10 / 0.8.38，处理 import
+├── playground.mjs    合约练习场：编译、部署、调用、参数检查、限流
+├── lab.mjs           链上实验场：编译 → 逐项部署 → 攻击 → 判定，SSE 实时推送
+├── chainlab/         实验场题目（漏洞合约、攻击步骤、判定规则、提示、参考答案）
+├── classes.mjs       班级、任务、批阅、资料、视频会议
+├── report.mjs        学习报告、班级学情、AI 学习建议
+├── social.mjs        情报站：好友、聊天、学术论坛（匿名、话题）、收藏
+├── feedback.mjs      问答日志、意见反馈、教材纠错
+├── agent.mjs         AI 审计 Agent（函数调用）
 ├── scanner.mjs       规则扫描器 + SWC 漏洞库
-├── variant.mjs       AI 变种出题、扫描器验题、预热题库、亲手修复校验
-├── safety.mjs        AI 安全：注入检测、内容审核、私钥 / 助记词保护
-├── phone.mjs         手机号绑定与验证码登录
-├── audits.mjs        审计记录（代码指纹去重）
-├── social.mjs        情报站：好友、聊天、广场、收藏
 ├── quiz.mjs          防御战 AI 出题
-├── vision.mjs        截图识别代码
-├── bilibili-search.mjs 学习视频搜索代理
-├── mcp-server.mjs    MCP 服务
-├── docs/             参赛材料与技术文档：系统架构、技术文档、评测报告、比赛指南
+├── mindmap.mjs       AI 思维导图（文件缓存）
+├── safety.mjs        AI 安全：注入检测、内容审核、私钥 / 助记词保护
+├── data.mjs / admin.mjs / audits.mjs / phone.mjs / vision.mjs / mcp-server.mjs
+├── prep/ fisco/ frontier/   自编教材（每章 readme.md + 配套 .sol 合约）
+├── docs/             技术文档、系统架构、评测报告、测试记录、MCP 说明
 ├── eval/             RAG 效果评测
-└── web/src/
-    ├── main.ts       创建应用，装上 Pinia 和路由
-    ├── router.ts     路由表（懒加载）+ 路由守卫（未登录 → 登录页；非管理员 → 不能进后台）
-    ├── types.ts      前后端共用的数据类型：用户、关卡、笔记、审计结果……
-    ├── App.vue       页面框架、顶栏、AI 悬浮窗、转场
-    ├── views/        页面：登录、大厅、预备营 / 训练营（同一阅读页）、白帽导师、案件档案、实战任务、AI 审计、情报站、管理后台
-    ├── components/   组件：聊天面板、3D 导师 MentorBot、3D 怪兽、防御战、思维导图、勋章墙、视频面板、个人档案……
-    ├── stores/       Pinia：user、ai、notes、mistakes、game、theme
-    └── data/         10 个实战关卡数据
+└── web/src/          前端：views/ 页面、components/ 组件、stores/ Pinia、data/ 关卡与导航数据
 ```
 
 ---
 
-## 设计说明
+## 安全
 
-### 组件化
-
-- **页面与组件分离**：`views/` 里的每个页面对应一个路由；可复用的部分拆成 `components/`。例如 `ChatPanel` 同时用在右下角悬浮窗和白帽导师整页里。
-- **组件通信**：弹窗类组件用 `props` 接收数据、`emit('close')` 通知父组件关闭。
-- **数据与界面分离**：漏洞猎人的关卡写在 `data/levels.ts`，加新关卡不用改页面代码。
-- **类型安全**：前端全量 TypeScript 严格模式，核心数据模型统一定义在 `src/types.ts`；`npm run typecheck` 做类型检查。
-- **性能**：路由懒加载 + 第三方库拆包（three.js / 思维导图 / Vue 各自独立缓存），首屏 JS 从 494KB 降到约 60KB（gzip）。
-- **响应式**：手机（≤760px）上导航可横向滑动、各页面自动改为单列布局。
-
-### 状态管理（Pinia）
-
-| Store | 管什么 | 解决的问题 |
-|---|---|---|
-| `user` | 当前用户、token、带 token 的请求工具 `api()` | 所有页面共享登录状态；路由守卫据此判断能否进入页面 |
-| `ai` | AI 面板开关、待发送的问题 | 训练营「选中文字问 AI」时，训练营和聊天面板互不引用，靠 store 传话 |
-| `notes` / `mistakes` / `game` | 笔记、错题、关卡进度 | 作为数据库数据在前端的副本：修改时先更新界面，再异步保存 |
-| `theme` | 背景主题、战斗氛围 | 实战时背景随怪兽变色、受伤闪光，游戏页面不用关心背景怎么画 |
-
-页面只调用 store 的 `load / add / update` 等方法，不关心数据存在哪里。所以把存储从 localStorage 迁移到数据库时，页面几乎不用改。
-
-### AI 集成：RAG（检索增强生成）
-
-```
-用户提问
-  → embedding-3 把问题转成向量
-  → 与教材 900 多个片段计算余弦相似度，取最相关的 4 段
-  → 相似度都低于 0.45：直接拒答「知识库中未找到相关依据」（阈值由 eval/ 的对照评测确定）
-  → 把片段 + 问题 + 规则交给 glm-4-flash，要求只依据资料回答并标注 [1][2]
-  → 通过 SSE 流式推送到前端，逐字显示，并附上引用原文
-```
-
-**怎么防止 AI 胡说：** ① 提示词限定只能依据资料回答；② 相似度阈值过滤不相关资料，资料不足时拒答；③ 回答带引用编号，用户可以点开核对原文。
-
-**AI 的其他用法：** AI 审计 Agent（函数调用，自主调用规则扫描、SWC 漏洞库、教材检索）；AI 举一反三出变种关卡并由规则扫描器验题；防御战出题；截图识别代码；章节思维导图（生成一次后缓存）。
-
-### 数据库设计
-
-共 22 张表，按业务分为四组，用户与其余数据基本为一对多关系：
-
-| 分组 | 表 |
-|---|---|
-| 账号 | `users` 用户、`sessions` 登录凭证、`login_logs` 登录记录、`sms_codes` 验证码 |
-| 学习 | `notes` 笔记、`mistakes` 错题、`game_progress` 关卡进度、`camp_progress` 防御战记录、`audit_records` 审计记录，以及变种关卡题库 |
-| 社区 | 好友申请、好友、聊天室、成员、消息、文件、帖子、点赞、收藏、评论 |
-| 运营 | `qa_logs` 问答日志、`feedback` 用户反馈 |
-
-- 外键设置 `ON DELETE CASCADE`：删除用户时，其数据一并清除。
-- `game_progress` 用联合主键保证「一人一关一条记录」，保存成绩时用 `ON CONFLICT … DO UPDATE SET star = MAX(…)` 只保留最好成绩。
-- 去重设计：同一道错题只记一次并累计错误次数；审计记录按代码指纹去重。
-
-<!-- E-R 图：docs/er.png -->
-
-### 安全
-
-- **密钥只在后端**：API Key 放在 `.env`，不进前端代码，也不提交到 Git。
-- **密码加盐哈希**：使用 scrypt，数据库只存 `盐:哈希`，看不到原密码；改密码必须验证旧密码。
-- **防 SQL 注入**：所有 SQL 使用 `?` 参数占位符。
-- **数据隔离**：每条数据操作都带 `WHERE user_id = ?`，即使篡改请求里的 id，也改不到别人的数据。
-- **权限在后端校验**：管理员接口由后端检查角色，非管理员返回 403；前端隐藏入口只是为了体验。
-- **防路径穿越**：读取教材文件和插图的接口会检查路径，不能用 `../` 读到其他文件。
-
-### 用户体验
-
-- AI 回答流式输出，不用等整段生成完；审计 Agent 的每一步也实时显示。
-- 笔记输入防抖（停止输入 0.6 秒后才保存），减少请求次数。
-- AI 悬浮窗用 `v-show`，切换页面时聊天记录不丢失。
-- 登录状态保存在本地，刷新页面不掉线。
+- API Key 只在后端 `.env`，不进前端、不进仓库；数据库、上传文件也不进仓库
+- 密码 scrypt 加盐哈希；所有 SQL 参数化；每次数据操作都校验 `user_id`；管理员权限在后端校验
+- 读取教材和合约文件时检查路径，防止路径穿越；上传文件扩展名白名单
+- 链上操作：同一用户同时只能有一个写操作，部署和交易每分钟限 20 次；只读查询单独限流
+- AI 安全：提示词注入检测、内容审核、私钥 / 助记词防泄露
+- 节点以 127.0.0.1 组网，WeBASE 与节点端口不在防火墙开放；外网只能访问 80 端口的网站
 
 ---
 
@@ -213,29 +163,23 @@ chainqa-app/
 
 | 成员 | 分工 |
 |---|---|
-| 李思瑶 | 项目构思与产品设计、全部代码开发（前端、后端、AI 功能）、主题与背景设计、技术文档、图像设计 |
+| 李思瑶 | 项目构思与产品设计、前后端与 AI 功能开发、联盟链搭建与服务器部署、教材编写、界面设计、技术文档 |
 
 ---
 
-## 📝 原创性说明
+## 原创性说明
 
-本项目为原创作品，由李思瑶独立完成：
+本项目为原创作品，由李思瑶独立完成：产品与玩法设计、前后端代码、数据库设计、AI 功能（RAG 与拒答机制、审计 Agent、规则扫描器、AI 安全、MCP 服务、评测方案）、链上实验场与合约练习场、联盟链搭建与部署、自编教材（区块链基础 7 章、FISCO BCOS 时间戳、电子存证、供应链金融）及配套合约、10 个实战关卡的漏洞合约。
 
-1. 产品构思与设计：「预备营 → 训练营 → 实战任务 → AI 审计」学习路线、漏洞怪兽对战玩法、防御战、变种出题与亲手修复等机制。
-2. 全部前后端代码：Vue 3 + TypeScript 前端、Node.js 后端、数据库设计。
-3. AI 功能的设计与实现：RAG 问答与拒答机制、AI 审计 Agent、规则扫描器、AI 安全防护、MCP 服务、RAG 评测方案。
-4. 10 个实战关卡的漏洞合约、预备营 7 章导读、勋章图案与界面视觉设计。
-
-开发过程中使用了 AI 编程助手辅助编写代码与文档，并使用 AI 工具辅助生成部分图像素材（AI 导师 3D 形象、勋章图案），所有内容均经本人审核、修改与测试。使用的第三方资料与素材见下方「致谢与声明」。
+开发过程中使用了 AI 编程助手辅助编写代码与文档，并使用 AI 工具辅助生成部分图像素材（AI 导师 3D 形象、勋章图案），所有内容均经本人审核、修改与测试。
 
 ---
 
 ## 致谢与声明
 
-1. 教材：开源项目 [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity)，版权归原作者所有，本项目仅将其作为知识库数据来源。
-2. 预备营参考资料：预备营（`prep/`）为本项目编写的区块链基础导读，内容对照以下官方资料核实，每章末尾列出参考资料；这些资料也作为知识库数据来源放在 `knowledge/`（不上传仓库，获取方式见「快速开始」）：
-   - [ethereum.org 中文文档](https://ethereum.org/zh/developers/docs/)（MIT 许可）
-   - [FISCO BCOS 官方文档](https://fisco-bcos-doc.readthedocs.io/zh-cn/latest/)，版权归 FISCO BCOS 开源社区所有
-3. AI 能力：[智谱 AI 开放平台](https://open.bigmodel.cn)。
-4. AI 导师 3D 形象：由腾讯混元 3D 生成。
-5. 实战任务 3D 怪兽模型：来自 Quaternius（CC0 授权）。
+1. 教材：开源项目 [WTF-Solidity](https://github.com/AmazingAng/WTF-Solidity)，版权归原作者所有，本项目仅作为知识库与学习内容来源。
+2. 自编教材的参考资料：ethereum.org 中文文档（MIT 许可）、[FISCO BCOS 官方文档](https://fisco-bcos-documentation.readthedocs.io/zh-cn/latest/)、Solidity 官方文档、最高人民法院与中国政府网公开文件，每章末尾列出出处。
+3. 区块链：[FISCO BCOS](https://github.com/FISCO-BCOS/FISCO-BCOS)、[WeBASE](https://github.com/WeBankBlockchain/WeBASE)（Apache-2.0）；[OpenZeppelin Contracts](https://github.com/OpenZeppelin/openzeppelin-contracts)（MIT）；[solc-js](https://github.com/ethereum/solc-js)（MIT）。
+4. AI 能力：[智谱 AI 开放平台](https://open.bigmodel.cn)。
+5. 字体：站酷庆科黄油体、Orbitron（均为 SIL OFL 1.1）。
+6. AI 导师 3D 形象由腾讯混元 3D 生成；实战任务 3D 怪兽模型来自 Quaternius（CC0）。
