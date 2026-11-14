@@ -25,16 +25,16 @@ MCP（Model Context Protocol，模型上下文协议）是 AI 工具的「通用
 }
 ```
 
-- Claude Desktop：设置 → 开发者 → 编辑配置（claude_desktop_config.json）
-- Cursor：设置 → MCP → Add new MCP server
+1. Claude Desktop：设置 → 开发者 → 编辑配置（claude_desktop_config.json）
+2. Cursor：设置 → MCP → Add new MCP server
 
 保存后重启 AI 助手，就能在对话里说「帮我用 scan_contract 审计这份合约：……」。
 
 ## 技术说明（答辩可讲）
-- 协议：JSON-RPC 2.0，通过标准输入 / 输出（stdio）通信，实现了 `initialize`、`tools/list`、`tools/call`、`ping`。
-- 没有用任何第三方库，按 MCP 规范手写，代码约 120 行，注释齐全。
-- 与网站共用同一套工具代码（`scanner.mjs`、`rag.mjs`），一处改进，两边同时生效。
-- 工具出错时按协议返回 `isError`，AI 助手能看到失败原因；没配 API Key 时只有检索工具不可用，另外两个照常工作。
+1. 协议：JSON-RPC 2.0，通过标准输入 / 输出（stdio）通信，实现了 `initialize`、`tools/list`、`tools/call`、`ping`。
+2. 没有用任何第三方库，按 MCP 规范手写，代码约 120 行，注释齐全。
+3. 与网站共用同一套工具代码（`scanner.mjs`、`rag.mjs`），一处改进，两边同时生效。
+4. 工具出错时按协议返回 `isError`，AI 助手能看到失败原因；没配 API Key 时只有检索工具不可用，另外两个照常工作。
 
 ## 自己测试
 ```bash
